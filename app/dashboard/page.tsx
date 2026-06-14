@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { PageHeader, Panel } from "@/components/ui";
+import { PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccounts, loadPosts } from "@/lib/storage";
 import { InstagramAccount, InstagramPost, PostType } from "@/lib/types";
 import { average, byDateAsc, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
@@ -37,6 +37,12 @@ export default function DashboardPage() {
       weekdayData,
       saveRank: [...targetPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
       likeRank: [...targetPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
+      totalViews: targetPosts.reduce((sum, post) => sum + post.views, 0),
+      averageEngagementRate: average(targetPosts.map((post) => getMetrics(post).engagementRate)),
+      averageSaves: average(targetPosts.map((post) => post.saves)),
+      bestType: [...typeData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
+      bestWeekday: [...weekdayData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
+      mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
       count: targetPosts.length
     };
   }, [posts, accountId]);
@@ -54,6 +60,24 @@ export default function DashboardPage() {
         </select>
       </Panel>
       {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。登録ページからサンプルデータを追加できます。</p></Panel> : null}
+      {data.count ? (
+        <>
+          <div className="mb-6 grid gap-4 md:grid-cols-4">
+            <Stat label="対象投稿" value={`${data.count}件`} />
+            <Stat label="合計表示数" value={data.totalViews.toLocaleString()} />
+            <Stat label="平均ER" value={`${data.averageEngagementRate.toFixed(2)}%`} />
+            <Stat label="平均保存数" value={Math.round(data.averageSaves).toLocaleString()} />
+          </div>
+          <Panel className="mb-6">
+            <h2 className="font-semibold">読み取りポイント</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <Insight label="反応が良い投稿タイプ" value={data.bestType?.averageEngagementRate ? `${data.bestType.name} / ${data.bestType.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
+              <Insight label="反応が良い曜日" value={data.bestWeekday?.averageEngagementRate ? `${data.bestWeekday.name}曜日 / ${data.bestWeekday.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
+              <Insight label="保存されやすい投稿" value={data.mostSavedPost ? `${data.mostSavedPost.date} / ${data.mostSavedPost.saves.toLocaleString()}保存` : "データ不足"} />
+            </div>
+          </Panel>
+        </>
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-2">
         <ChartPanel title="日別表示数の推移">
           <LineChart data={data.dailyViews}>
@@ -111,6 +135,15 @@ export default function DashboardPage() {
           </BarChart>
         </ChartPanel>
       </div>
+    </div>
+  );
+}
+
+function Insight({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
+      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
+      <p className="mt-2 text-base font-bold text-ink">{value}</p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Database, FileUp, ListChecks, Sparkles, TrendingUp, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, Database, FileUp, ListChecks, Sparkles, TrendingUp, Users } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
 import { loadAccounts, loadPosts } from "@/lib/storage";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
@@ -22,6 +22,7 @@ export default function Home() {
     return {
       totalViews: posts.reduce((sum, post) => sum + post.views, 0),
       averageEngagementRate: average(posts.map((post) => getMetrics(post).engagementRate)),
+      screenshotCount: posts.filter((post) => Boolean(post.screenshot)).length,
       topPost,
       latest
     };
@@ -40,7 +41,7 @@ export default function Home() {
         <QuickStat label="合計表示数" value={summary.totalViews.toLocaleString()} tone="plum" />
         <QuickStat label="平均ER" value={formatPercent(summary.averageEngagementRate)} tone="sky" />
       </div>
-      <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_380px]">
         <Panel className="relative overflow-hidden">
           <div className="absolute right-0 top-0 h-full w-1 bg-clay" />
           <h2 className="flex items-center gap-2 font-semibold"><TrendingUp size={18} className="text-clay" />次に見るべきこと</h2>
@@ -61,10 +62,19 @@ export default function Home() {
           </div>
         </Panel>
         <Panel>
-          <h2 className="font-semibold">データ保全</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">ブラウザ保存のため、定期的なバックアップがおすすめです。設定ページからJSONで保存・復元できます。</p>
-          <div className="mt-4">
-            <ButtonLink href="/settings">バックアップ管理</ButtonLink>
+          <h2 className="flex items-center gap-2 font-semibold"><CheckCircle2 size={18} className="text-moss" />運用ステータス</h2>
+          <div className="mt-4 grid gap-3 text-sm">
+            <StatusRow label="アカウント登録" value={accounts.length ? `${accounts.length}件登録済み` : "未登録"} active={accounts.length > 0} />
+            <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件登録済み` : "未登録"} active={posts.length > 0} />
+            <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
+            <StatusRow label="AI接続" value="設定ページで確認" active />
+          </div>
+          <div className="mt-5 rounded-md border border-stone-200/80 bg-fog/80 p-3">
+            <p className="text-sm font-semibold">データ保全</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">ブラウザ保存のため、定期的なバックアップがおすすめです。</p>
+            <div className="mt-3">
+              <ButtonLink href="/settings">バックアップ管理</ButtonLink>
+            </div>
           </div>
         </Panel>
       </div>
@@ -90,6 +100,15 @@ export default function Home() {
           <p className="mt-2 text-sm leading-6 text-stone-600">OpenAI APIをサーバー側から呼び出し、投稿ごとの強み、弱み、改善案、ハッシュタグ、投稿スコアを出します。</p>
         </Panel>
       </div>
+    </div>
+  );
+}
+
+function StatusRow({ label, value, active }: { label: string; value: string; active: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-stone-200/80 bg-white/70 px-3 py-2">
+      <span className="font-medium text-stone-700">{label}</span>
+      <span className={`rounded-md px-2 py-1 text-xs font-semibold ${active ? "bg-skyglass text-ink" : "bg-stone-100 text-stone-500"}`}>{value}</span>
     </div>
   );
 }
