@@ -109,7 +109,7 @@ export default function PostsPage() {
                     <td>{formatPercent(metrics.engagementRate)}</td>
                     <td>{formatDateTime(post.createdAt)}</td>
                     <td>{formatDateTime(post.updatedAt ?? post.createdAt)}</td>
-                    <td><Link className="font-semibold text-clay hover:underline" href={`/posts/${post.id}`}>開く</Link></td>
+                    <td><Link className="font-semibold text-clay hover:underline" href={`/posts/detail?id=${post.id}`}>開く</Link></td>
                   </tr>
                 );
               })}

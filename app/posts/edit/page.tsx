@@ -1,21 +1,30 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import { loadAccounts, loadPosts, updatePost } from "@/lib/storage";
 import { InstagramAccount, InstagramPostInput, PostType } from "@/lib/types";
 
 export default function EditPostPage() {
-  const params = useParams<{ id: string }>();
+  return (
+    <Suspense fallback={<PageHeader title="投稿編集" description="投稿データを読み込んでいます。" />}>
+      <EditPostContent />
+    </Suspense>
+  );
+}
+
+function EditPostContent() {
+  const params = useSearchParams();
   const router = useRouter();
+  const id = params.get("id") ?? "";
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [form, setForm] = useState<InstagramPostInput | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     setAccounts(loadAccounts());
-    const post = loadPosts().find((item) => item.id === params.id);
+    const post = loadPosts().find((item) => item.id === id);
     if (!post) return;
     setForm({
       accountId: post.accountId,
@@ -34,7 +43,7 @@ export default function EditPostPage() {
       memo: post.memo,
       screenshot: post.screenshot
     });
-  }, [params.id]);
+  }, [id]);
 
   if (!form) {
     return <PageHeader title="投稿が見つかりません" description="一覧から投稿を選び直してください。" />;
@@ -54,9 +63,9 @@ export default function EditPostPage() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    updatePost(params.id, form);
+    updatePost(id, form);
     setMessage("投稿を更新しました。");
-    router.push(`/posts/${params.id}`);
+    router.push(`/posts/detail?id=${id}`);
   };
 
   return (
@@ -123,7 +132,7 @@ export default function EditPostPage() {
           </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button type="submit">変更を保存</Button>
-            <Button variant="secondary" onClick={() => router.push(`/posts/${params.id}`)}>キャンセル</Button>
+            <Button variant="secondary" onClick={() => router.push(`/posts/detail?id=${id}`)}>キャンセル</Button>
           </div>
         </form>
         {message ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}

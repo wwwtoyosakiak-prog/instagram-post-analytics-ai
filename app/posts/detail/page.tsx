@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { deletePost, loadAccounts, loadPosts } from "@/lib/storage";
 import { AiAnalysis, InstagramAccount, InstagramPost } from "@/lib/types";
@@ -10,8 +10,17 @@ import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
 export default function PostDetailPage() {
-  const params = useParams<{ id: string }>();
+  return (
+    <Suspense fallback={<PageHeader title="投稿詳細" description="投稿データを読み込んでいます。" />}>
+      <PostDetailContent />
+    </Suspense>
+  );
+}
+
+function PostDetailContent() {
+  const params = useSearchParams();
   const router = useRouter();
+  const id = params.get("id") ?? "";
   const [post, setPost] = useState<InstagramPost | null>(null);
   const [account, setAccount] = useState<InstagramAccount | null>(null);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
@@ -19,10 +28,10 @@ export default function PostDetailPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const foundPost = loadPosts().find((item) => item.id === params.id) ?? null;
+    const foundPost = loadPosts().find((item) => item.id === id) ?? null;
     setPost(foundPost);
     setAccount(loadAccounts().find((item) => item.id === foundPost?.accountId) ?? null);
-  }, [params.id]);
+  }, [id]);
 
   if (!post) {
     return <PageHeader title="投稿が見つかりません" description="一覧から投稿を選び直してください。" />;
@@ -42,8 +51,8 @@ export default function PostDetailPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "分析に失敗しました。");
       setAnalysis(data.analysis);
-    } catch (event) {
-      setError(event instanceof Error ? event.message : "分析に失敗しました。");
+    } catch {
+      setError("GitHub Pages公開版ではOpenAI API Routeは動きません。サンプル分析を使うか、Vercelで公開してください。");
     } finally {
       setLoading(false);
     }
@@ -81,7 +90,7 @@ export default function PostDetailPage() {
             <div><dt className="font-semibold">編集日時</dt><dd>{formatDateTime(post.updatedAt ?? post.createdAt)}</dd></div>
           </dl>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Link href={`/posts/${post.id}/edit`} className="inline-flex h-10 items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-ink hover:border-moss">
+            <Link href={`/posts/edit?id=${post.id}`} className="inline-flex h-10 items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-ink hover:border-moss">
               編集
             </Link>
             <Button variant="secondary" onClick={removePost}>削除</Button>
@@ -93,7 +102,7 @@ export default function PostDetailPage() {
             <Button variant="secondary" onClick={() => setAnalysis(createSampleAnalysis(post))}>サンプル分析</Button>
           </div>
           {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-          {analysis ? <AnalysisView analysis={analysis} /> : <p className="text-sm text-stone-600">APIキーがない場合はサンプル分析を使えます。</p>}
+          {analysis ? <AnalysisView analysis={analysis} /> : <p className="text-sm text-stone-600">GitHub Pages公開版ではサンプル分析が使えます。</p>}
         </Panel>
       </div>
     </div>
