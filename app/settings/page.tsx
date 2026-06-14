@@ -2,7 +2,6 @@
 
 import { ChangeEvent, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { pullPhpDataToLocal, pushLocalDataToPhp, testPhpBackend } from "@/lib/php-backend";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
 
 type TestResult = {
@@ -14,10 +13,8 @@ type TestResult = {
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
-  const [phpLoading, setPhpLoading] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
   const [dataMessage, setDataMessage] = useState("");
-  const [phpMessage, setPhpMessage] = useState("");
 
   const testOpenAi = async () => {
     setLoading(true);
@@ -73,48 +70,6 @@ export default function SettingsPage() {
     setDataMessage("ローカルデータを削除しました。");
   };
 
-  const runPhpTest = async () => {
-    setPhpLoading(true);
-    setPhpMessage("");
-    try {
-      const data = await testPhpBackend();
-      setPhpMessage(`PHP接続成功: ${data.phpVersion ? `PHP ${data.phpVersion}` : data.message ?? "起動中"}`);
-    } catch {
-      setPhpMessage("PHP接続失敗: php-backendを起動してから再度試してください。");
-    } finally {
-      setPhpLoading(false);
-    }
-  };
-
-  const saveToPhp = async () => {
-    setPhpLoading(true);
-    setPhpMessage("");
-    try {
-      const data = await pushLocalDataToPhp();
-      const accountCount = data.counts?.accounts ?? 0;
-      const postCount = data.counts?.posts ?? 0;
-      setPhpMessage(`PHPへ保存しました。アカウント${accountCount}件、投稿${postCount}件。`);
-    } catch {
-      setPhpMessage("PHPへの保存に失敗しました。PHPサーバーが起動しているか確認してください。");
-    } finally {
-      setPhpLoading(false);
-    }
-  };
-
-  const loadFromPhp = async () => {
-    if (!window.confirm("PHP側の保存データでブラウザ内データを上書きしますか？")) return;
-    setPhpLoading(true);
-    setPhpMessage("");
-    try {
-      const backup = await pullPhpDataToLocal();
-      setPhpMessage(`PHPから復元しました。アカウント${backup.accounts.length}件、投稿${backup.posts.length}件。画面を再読み込みしてください。`);
-    } catch {
-      setPhpMessage("PHPからの復元に失敗しました。PHPサーバーが起動しているか確認してください。");
-    } finally {
-      setPhpLoading(false);
-    }
-  };
-
   return (
     <div>
       <PageHeader title="設定" description="OpenAI APIキーの設定状態と接続を確認できます。" />
@@ -162,22 +117,6 @@ OPENAI_MODEL=gpt-4.1-mini`}</pre>
           <Button variant="secondary" onClick={resetData}>全データ削除</Button>
         </div>
         {dataMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{dataMessage}</p> : null}
-      </Panel>
-      <Panel className="mt-6">
-        <h2 className="font-semibold">PHPバックエンド連携</h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          PHPサーバーを起動すると、登録データをPHP側のJSONファイルへ保存・復元できます。将来、MySQLやPostgreSQLへ移行するための入口として使えます。
-        </p>
-        <pre className="mt-3 overflow-auto rounded-md bg-stone-100 p-3 text-xs">{`cd php-backend
-php -S 127.0.0.1:8080 router.php`}</pre>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={runPhpTest} disabled={phpLoading}>
-            {phpLoading ? "確認中..." : "PHP接続をテスト"}
-          </Button>
-          <Button onClick={saveToPhp} disabled={phpLoading}>PHPへ保存</Button>
-          <Button variant="secondary" onClick={loadFromPhp} disabled={phpLoading}>PHPから復元</Button>
-        </div>
-        {phpMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{phpMessage}</p> : null}
       </Panel>
     </div>
   );
