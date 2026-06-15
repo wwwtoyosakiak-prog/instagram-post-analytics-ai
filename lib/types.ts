@@ -88,3 +88,22 @@ export type MonthlyReportRecord = MonthlyReport & {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ImprovementTaskStatus = "todo" | "doing" | "done";
+
+export type ImprovementTaskInput = {
+  postId?: string;
+  analysisId?: string;
+  title: string;
+  status: ImprovementTaskStatus;
+  assignee: string;
+  dueDate: string;
+  memo: string;
+};
+
+export type ImprovementTask = ImprovementTaskInput & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+};

@@ -2,8 +2,8 @@
 
 import { ChangeEvent, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, pushLocalBackupToServer } from "@/lib/cloud-storage";
-import { exportAccountsCsv, exportAnalysesCsv, exportMonthlyReportsCsv, exportPostsCsv } from "@/lib/csv";
+import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, loadTasksData, pushLocalBackupToServer } from "@/lib/cloud-storage";
+import { exportAccountsCsv, exportAnalysesCsv, exportMonthlyReportsCsv, exportPostsCsv, exportTasksCsv } from "@/lib/csv";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
 
 type TestResult = {
@@ -90,7 +90,7 @@ export default function SettingsPage() {
     setDataMessage("");
     try {
       const exportedAt = new Date().toISOString().slice(0, 10);
-      const [accounts, posts, reports] = await Promise.all([loadAccountsData(), loadPostsData(), loadMonthlyReportsData()]);
+      const [accounts, posts, reports, tasks] = await Promise.all([loadAccountsData(), loadPostsData(), loadMonthlyReportsData(), loadTasksData()]);
       const analyses = (await Promise.all(posts.map((post) => loadAnalysesData(post.id)))).flat();
       const accountNameById = Object.fromEntries(accounts.map((account) => [account.id, account.name]));
       const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
@@ -99,7 +99,8 @@ export default function SettingsPage() {
       downloadCsv(exportPostsCsv(posts, accountNameById), `instagram-ai-posts-${exportedAt}.csv`);
       downloadCsv(exportAnalysesCsv(analyses, postById), `instagram-ai-analyses-${exportedAt}.csv`);
       downloadCsv(exportMonthlyReportsCsv(reports), `instagram-ai-monthly-reports-${exportedAt}.csv`);
-      setDataMessage(`CSVを書き出しました。アカウント${accounts.length}件、投稿${posts.length}件、AI分析${analyses.length}件、月次レポート${reports.length}件。`);
+      downloadCsv(exportTasksCsv(tasks, postById), `instagram-ai-tasks-${exportedAt}.csv`);
+      setDataMessage(`CSVを書き出しました。アカウント${accounts.length}件、投稿${posts.length}件、AI分析${analyses.length}件、月次レポート${reports.length}件、改善タスク${tasks.length}件。`);
     } catch {
       setDataMessage("CSVを書き出せませんでした。サーバー保存の設定や通信状態を確認してください。");
     } finally {
@@ -122,7 +123,7 @@ export default function SettingsPage() {
     setServerLoading(true);
     try {
       const result = await pushLocalBackupToServer();
-      setServerMessage(`サーバーへ移行しました。アカウント${result.accounts}件、投稿${result.posts}件。`);
+      setServerMessage(`サーバーへ移行しました。アカウント${result.accounts}件、投稿${result.posts}件、改善タスク${result.tasks}件。`);
     } catch {
       setServerMessage("サーバーへの移行に失敗しました。Supabase環境変数とテーブル設定を確認してください。");
     } finally {
@@ -166,7 +167,7 @@ OPENAI_MODEL=gpt-4.1-mini`}</pre>
       <Panel className="mt-6">
         <h2 className="font-semibold">データ管理</h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          アカウントと投稿データをJSONでバックアップできます。CSV出力では、アカウント、投稿、AI分析結果、月次レポートを社内共有しやすい形式で書き出せます。
+          アカウントと投稿データをJSONでバックアップできます。CSV出力では、アカウント、投稿、AI分析結果、月次レポート、改善タスクを社内共有しやすい形式で書き出せます。
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={downloadBackup}>バックアップを書き出す</Button>

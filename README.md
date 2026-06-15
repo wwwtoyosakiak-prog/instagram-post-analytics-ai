@@ -69,6 +69,7 @@ supabase/schema.sql
 - `instagram_posts`
 - `instagram_post_analyses`
 - `instagram_monthly_reports`
+- `instagram_improvement_tasks`
 
 すでに過去版のSQLを実行済みで、AI分析履歴テーブルだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
 
@@ -80,6 +81,12 @@ supabase/add-analysis-history.sql
 
 ```text
 supabase/add-monthly-reports.sql
+```
+
+改善タスク管理テーブルだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
+
+```text
+supabase/add-improvement-tasks.sql
 ```
 
 すでに過去版の投稿テーブルを作成済みで、投稿カテゴリだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
@@ -124,8 +131,9 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 - 投稿CSV
 - AI分析結果CSV
 - 月次レポートCSV
+- 改善タスクCSV
 
-CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結果と月次レポートは、Supabase保存が有効な場合に保存済みデータを取得して出力します。
+CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結果、月次レポート、改善タスクは、Supabase保存が有効な場合に保存済みデータを取得して出力します。
 
 ## 将来のAPI・データベース連携
 
@@ -217,9 +225,20 @@ ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量
 - 投稿一覧ページ
 - 投稿カレンダーページ
 - 投稿詳細・AI分析ページ
+- 改善タスク管理ページ
 - ダッシュボードページ
 - レポートページ
 - 設定ページ
+
+## 改善タスク管理
+
+投稿詳細・AI分析ページの「改善案をタスク化」から、AI分析の改善案をタスクとして保存できます。タスクページでは、状態・担当者・期限・メモを編集できます。
+
+- 状態: 対応前、対応中、完了
+- 担当者
+- 期限
+- メモ
+- 投稿との紐づけ
 
 ## 投稿カレンダー
 

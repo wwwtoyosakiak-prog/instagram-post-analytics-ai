@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyReport, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyReport, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -70,6 +70,20 @@ type MonthlyReportRow = {
   needs_work_posts: InstagramPost[];
   summary: string;
   next_month_policy: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+type TaskRow = {
+  id: string;
+  post_id: string | null;
+  analysis_id: string | null;
+  title: string;
+  status: ImprovementTaskStatus;
+  assignee: string | null;
+  due_date: string | null;
+  memo: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -249,6 +263,35 @@ function monthlyReportToRow(report: MonthlyReport, accountId: string | null, acc
   };
 }
 
+function mapTask(row: TaskRow): ImprovementTask {
+  return {
+    id: row.id,
+    postId: row.post_id ?? undefined,
+    analysisId: row.analysis_id ?? undefined,
+    title: row.title,
+    status: row.status,
+    assignee: row.assignee ?? "",
+    dueDate: row.due_date ?? "",
+    memo: row.memo ?? "",
+    completedAt: row.completed_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function taskToRow(input: ImprovementTaskInput) {
+  return {
+    post_id: input.postId || null,
+    analysis_id: input.analysisId || null,
+    title: input.title,
+    status: input.status,
+    assignee: input.assignee,
+    due_date: input.dueDate || null,
+    memo: input.memo,
+    completed_at: input.status === "done" ? new Date().toISOString() : null
+  };
+}
+
 export async function listAccountsFromSupabase() {
   const rows = await supabaseRequest<AccountRow[]>("instagram_accounts?select=*&order=created_at.desc");
   return rows.map(mapAccount);
@@ -363,4 +406,49 @@ export async function createMonthlyReportInSupabase(report: MonthlyReport, accou
     body: JSON.stringify(monthlyReportToRow(report, accountId, accountName))
   });
   return mapMonthlyReport(rows[0]);
+}
+
+export async function listTasksFromSupabase(postId?: string | null) {
+  const filters = ["select=*", "order=updated_at.desc"];
+  if (postId) filters.push(`post_id=eq.${encodeURIComponent(postId)}`);
+  const rows = await supabaseRequest<TaskRow[]>(`instagram_improvement_tasks?${filters.join("&")}`);
+  return rows.map(mapTask);
+}
+
+export async function createTaskInSupabase(input: ImprovementTaskInput) {
+  const rows = await supabaseRequest<TaskRow[]>("instagram_improvement_tasks", {
+    method: "POST",
+    body: JSON.stringify(taskToRow(input))
+  });
+  return mapTask(rows[0]);
+}
+
+export async function updateTaskInSupabase(id: string, input: ImprovementTaskInput) {
+  const rows = await supabaseRequest<TaskRow[]>(`instagram_improvement_tasks?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(taskToRow(input))
+  });
+  return rows[0] ? mapTask(rows[0]) : null;
+}
+
+export async function deleteTaskFromSupabase(id: string) {
+  await supabaseRequest<void>(`instagram_improvement_tasks?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function upsertTasksInSupabase(tasks: ImprovementTask[]) {
+  const rows = tasks.map((task) => ({
+    id: task.id,
+    ...taskToRow(task),
+    completed_at: task.completedAt ?? (task.status === "done" ? new Date().toISOString() : null),
+    created_at: task.createdAt,
+    updated_at: task.updatedAt
+  }));
+  const result = await supabaseRequest<TaskRow[]>("instagram_improvement_tasks?on_conflict=id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify(rows)
+  });
+  return result.map(mapTask);
 }

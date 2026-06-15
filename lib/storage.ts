@@ -1,15 +1,17 @@
 "use client";
 
-import { InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput } from "@/lib/types";
+import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput } from "@/lib/types";
 
 const POSTS_STORAGE_KEY = "instagram-ai-posts-v1";
 const ACCOUNTS_STORAGE_KEY = "instagram-ai-accounts-v1";
+const TASKS_STORAGE_KEY = "instagram-ai-tasks-v1";
 
 export type LocalBackup = {
   exportedAt: string;
   version: 1;
   accounts: InstagramAccount[];
   posts: InstagramPost[];
+  tasks?: ImprovementTask[];
 };
 
 export function loadPosts(): InstagramPost[] {
@@ -57,23 +59,80 @@ export function deletePost(id: string) {
   savePosts(loadPosts().filter((post) => post.id !== id));
 }
 
+export function loadTasks(): ImprovementTask[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(TASKS_STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as ImprovementTask[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveTasks(tasks: ImprovementTask[]) {
+  window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+}
+
+export function addTask(input: ImprovementTaskInput) {
+  const now = new Date().toISOString();
+  const task: ImprovementTask = {
+    ...input,
+    id: crypto.randomUUID(),
+    completedAt: input.status === "done" ? now : undefined,
+    createdAt: now,
+    updatedAt: now
+  };
+  saveTasks([task, ...loadTasks()]);
+  return task;
+}
+
+export function updateTask(id: string, input: ImprovementTaskInput) {
+  const tasks = loadTasks();
+  const now = new Date().toISOString();
+  const updated = tasks.map((task) => {
+    if (task.id !== id) return task;
+    return {
+      ...task,
+      ...input,
+      completedAt: input.status === "done" ? task.completedAt ?? now : undefined,
+      updatedAt: now
+    };
+  });
+  saveTasks(updated);
+  return updated.find((task) => task.id === id) ?? null;
+}
+
+export function deleteTask(id: string) {
+  saveTasks(loadTasks().filter((task) => task.id !== id));
+}
+
+export function upsertManyTasks(nextTasks: ImprovementTask[]) {
+  const current = loadTasks();
+  const ids = new Set(current.map((task) => task.id));
+  saveTasks([...nextTasks.filter((task) => !ids.has(task.id)), ...current]);
+}
+
 export function exportLocalBackup(): LocalBackup {
   return {
     exportedAt: new Date().toISOString(),
     version: 1,
     accounts: loadAccounts(),
-    posts: loadPosts()
+    posts: loadPosts(),
+    tasks: loadTasks()
   };
 }
 
 export function importLocalBackup(backup: LocalBackup) {
   saveAccounts(Array.isArray(backup.accounts) ? backup.accounts : []);
   savePosts(Array.isArray(backup.posts) ? backup.posts : []);
+  saveTasks(Array.isArray(backup.tasks) ? backup.tasks : []);
 }
 
 export function clearLocalData() {
   saveAccounts([]);
   savePosts([]);
+  saveTasks([]);
 }
 
 export function loadAccounts(): InstagramAccount[] {

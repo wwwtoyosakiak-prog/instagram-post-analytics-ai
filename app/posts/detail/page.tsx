@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { deletePostData, loadAccountsData, loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
-import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramPost } from "@/lib/types";
+import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postCategoryLabels, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
@@ -26,18 +26,20 @@ function PostDetailContent() {
   const [account, setAccount] = useState<InstagramAccount | null>(null);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
+  const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingAnalysis, setSavingAnalysis] = useState(false);
   const [error, setError] = useState("");
   const [analysisMessage, setAnalysisMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id)]).then(([posts, accounts, analyses]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id)]).then(([posts, accounts, analyses, loadedTasks]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
       setAccount(accounts.find((item) => item.id === foundPost?.accountId) ?? null);
       setAnalysisHistory(analyses);
       setAnalysis(analyses[0] ?? null);
+      setTasks(loadedTasks);
     });
   }, [id]);
 
@@ -97,6 +99,21 @@ function PostDetailContent() {
     router.push("/posts");
   };
 
+  const createTaskFromImprovement = async (title: string) => {
+    const analysisId = analysis && "id" in analysis ? (analysis as AiAnalysisRecord).id : undefined;
+    const saved = await addTaskData({
+      postId: post.id,
+      analysisId,
+      title,
+      status: "todo",
+      assignee: "",
+      dueDate: "",
+      memo: "AI分析の改善案から作成"
+    });
+    setTasks((current) => [saved, ...current]);
+    setAnalysisMessage("改善タスクを作成しました。");
+  };
+
   return (
     <div>
       <PageHeader title="投稿詳細・AI分析" description="投稿内容、画像、数値をもとに改善案を確認します。" />
@@ -137,7 +154,12 @@ function PostDetailContent() {
           </div>
           {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           {analysisMessage ? <p className="mb-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{analysisMessage}</p> : null}
-          {analysis ? <AnalysisView analysis={analysis} /> : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
+          {analysis ? (
+            <>
+              <AnalysisView analysis={analysis} />
+              <TaskCreator analysis={analysis} tasks={tasks} onCreate={createTaskFromImprovement} />
+            </>
+          ) : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
           <AnalysisComparison analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
         </Panel>
       </div>
@@ -182,6 +204,34 @@ function AnalysisView({ analysis }: { analysis: AiAnalysis }) {
       <List title="おすすめ投稿案" items={analysis.nextIdeas} />
       <List title="おすすめハッシュタグ" items={analysis.hashtags} />
     </div>
+  );
+}
+
+function TaskCreator({ analysis, tasks, onCreate }: { analysis: AiAnalysis; tasks: ImprovementTask[]; onCreate: (title: string) => void }) {
+  const existingTitles = new Set(tasks.map((task) => task.title));
+  return (
+    <section className="mt-6 rounded-md border border-stone-200 bg-white/82 p-4">
+      <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="font-semibold">改善案をタスク化</h2>
+          <p className="mt-1 text-sm text-stone-600">対応したい改善案をタスクとして保存できます。</p>
+        </div>
+        <Link href="/tasks" className="text-sm font-semibold text-clay hover:underline">タスク一覧を開く</Link>
+      </div>
+      <div className="mt-4 grid gap-2">
+        {analysis.improvements.map((item) => {
+          const exists = existingTitles.has(item);
+          return (
+            <div key={item} className="flex flex-col gap-2 rounded-md bg-fog p-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm leading-6 text-ink">{item}</p>
+              <Button variant={exists ? "secondary" : "primary"} onClick={() => onCreate(item)} disabled={exists}>
+                {exists ? "作成済み" : "タスク作成"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
