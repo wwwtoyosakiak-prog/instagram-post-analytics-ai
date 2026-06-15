@@ -118,6 +118,15 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 設定ページの「データ管理」から、登録済みアカウントと投稿データをJSONで書き出し・復元できます。localStorage運用中は、運用前後に定期的にバックアップしてください。
 
+設定ページの「CSVをまとめて書き出す」から、以下のCSVを出力できます。
+
+- アカウントCSV
+- 投稿CSV
+- AI分析結果CSV
+- 月次レポートCSV
+
+CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結果と月次レポートは、Supabase保存が有効な場合に保存済みデータを取得して出力します。
+
 ## 将来のAPI・データベース連携
 
 現在の登録データは、Supabase設定済みの場合はサーバー側、未設定の場合はブラウザのlocalStorageに保存します。将来的に外部APIや別データベースへ移行する場合は、`lib/cloud-storage.ts` と `lib/supabase-admin.ts` を差し替えます。差し替え時の契約は `lib/data-repository.ts` に型として整理しています。

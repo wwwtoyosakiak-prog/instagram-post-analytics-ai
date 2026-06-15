@@ -2,7 +2,8 @@
 
 import { ChangeEvent, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, pushLocalBackupToServer } from "@/lib/cloud-storage";
+import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, pushLocalBackupToServer } from "@/lib/cloud-storage";
+import { exportAccountsCsv, exportAnalysesCsv, exportMonthlyReportsCsv, exportPostsCsv } from "@/lib/csv";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
 
 type TestResult = {
@@ -18,6 +19,7 @@ export default function SettingsPage() {
   const [result, setResult] = useState<TestResult | null>(null);
   const [dataMessage, setDataMessage] = useState("");
   const [serverMessage, setServerMessage] = useState("");
+  const [csvLoading, setCsvLoading] = useState(false);
 
   const testOpenAi = async () => {
     setLoading(true);
@@ -71,6 +73,38 @@ export default function SettingsPage() {
     if (!window.confirm("登録済みのアカウントと投稿をすべて削除しますか？この操作は元に戻せません。")) return;
     clearLocalData();
     setDataMessage("ローカルデータを削除しました。");
+  };
+
+  const downloadCsv = (csv: string, filename: string) => {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCsvFiles = async () => {
+    setCsvLoading(true);
+    setDataMessage("");
+    try {
+      const exportedAt = new Date().toISOString().slice(0, 10);
+      const [accounts, posts, reports] = await Promise.all([loadAccountsData(), loadPostsData(), loadMonthlyReportsData()]);
+      const analyses = (await Promise.all(posts.map((post) => loadAnalysesData(post.id)))).flat();
+      const accountNameById = Object.fromEntries(accounts.map((account) => [account.id, account.name]));
+      const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
+
+      downloadCsv(exportAccountsCsv(accounts), `instagram-ai-accounts-${exportedAt}.csv`);
+      downloadCsv(exportPostsCsv(posts, accountNameById), `instagram-ai-posts-${exportedAt}.csv`);
+      downloadCsv(exportAnalysesCsv(analyses, postById), `instagram-ai-analyses-${exportedAt}.csv`);
+      downloadCsv(exportMonthlyReportsCsv(reports), `instagram-ai-monthly-reports-${exportedAt}.csv`);
+      setDataMessage(`CSVを書き出しました。アカウント${accounts.length}件、投稿${posts.length}件、AI分析${analyses.length}件、月次レポート${reports.length}件。`);
+    } catch {
+      setDataMessage("CSVを書き出せませんでした。サーバー保存の設定や通信状態を確認してください。");
+    } finally {
+      setCsvLoading(false);
+    }
   };
 
   const checkServerStorage = async () => {
@@ -132,10 +166,11 @@ OPENAI_MODEL=gpt-4.1-mini`}</pre>
       <Panel className="mt-6">
         <h2 className="font-semibold">データ管理</h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          アカウントと投稿データをJSONでバックアップできます。ブラウザ保存のため、定期的に書き出してください。
+          アカウントと投稿データをJSONでバックアップできます。CSV出力では、アカウント、投稿、AI分析結果、月次レポートを社内共有しやすい形式で書き出せます。
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={downloadBackup}>バックアップを書き出す</Button>
+          <Button variant="secondary" onClick={exportCsvFiles} disabled={csvLoading}>{csvLoading ? "CSV出力中..." : "CSVをまとめて書き出す"}</Button>
           <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-ink hover:border-moss">
             バックアップを復元
             <input className="hidden" type="file" accept="application/json,.json" onChange={restoreBackup} />

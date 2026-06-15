@@ -1,4 +1,5 @@
-import { InstagramPost, PostCategory, PostType } from "@/lib/types";
+import { AiAnalysisRecord, InstagramAccount, InstagramPost, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
+import { getMetrics, postCategoryLabels, postTypeLabels } from "@/lib/metrics";
 
 const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "category", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
 
@@ -63,3 +64,175 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
 
 export const csvTemplate = `${headers.join(",")}
 ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,product,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"`;
+
+function escapeCsv(value: unknown) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function createCsv(rows: unknown[][]) {
+  return `\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}`;
+}
+
+export function exportAccountsCsv(accounts: InstagramAccount[]) {
+  return createCsv([
+    ["id", "accountName", "username", "profileUrl", "industry", "targetAudience", "goal", "memo", "createdAt", "updatedAt"],
+    ...accounts.map((account) => [
+      account.id,
+      account.name,
+      account.username,
+      account.profileUrl,
+      account.industry,
+      account.targetAudience,
+      account.goal,
+      account.memo,
+      account.createdAt,
+      account.updatedAt
+    ])
+  ]);
+}
+
+export function exportPostsCsv(posts: InstagramPost[], accountNameById: Record<string, string> = {}) {
+  return createCsv([
+    [
+      "id",
+      "accountId",
+      "accountName",
+      "date",
+      "recordedDate",
+      "url",
+      "caption",
+      "hashtags",
+      "type",
+      "typeLabel",
+      "category",
+      "categoryLabel",
+      "mediaCount",
+      "likes",
+      "comments",
+      "saves",
+      "shares",
+      "views",
+      "engagement",
+      "engagementRate",
+      "saveRate",
+      "commentRate",
+      "memo",
+      "hasScreenshot",
+      "createdAt",
+      "updatedAt"
+    ],
+    ...posts.map((post) => {
+      const metrics = getMetrics(post);
+      return [
+        post.id,
+        post.accountId ?? "",
+        post.accountId ? accountNameById[post.accountId] ?? "" : "",
+        post.date,
+        post.recordedDate,
+        post.url,
+        post.caption,
+        post.hashtags,
+        post.type,
+        postTypeLabels[post.type],
+        post.category ?? "other",
+        postCategoryLabels[post.category ?? "other"],
+        post.mediaCount,
+        post.likes,
+        post.comments,
+        post.saves,
+        post.shares,
+        post.views,
+        metrics.engagement,
+        metrics.engagementRate.toFixed(2),
+        metrics.saveRate.toFixed(2),
+        metrics.commentRate.toFixed(2),
+        post.memo,
+        post.screenshot ? "yes" : "no",
+        post.createdAt,
+        post.updatedAt
+      ];
+    })
+  ]);
+}
+
+export function exportAnalysesCsv(analyses: AiAnalysisRecord[], postById: Record<string, InstagramPost> = {}) {
+  return createCsv([
+    [
+      "id",
+      "postId",
+      "postDate",
+      "postCategory",
+      "score",
+      "scoreDelta",
+      "firstImpression",
+      "imageMessage",
+      "captionClarity",
+      "strengths",
+      "weaknesses",
+      "reason",
+      "improvements",
+      "nextIdeas",
+      "hashtags",
+      "createdAt"
+    ],
+    ...analyses.map((analysis) => {
+      const post = postById[analysis.postId];
+      return [
+        analysis.id,
+        analysis.postId,
+        post?.date ?? "",
+        post ? postCategoryLabels[post.category ?? "other"] : "",
+        analysis.score,
+        analysis.scoreDelta ?? "",
+        analysis.firstImpression,
+        analysis.imageMessage,
+        analysis.captionClarity,
+        analysis.strengths,
+        analysis.weaknesses,
+        analysis.reason,
+        analysis.improvements.join(" / "),
+        analysis.nextIdeas.join(" / "),
+        analysis.hashtags.join(" "),
+        analysis.createdAt
+      ];
+    })
+  ]);
+}
+
+export function exportMonthlyReportsCsv(reports: MonthlyReportRecord[]) {
+  return createCsv([
+    [
+      "id",
+      "month",
+      "accountId",
+      "accountName",
+      "totalViews",
+      "averageLikes",
+      "averageSaves",
+      "averageEngagementRate",
+      "topPostIds",
+      "needsWorkPostIds",
+      "summary",
+      "nextMonthPolicy",
+      "createdAt",
+      "updatedAt"
+    ],
+    ...reports.map((report) => [
+      report.id,
+      report.month,
+      report.accountId ?? "",
+      report.accountName,
+      report.totalViews,
+      report.averageLikes.toFixed(2),
+      report.averageSaves.toFixed(2),
+      report.averageEngagementRate.toFixed(2),
+      report.topPosts.map((post) => post.id).join(" / "),
+      report.needsWorkPosts.map((post) => post.id).join(" / "),
+      report.summary,
+      report.nextMonthPolicy.join(" / "),
+      report.createdAt,
+      report.updatedAt
+    ])
+  ]);
+}
