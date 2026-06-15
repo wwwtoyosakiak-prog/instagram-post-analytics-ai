@@ -15,7 +15,7 @@ import {
   upsertManyPosts
 } from "@/lib/storage";
 import { InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput } from "@/lib/types";
-import { AiAnalysis, AiAnalysisRecord } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 
 type ServerStatus = {
   mode: "supabase" | "local";
@@ -205,6 +205,32 @@ export async function saveAnalysisData(postId: string, analysis: AiAnalysis): Pr
       body: JSON.stringify({ postId, analysis })
     });
     return data.analysis;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return null;
+  }
+}
+
+export async function loadMonthlyReportsData(accountId?: string, month?: string): Promise<MonthlyReportRecord[]> {
+  const params = new URLSearchParams();
+  if (accountId) params.set("accountId", accountId);
+  if (month) params.set("month", month);
+  try {
+    const data = await requestJson<{ reports: MonthlyReportRecord[] }>(`/api/data/monthly-reports?${params.toString()}`);
+    return data.reports;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return [];
+  }
+}
+
+export async function saveMonthlyReportData(report: MonthlyReport, accountId: string | null, accountName: string): Promise<MonthlyReportRecord | null> {
+  try {
+    const data = await requestJson<{ report: MonthlyReportRecord }>("/api/data/monthly-reports", {
+      method: "POST",
+      body: JSON.stringify({ report, accountId, accountName })
+    });
+    return data.report;
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
     return null;

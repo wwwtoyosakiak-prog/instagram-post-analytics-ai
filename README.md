@@ -68,11 +68,18 @@ supabase/schema.sql
 - `instagram_accounts`
 - `instagram_posts`
 - `instagram_post_analyses`
+- `instagram_monthly_reports`
 
 すでに過去版のSQLを実行済みで、AI分析履歴テーブルだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
 
 ```text
 supabase/add-analysis-history.sql
+```
+
+月次レポート保存テーブルだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
+
+```text
+supabase/add-monthly-reports.sql
 ```
 
 ### 2. Vercelに環境変数を追加

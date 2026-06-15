@@ -78,3 +78,11 @@ export type MonthlyReport = {
   summary: string;
   nextMonthPolicy: string[];
 };
+
+export type MonthlyReportRecord = MonthlyReport & {
+  id: string;
+  accountId: string | null;
+  accountName: string;
+  createdAt: string;
+  updatedAt: string;
+};

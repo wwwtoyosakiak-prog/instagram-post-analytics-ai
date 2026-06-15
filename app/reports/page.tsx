@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, MonthlyReport } from "@/lib/types";
+import { loadAccountsData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { InstagramAccount, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 
 export default function ReportsPage() {
@@ -13,8 +13,12 @@ export default function ReportsPage() {
   const [accountId, setAccountId] = useState("all");
   const [month, setMonth] = useState("");
   const [aiSummary, setAiSummary] = useState("");
+  const [savedReports, setSavedReports] = useState<MonthlyReportRecord[]>([]);
+  const [selectedReport, setSelectedReport] = useState<MonthlyReportRecord | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
@@ -23,6 +27,11 @@ export default function ReportsPage() {
       setMonth(loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7));
     });
   }, []);
+
+  useEffect(() => {
+    if (!month) return;
+    loadMonthlyReportsData(accountId, month).then(setSavedReports);
+  }, [accountId, month]);
 
   const report = useMemo<MonthlyReport>(() => {
     const monthly = posts.filter((post) => post.date.startsWith(month)).filter((post) => accountId === "all" || post.accountId === accountId);
@@ -40,6 +49,8 @@ export default function ReportsPage() {
     };
   }, [posts, month, accountId, aiSummary]);
 
+  const displayReport = selectedReport ?? report;
+
   const createAiReport = async () => {
     const account = accounts.find((item) => item.id === accountId) ?? null;
     setLoading(true);
@@ -53,11 +64,41 @@ export default function ReportsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "AI総評の作成に失敗しました。");
       setAiSummary(data.summary);
+      setSelectedReport(null);
     } catch (event) {
       setError(event instanceof Error ? event.message : "AI総評の作成に失敗しました。");
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveCurrentReport = async () => {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    const account = accounts.find((item) => item.id === accountId);
+    const saved = await saveMonthlyReportData(report, accountId === "all" ? null : accountId, account?.name ?? "すべて");
+    if (saved) {
+      setSavedReports((current) => [saved, ...current]);
+      setSelectedReport(saved);
+      setMessage("月次レポートを保存しました。");
+    } else {
+      setError("月次レポートの保存に失敗しました。サーバー保存設定を確認してください。");
+    }
+    setSaving(false);
+  };
+
+  const showSavedReport = (saved: MonthlyReportRecord) => {
+    setSelectedReport(saved);
+    setMonth(saved.month);
+    setAccountId(saved.accountId ?? "all");
+    setAiSummary(saved.summary);
+    setMessage("保存済みレポートを再表示しています。");
+  };
+
+  const resetToCurrentReport = () => {
+    setSelectedReport(null);
+    setMessage("現在の投稿データから再計算したレポートを表示しています。");
   };
 
   return (
@@ -67,11 +108,11 @@ export default function ReportsPage() {
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label>対象月</label>
-            <input className="mt-1" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <input className="mt-1" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setSelectedReport(null); }} />
           </div>
           <div>
             <label>アカウント</label>
-            <select className="mt-1" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <select className="mt-1" value={accountId} onChange={(e) => { setAccountId(e.target.value); setSelectedReport(null); }}>
               <option value="all">すべて</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.name}</option>
@@ -81,27 +122,52 @@ export default function ReportsPage() {
         </div>
       </Panel>
       <div className="grid gap-4 md:grid-cols-4">
-        <Stat label="合計表示数" value={report.totalViews.toLocaleString()} />
-        <Stat label="平均いいね数" value={Math.round(report.averageLikes).toLocaleString()} />
-        <Stat label="平均保存数" value={Math.round(report.averageSaves).toLocaleString()} />
-        <Stat label="平均エンゲージメント率" value={formatPercent(report.averageEngagementRate)} />
+        <Stat label="合計表示数" value={displayReport.totalViews.toLocaleString()} />
+        <Stat label="平均いいね数" value={Math.round(displayReport.averageLikes).toLocaleString()} />
+        <Stat label="平均保存数" value={Math.round(displayReport.averageSaves).toLocaleString()} />
+        <Stat label="平均エンゲージメント率" value={formatPercent(displayReport.averageEngagementRate)} />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Ranking title="伸びた投稿TOP3" posts={report.topPosts} />
-        <Ranking title="改善が必要な投稿TOP3" posts={report.needsWorkPosts} />
+        <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
+        <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
       </div>
       <Panel className="mt-6">
         <div className="mb-4 flex flex-wrap gap-2">
           <Button onClick={createAiReport} disabled={loading}>{loading ? "作成中..." : "AI総評を作成"}</Button>
-          <Button variant="secondary" onClick={() => setAiSummary("リールは表示数獲得に強く、カルーセルは保存に貢献しています。来月は実演リールで認知を広げ、保存されるチェックリスト投稿で見込み顧客との接点を増やす方針が有効です。")}>サンプル総評</Button>
+          <Button variant="secondary" onClick={() => { setAiSummary("リールは表示数獲得に強く、カルーセルは保存に貢献しています。来月は実演リールで認知を広げ、保存されるチェックリスト投稿で見込み顧客との接点を増やす方針が有効です。"); setSelectedReport(null); }}>サンプル総評</Button>
+          <Button variant="secondary" onClick={saveCurrentReport} disabled={saving}>{saving ? "保存中..." : "月次レポートを保存"}</Button>
+          {selectedReport ? <Button variant="secondary" onClick={resetToCurrentReport}>現在データに戻す</Button> : null}
         </div>
         {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+        {message ? <p className="mb-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}
+        {selectedReport ? <p className="mb-4 rounded-md bg-fog px-3 py-2 text-sm text-stone-700">保存日時: {formatDateTime(selectedReport.createdAt)} / 対象: {selectedReport.accountName}</p> : null}
         <h2 className="font-semibold">AIによる総評</h2>
-        <p className="mt-2 text-sm leading-6 text-stone-700">{report.summary}</p>
+        <p className="mt-2 text-sm leading-6 text-stone-700">{displayReport.summary}</p>
         <h2 className="mt-5 font-semibold">来月の投稿方針</h2>
         <ul className="mt-2 grid gap-2">
-          {report.nextMonthPolicy.map((item) => <li className="rounded-md bg-stone-100 px-3 py-2 text-sm" key={item}>{item}</li>)}
+          {displayReport.nextMonthPolicy.map((item) => <li className="rounded-md bg-stone-100 px-3 py-2 text-sm" key={item}>{item}</li>)}
         </ul>
+      </Panel>
+      <Panel className="mt-6">
+        <h2 className="font-semibold">過去レポート一覧</h2>
+        <p className="mt-2 text-sm leading-6 text-stone-600">同じ月・同じアカウントで保存したレポートを履歴として確認できます。</p>
+        <div className="mt-4 grid gap-2">
+          {savedReports.map((saved) => (
+            <button
+              key={saved.id}
+              type="button"
+              onClick={() => showSavedReport(saved)}
+              className="flex flex-col gap-2 rounded-md border border-stone-200 bg-white/80 px-3 py-3 text-left hover:border-moss md:flex-row md:items-center md:justify-between"
+            >
+              <span>
+                <span className="font-semibold">{saved.month} / {saved.accountName}</span>
+                <span className="ml-2 text-sm text-stone-500">{formatDateTime(saved.createdAt)}</span>
+              </span>
+              <span className="text-sm text-stone-600">表示 {saved.totalViews.toLocaleString()} / ER {formatPercent(saved.averageEngagementRate)}</span>
+            </button>
+          ))}
+          {!savedReports.length ? <p className="text-sm text-stone-500">保存済みレポートはまだありません。</p> : null}
+        </div>
       </Panel>
     </div>
   );
@@ -113,7 +179,7 @@ function Ranking({ title, posts }: { title: string; posts: InstagramPost[] }) {
       <h2 className="mb-3 font-semibold">{title}</h2>
       <div className="space-y-3">
         {posts.map((post) => (
-          <Link href={`/posts/${post.id}`} key={post.id} className="block rounded-md border border-stone-200 p-3 hover:border-moss">
+          <Link href={`/posts/detail?id=${post.id}`} key={post.id} className="block rounded-md border border-stone-200 p-3 hover:border-moss">
             <p className="text-sm font-semibold">{post.date} / ER {formatPercent(getMetrics(post).engagementRate)}</p>
             <p className="mt-1 line-clamp-2 text-sm text-stone-600">{post.caption}</p>
           </Link>
@@ -122,4 +188,9 @@ function Ranking({ title, posts }: { title: string; posts: InstagramPost[] }) {
       </div>
     </Panel>
   );
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "未記録";
+  return new Date(value).toLocaleString("ja-JP");
 }
