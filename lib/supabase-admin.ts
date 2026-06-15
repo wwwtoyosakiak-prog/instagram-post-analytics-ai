@@ -1,4 +1,4 @@
-import { InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -37,6 +37,23 @@ type PostRow = {
   screenshot: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type AnalysisRow = {
+  id: string;
+  post_id: string;
+  first_impression: string;
+  image_message: string;
+  caption_clarity: string;
+  strengths: string;
+  weaknesses: string;
+  reason: string;
+  improvements: string[];
+  next_ideas: string[];
+  hashtags: string[];
+  score: number;
+  score_delta: number | null;
+  created_at: string;
 };
 
 function assertConfigured() {
@@ -141,6 +158,42 @@ function postToRow(input: InstagramPostInput) {
   };
 }
 
+function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    firstImpression: row.first_impression,
+    imageMessage: row.image_message,
+    captionClarity: row.caption_clarity,
+    strengths: row.strengths,
+    weaknesses: row.weaknesses,
+    reason: row.reason,
+    improvements: row.improvements ?? [],
+    nextIdeas: row.next_ideas ?? [],
+    hashtags: row.hashtags ?? [],
+    score: row.score,
+    scoreDelta: row.score_delta,
+    createdAt: row.created_at
+  };
+}
+
+function analysisToRow(postId: string, analysis: AiAnalysis, scoreDelta: number | null) {
+  return {
+    post_id: postId,
+    first_impression: analysis.firstImpression,
+    image_message: analysis.imageMessage,
+    caption_clarity: analysis.captionClarity,
+    strengths: analysis.strengths,
+    weaknesses: analysis.weaknesses,
+    reason: analysis.reason,
+    improvements: analysis.improvements,
+    next_ideas: analysis.nextIdeas,
+    hashtags: analysis.hashtags,
+    score: analysis.score,
+    score_delta: scoreDelta
+  };
+}
+
 export async function listAccountsFromSupabase() {
   const rows = await supabaseRequest<AccountRow[]>("instagram_accounts?select=*&order=created_at.desc");
   return rows.map(mapAccount);
@@ -223,4 +276,19 @@ export async function upsertPostsInSupabase(posts: InstagramPost[]) {
     body: JSON.stringify(rows)
   });
   return result.map(mapPost);
+}
+
+export async function listAnalysesFromSupabase(postId: string) {
+  const rows = await supabaseRequest<AnalysisRow[]>(`instagram_post_analyses?post_id=eq.${encodeURIComponent(postId)}&select=*&order=created_at.desc`);
+  return rows.map(mapAnalysis);
+}
+
+export async function createAnalysisInSupabase(postId: string, analysis: AiAnalysis) {
+  const previous = await listAnalysesFromSupabase(postId);
+  const scoreDelta = previous[0] ? analysis.score - previous[0].score : null;
+  const rows = await supabaseRequest<AnalysisRow[]>("instagram_post_analyses", {
+    method: "POST",
+    body: JSON.stringify(analysisToRow(postId, analysis, scoreDelta))
+  });
+  return mapAnalysis(rows[0]);
 }

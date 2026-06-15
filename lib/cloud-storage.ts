@@ -15,6 +15,7 @@ import {
   upsertManyPosts
 } from "@/lib/storage";
 import { InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord } from "@/lib/types";
 
 type ServerStatus = {
   mode: "supabase" | "local";
@@ -185,4 +186,27 @@ export async function pushLocalBackupToServer() {
   await upsertAccountsData(accounts);
   await upsertPostsData(posts);
   return { accounts: accounts.length, posts: posts.length };
+}
+
+export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord[]> {
+  try {
+    const data = await requestJson<{ analyses: AiAnalysisRecord[] }>(`/api/data/analyses?postId=${encodeURIComponent(postId)}`);
+    return data.analyses;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return [];
+  }
+}
+
+export async function saveAnalysisData(postId: string, analysis: AiAnalysis): Promise<AiAnalysisRecord | null> {
+  try {
+    const data = await requestJson<{ analysis: AiAnalysisRecord }>("/api/data/analyses", {
+      method: "POST",
+      body: JSON.stringify({ postId, analysis })
+    });
+    return data.analysis;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return null;
+  }
 }

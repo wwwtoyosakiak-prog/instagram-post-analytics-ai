@@ -60,6 +60,13 @@ export type AiAnalysis = {
   score: number;
 };
 
+export type AiAnalysisRecord = AiAnalysis & {
+  id: string;
+  postId: string;
+  scoreDelta: number | null;
+  createdAt: string;
+};
+
 export type MonthlyReport = {
   month: string;
   totalViews: number;

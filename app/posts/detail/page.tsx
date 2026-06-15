@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { deletePostData, loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
-import { AiAnalysis, InstagramAccount, InstagramPost } from "@/lib/types";
+import { deletePostData, loadAccountsData, loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
+import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
@@ -24,14 +24,19 @@ function PostDetailContent() {
   const [post, setPost] = useState<InstagramPost | null>(null);
   const [account, setAccount] = useState<InstagramAccount | null>(null);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
+  const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingAnalysis, setSavingAnalysis] = useState(false);
   const [error, setError] = useState("");
+  const [analysisMessage, setAnalysisMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData()]).then(([posts, accounts]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id)]).then(([posts, accounts, analyses]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
       setAccount(accounts.find((item) => item.id === foundPost?.accountId) ?? null);
+      setAnalysisHistory(analyses);
+      setAnalysis(analyses[0] ?? null);
     });
   }, [id]);
 
@@ -53,11 +58,36 @@ function PostDetailContent() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "分析に失敗しました。");
       setAnalysis(data.analysis);
+      setSavingAnalysis(true);
+      const saved = await saveAnalysisData(post.id, data.analysis);
+      if (saved) {
+        setAnalysisHistory((current) => [saved, ...current]);
+        setAnalysis(saved);
+        setAnalysisMessage("AI分析結果を保存しました。");
+      } else {
+        setAnalysisMessage("AI分析結果を表示しました。サーバー保存は未設定です。");
+      }
     } catch {
       setError("GitHub Pages公開版ではOpenAI API Routeは動きません。サンプル分析を使うか、Vercelで公開してください。");
     } finally {
       setLoading(false);
+      setSavingAnalysis(false);
     }
+  };
+
+  const useSampleAnalysis = async () => {
+    const sample = createSampleAnalysis(post);
+    setAnalysis(sample);
+    setSavingAnalysis(true);
+    const saved = await saveAnalysisData(post.id, sample);
+    if (saved) {
+      setAnalysisHistory((current) => [saved, ...current]);
+      setAnalysis(saved);
+      setAnalysisMessage("サンプル分析結果を保存しました。");
+    } else {
+      setAnalysisMessage("サンプル分析を表示しました。サーバー保存は未設定です。");
+    }
+    setSavingAnalysis(false);
   };
 
   const removePost = async () => {
@@ -100,11 +130,13 @@ function PostDetailContent() {
         </Panel>
         <Panel>
           <div className="mb-4 flex flex-wrap gap-2">
-            <Button onClick={analyze} disabled={loading}>{loading ? "分析中..." : "OpenAIで分析"}</Button>
-            <Button variant="secondary" onClick={() => setAnalysis(createSampleAnalysis(post))}>サンプル分析</Button>
+            <Button onClick={analyze} disabled={loading || savingAnalysis}>{loading ? "分析中..." : savingAnalysis ? "保存中..." : "OpenAIで分析・保存"}</Button>
+            <Button variant="secondary" onClick={useSampleAnalysis} disabled={savingAnalysis}>サンプル分析を保存</Button>
           </div>
           {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-          {analysis ? <AnalysisView analysis={analysis} /> : <p className="text-sm text-stone-600">GitHub Pages公開版ではサンプル分析が使えます。</p>}
+          {analysisMessage ? <p className="mb-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{analysisMessage}</p> : null}
+          {analysis ? <AnalysisView analysis={analysis} /> : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
+          <AnalysisHistory analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
         </Panel>
       </div>
     </div>
@@ -117,11 +149,19 @@ function formatDateTime(value?: string) {
 }
 
 function AnalysisView({ analysis }: { analysis: AiAnalysis }) {
+  const scoreDelta = "scoreDelta" in analysis ? analysis.scoreDelta : null;
   return (
     <div className="space-y-5">
       <div className="rounded-lg bg-skyglass p-4">
         <p className="text-sm font-medium text-stone-600">投稿スコア</p>
-        <p className="mt-1 text-4xl font-bold text-ink">{analysis.score}<span className="text-lg"> / 100</span></p>
+        <div className="mt-1 flex flex-wrap items-end gap-3">
+          <p className="text-4xl font-bold text-ink">{analysis.score}<span className="text-lg"> / 100</span></p>
+          {typeof scoreDelta === "number" ? (
+            <p className={`mb-1 rounded-md px-2 py-1 text-sm font-semibold ${scoreDelta >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+              前回比 {scoreDelta >= 0 ? "+" : ""}{scoreDelta}
+            </p>
+          ) : null}
+        </div>
       </div>
       {[
         ["投稿の第一印象", analysis.firstImpression],
@@ -140,6 +180,33 @@ function AnalysisView({ analysis }: { analysis: AiAnalysis }) {
       <List title="おすすめ投稿案" items={analysis.nextIdeas} />
       <List title="おすすめハッシュタグ" items={analysis.hashtags} />
     </div>
+  );
+}
+
+function AnalysisHistory({ analyses, onSelect }: { analyses: AiAnalysisRecord[]; onSelect: (analysis: AiAnalysisRecord) => void }) {
+  if (!analyses.length) return null;
+  return (
+    <section className="mt-8 border-t border-stone-200 pt-5">
+      <h2 className="font-semibold">AI分析履歴</h2>
+      <div className="mt-3 grid gap-2">
+        {analyses.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item)}
+            className="flex w-full items-center justify-between gap-3 rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-left text-sm hover:border-moss"
+          >
+            <span>
+              <span className="font-semibold">{formatDateTime(item.createdAt)}</span>
+              <span className="ml-2 text-stone-500">スコア {item.score}/100</span>
+            </span>
+            <span className={`rounded-md px-2 py-1 text-xs font-semibold ${typeof item.scoreDelta === "number" && item.scoreDelta < 0 ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
+              {typeof item.scoreDelta === "number" ? `前回比 ${item.scoreDelta >= 0 ? "+" : ""}${item.scoreDelta}` : "初回"}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
