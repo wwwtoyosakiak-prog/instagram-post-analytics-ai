@@ -107,3 +107,16 @@ export type ImprovementTask = ImprovementTaskInput & {
   updatedAt: string;
   completedAt?: string;
 };
+
+export type CategoryAiReportItem = {
+  category: string;
+  summary: string;
+  strength: string;
+  weakness: string;
+  recommendation: string;
+};
+
+export type CategoryAiReport = {
+  overall: string;
+  items: CategoryAiReportItem[];
+};

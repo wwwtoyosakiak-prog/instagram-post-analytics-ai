@@ -3,19 +3,22 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
+import { loadAccountsData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, CategoryAiReport, InstagramAccount, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics, postCategoryOptions } from "@/lib/metrics";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [accountId, setAccountId] = useState("all");
   const [month, setMonth] = useState("");
   const [aiSummary, setAiSummary] = useState("");
+  const [categoryAiReport, setCategoryAiReport] = useState<CategoryAiReport | null>(null);
   const [savedReports, setSavedReports] = useState<MonthlyReportRecord[]>([]);
   const [selectedReport, setSelectedReport] = useState<MonthlyReportRecord | null>(null);
   const [loading, setLoading] = useState(false);
+  const [categoryLoading, setCategoryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -25,6 +28,9 @@ export default function ReportsPage() {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setMonth(loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7));
+      Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
+        setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
+      });
     });
   }, []);
 
@@ -57,10 +63,13 @@ export default function ReportsPage() {
         name: category.label,
         count: items.length,
         averageViews: Math.round(average(items.map((post) => post.views))),
-        averageSaveRate: average(items.map((post) => getMetrics(post).saveRate))
+        averageSaveRate: average(items.map((post) => getMetrics(post).saveRate)),
+        averageEngagementRate: average(items.map((post) => getMetrics(post).engagementRate)),
+        averageAiScore: average(items.map((post) => latestAnalysisByPostId[post.id]?.score ?? 0).filter((score) => score > 0)),
+        sampleCaptions: items.slice(0, 3).map((post) => post.caption)
       };
     }).filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate);
-  }, [posts, month, accountId]);
+  }, [posts, month, accountId, latestAnalysisByPostId]);
 
   const displayReport = selectedReport ?? report;
 
@@ -83,6 +92,43 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const createCategoryAiReport = async () => {
+    const account = accounts.find((item) => item.id === accountId) ?? null;
+    setCategoryLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/category-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: categoryData, account, month })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "カテゴリ別AIレポートの作成に失敗しました。");
+      setCategoryAiReport(data.report);
+    } catch (event) {
+      setError(event instanceof Error ? event.message : "カテゴリ別AIレポートの作成に失敗しました。");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
+  const createSampleCategoryAiReport = () => {
+    const strongest = [...categoryData].sort((a, b) => b.averageSaveRate - a.averageSaveRate)[0];
+    const highScore = [...categoryData].sort((a, b) => b.averageAiScore - a.averageAiScore)[0];
+    setCategoryAiReport({
+      overall: strongest
+        ? `${strongest.name}は保存率が高く、見返したい情報として機能しています。${highScore ? `${highScore.name}はAIスコア面で評価が高く、次月も軸にできます。` : ""}`
+        : "カテゴリ別に投稿を登録すると、テーマごとの傾向を確認できます。",
+      items: categoryData.map((category) => ({
+        category: category.name,
+        summary: `${category.count}件の投稿があり、平均表示数は${category.averageViews.toLocaleString()}、平均保存率は${formatPercent(category.averageSaveRate)}です。`,
+        strength: category.averageSaveRate >= 1.5 ? "保存率が比較的高く、後で見返す価値を出せています。" : "投稿テーマとしての蓄積があり、改善検証の土台になります。",
+        weakness: category.averageViews < average(categoryData.map((item) => item.averageViews)) ? "表示数の伸びには改善余地があります。" : "表示数は取れていますが、保存やコメントにつなげる工夫が必要です。",
+        recommendation: "次回は冒頭で得られる価値を明確にし、保存したくなるチェックリストや比較要素を入れてください。"
+      }))
+    });
   };
 
   const saveCurrentReport = async () => {
@@ -153,10 +199,34 @@ export default function ReportsPage() {
               <p className="mt-2 text-sm text-stone-600">投稿数: {item.count}件</p>
               <p className="mt-1 text-sm text-stone-600">平均表示数: {item.averageViews.toLocaleString()}</p>
               <p className="mt-1 text-sm text-stone-600">平均保存率: {formatPercent(item.averageSaveRate)}</p>
+              <p className="mt-1 text-sm text-stone-600">平均AIスコア: {item.averageAiScore ? `${item.averageAiScore.toFixed(1)}点` : "未分析"}</p>
             </div>
           ))}
           {!categoryData.length ? <p className="text-sm text-stone-500">カテゴリ付き投稿がありません。</p> : null}
         </div>
+      </Panel>
+      <Panel className="mt-6">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button onClick={createCategoryAiReport} disabled={categoryLoading}>{categoryLoading ? "作成中..." : "カテゴリ別AIレポートを作成"}</Button>
+          <Button variant="secondary" onClick={createSampleCategoryAiReport}>サンプルカテゴリレポート</Button>
+        </div>
+        <h2 className="font-semibold">カテゴリ別AIレポート</h2>
+        {categoryAiReport ? (
+          <div className="mt-4">
+            <p className="rounded-md bg-skyglass px-3 py-3 text-sm leading-6 text-ink">{categoryAiReport.overall}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {categoryAiReport.items.map((item) => (
+                <div key={item.category} className="rounded-md border border-stone-200 bg-white/80 p-4">
+                  <h3 className="font-semibold">{item.category}</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-700">{item.summary}</p>
+                  <p className="mt-3 text-sm leading-6"><span className="font-semibold">強み: </span>{item.strength}</p>
+                  <p className="mt-2 text-sm leading-6"><span className="font-semibold">課題: </span>{item.weakness}</p>
+                  <p className="mt-2 text-sm leading-6"><span className="font-semibold">次の方針: </span>{item.recommendation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : <p className="mt-2 text-sm leading-6 text-stone-600">カテゴリごとの表示数、保存率、AIスコアをもとに、伸びやすいテーマと改善余地をまとめます。</p>}
       </Panel>
       <Panel className="mt-6">
         <div className="mb-4 flex flex-wrap gap-2">
