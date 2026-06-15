@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { loadAccounts, loadPosts, updatePost } from "@/lib/storage";
+import { loadAccountsData, loadPostsData, updatePostData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPostInput, PostType } from "@/lib/types";
 
 export default function EditPostPage() {
@@ -23,25 +23,27 @@ function EditPostContent() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setAccounts(loadAccounts());
-    const post = loadPosts().find((item) => item.id === id);
-    if (!post) return;
-    setForm({
-      accountId: post.accountId,
-      date: post.date,
-      recordedDate: post.recordedDate ?? post.date,
-      url: post.url,
-      caption: post.caption,
-      hashtags: post.hashtags ?? "",
-      type: post.type,
-      mediaCount: post.mediaCount ?? 1,
-      likes: post.likes,
-      comments: post.comments,
-      saves: post.saves,
-      shares: post.shares,
-      views: post.views,
-      memo: post.memo,
-      screenshot: post.screenshot
+    Promise.all([loadAccountsData(), loadPostsData()]).then(([loadedAccounts, posts]) => {
+      setAccounts(loadedAccounts);
+      const post = posts.find((item) => item.id === id);
+      if (!post) return;
+      setForm({
+        accountId: post.accountId,
+        date: post.date,
+        recordedDate: post.recordedDate ?? post.date,
+        url: post.url,
+        caption: post.caption,
+        hashtags: post.hashtags ?? "",
+        type: post.type,
+        mediaCount: post.mediaCount ?? 1,
+        likes: post.likes,
+        comments: post.comments,
+        saves: post.saves,
+        shares: post.shares,
+        views: post.views,
+        memo: post.memo,
+        screenshot: post.screenshot
+      });
     });
   }, [id]);
 
@@ -61,9 +63,9 @@ function EditPostContent() {
     reader.readAsDataURL(file);
   };
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    updatePost(id, form);
+    await updatePostData(id, form);
     setMessage("投稿を更新しました。");
     router.push(`/posts/detail?id=${id}`);
   };

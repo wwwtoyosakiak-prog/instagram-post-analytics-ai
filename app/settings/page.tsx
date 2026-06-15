@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
+import { getServerStorageStatus, pushLocalBackupToServer } from "@/lib/cloud-storage";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
 
 type TestResult = {
@@ -13,8 +14,10 @@ type TestResult = {
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
+  const [serverLoading, setServerLoading] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
   const [dataMessage, setDataMessage] = useState("");
+  const [serverMessage, setServerMessage] = useState("");
 
   const testOpenAi = async () => {
     setLoading(true);
@@ -70,6 +73,29 @@ export default function SettingsPage() {
     setDataMessage("ローカルデータを削除しました。");
   };
 
+  const checkServerStorage = async () => {
+    setServerLoading(true);
+    try {
+      const status = await getServerStorageStatus();
+      setServerMessage(status.serverStorageEnabled ? "サーバー保存は有効です。Supabaseに保存されます。" : "サーバー保存は未設定です。現在はブラウザ保存で動作します。");
+    } finally {
+      setServerLoading(false);
+    }
+  };
+
+  const migrateLocalData = async () => {
+    if (!window.confirm("現在のブラウザ内データをサーバーへ保存しますか？")) return;
+    setServerLoading(true);
+    try {
+      const result = await pushLocalBackupToServer();
+      setServerMessage(`サーバーへ移行しました。アカウント${result.accounts}件、投稿${result.posts}件。`);
+    } catch {
+      setServerMessage("サーバーへの移行に失敗しました。Supabase環境変数とテーブル設定を確認してください。");
+    } finally {
+      setServerLoading(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="設定" description="OpenAI APIキーの設定状態と接続を確認できます。" />
@@ -117,6 +143,19 @@ OPENAI_MODEL=gpt-4.1-mini`}</pre>
           <Button variant="secondary" onClick={resetData}>全データ削除</Button>
         </div>
         {dataMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{dataMessage}</p> : null}
+      </Panel>
+      <Panel className="mt-6">
+        <h2 className="font-semibold">サーバー保存</h2>
+        <p className="mt-2 text-sm leading-6 text-stone-600">
+          Supabaseを設定すると、アカウントと投稿データをサーバー側に保存できます。未設定の場合はこれまで通りブラウザ保存で動きます。
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={checkServerStorage} disabled={serverLoading}>
+            {serverLoading ? "確認中..." : "サーバー保存状態を確認"}
+          </Button>
+          <Button variant="secondary" onClick={migrateLocalData} disabled={serverLoading}>ブラウザ内データをサーバーへ移行</Button>
+        </div>
+        {serverMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{serverMessage}</p> : null}
       </Panel>
     </div>
   );

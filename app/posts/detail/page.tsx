@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { deletePost, loadAccounts, loadPosts } from "@/lib/storage";
+import { deletePostData, loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysis, InstagramAccount, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
@@ -28,9 +28,11 @@ function PostDetailContent() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const foundPost = loadPosts().find((item) => item.id === id) ?? null;
-    setPost(foundPost);
-    setAccount(loadAccounts().find((item) => item.id === foundPost?.accountId) ?? null);
+    Promise.all([loadPostsData(), loadAccountsData()]).then(([posts, accounts]) => {
+      const foundPost = posts.find((item) => item.id === id) ?? null;
+      setPost(foundPost);
+      setAccount(accounts.find((item) => item.id === foundPost?.accountId) ?? null);
+    });
   }, [id]);
 
   if (!post) {
@@ -58,9 +60,9 @@ function PostDetailContent() {
     }
   };
 
-  const removePost = () => {
+  const removePost = async () => {
     if (!window.confirm("この投稿データを削除しますか？")) return;
-    deletePost(post.id);
+    await deletePostData(post.id);
     router.push("/posts");
   };
 

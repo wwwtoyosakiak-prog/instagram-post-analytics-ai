@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccounts, loadPosts } from "@/lib/storage";
+import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost, PostType } from "@/lib/types";
 import { average, byDateAsc, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
 
@@ -12,8 +12,10 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [accountId, setAccountId] = useState("all");
   useEffect(() => {
-    setPosts(loadPosts());
-    setAccounts(loadAccounts());
+    Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
+      setPosts(loadedPosts);
+      setAccounts(loadedAccounts);
+    });
   }, []);
 
   const data = useMemo(() => {

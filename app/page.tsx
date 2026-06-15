@@ -3,17 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CheckCircle2, Database, FileUp, ListChecks, Sparkles, TrendingUp, Users } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { loadAccounts, loadPosts } from "@/lib/storage";
+import { getServerStorageStatus, loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 
 export default function Home() {
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
+  const [serverStorageEnabled, setServerStorageEnabled] = useState(false);
 
   useEffect(() => {
-    setAccounts(loadAccounts());
-    setPosts(loadPosts());
+    Promise.all([loadAccountsData(), loadPostsData(), getServerStorageStatus()]).then(([loadedAccounts, loadedPosts, status]) => {
+      setAccounts(loadedAccounts);
+      setPosts(loadedPosts);
+      setServerStorageEnabled(status.serverStorageEnabled);
+    });
   }, []);
 
   const summary = useMemo(() => {
@@ -67,6 +71,7 @@ export default function Home() {
             <StatusRow label="アカウント登録" value={accounts.length ? `${accounts.length}件登録済み` : "未登録"} active={accounts.length > 0} />
             <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件登録済み` : "未登録"} active={posts.length > 0} />
             <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
+            <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー保存" : "ブラウザ保存"} active={serverStorageEnabled} />
             <StatusRow label="AI接続" value="設定ページで確認" active />
           </div>
           <div className="mt-5 rounded-md border border-stone-200/80 bg-fog/80 p-3">

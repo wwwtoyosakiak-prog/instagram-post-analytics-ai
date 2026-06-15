@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccounts, loadPosts } from "@/lib/storage";
+import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost, MonthlyReport } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 
@@ -17,10 +17,11 @@ export default function ReportsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loaded = loadPosts();
-    setPosts(loaded);
-    setAccounts(loadAccounts());
-    setMonth(loaded[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7));
+    Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
+      setPosts(loadedPosts);
+      setAccounts(loadedAccounts);
+      setMonth(loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7));
+    });
   }, []);
 
   const report = useMemo<MonthlyReport>(() => {

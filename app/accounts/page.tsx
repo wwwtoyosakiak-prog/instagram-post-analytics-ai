@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { addAccount, deleteAccount, loadAccounts, updateAccount, upsertManyAccounts } from "@/lib/storage";
+import { addAccountData, deleteAccountData, loadAccountsData, updateAccountData, upsertAccountsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramAccountInput } from "@/lib/types";
 import { sampleAccounts } from "@/lib/sample-data";
 
@@ -22,27 +22,29 @@ export default function AccountsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
-  const refresh = () => setAccounts(loadAccounts());
+  const refresh = async () => setAccounts(await loadAccountsData());
 
-  useEffect(() => refresh(), []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   const setValue = (key: keyof InstagramAccountInput, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     const input = { ...form, username: form.username.replace(/^@/, "") };
     if (editingId) {
-      updateAccount(editingId, input);
+      await updateAccountData(editingId, input);
       setMessage("アカウントを更新しました。");
     } else {
-      addAccount(input);
+      await addAccountData(input);
       setMessage("アカウントを登録しました。");
     }
     setForm(initialForm);
     setEditingId(null);
-    refresh();
+    await refresh();
   };
 
   const startEdit = (account: InstagramAccount) => {
@@ -65,18 +67,18 @@ export default function AccountsPage() {
     setMessage("");
   };
 
-  const removeAccount = (account: InstagramAccount) => {
+  const removeAccount = async (account: InstagramAccount) => {
     if (!window.confirm(`${account.name} を削除しますか？投稿データ自体は削除されません。`)) return;
-    deleteAccount(account.id);
+    await deleteAccountData(account.id);
     if (editingId === account.id) cancelEdit();
     setMessage("アカウントを削除しました。");
-    refresh();
+    await refresh();
   };
 
-  const addSamples = () => {
-    upsertManyAccounts(sampleAccounts);
+  const addSamples = async () => {
+    await upsertAccountsData(sampleAccounts);
     setMessage("サンプルアカウントを追加しました。");
-    refresh();
+    await refresh();
   };
 
   return (

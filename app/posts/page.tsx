@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { loadAccounts, loadPosts } from "@/lib/storage";
+import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost, PostType } from "@/lib/types";
 import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
 
@@ -17,8 +17,10 @@ export default function PostsPage() {
   const [accountId, setAccountId] = useState("all");
 
   useEffect(() => {
-    setPosts(loadPosts());
-    setAccounts(loadAccounts());
+    Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
+      setPosts(loadedPosts);
+      setAccounts(loadedAccounts);
+    });
   }, []);
 
   const filtered = useMemo(() => {

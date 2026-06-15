@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { addPost, loadAccounts, upsertManyAccounts, upsertManyPosts } from "@/lib/storage";
+import { addPostData, loadAccountsData, upsertAccountsData, upsertPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPostInput, PostType } from "@/lib/types";
 import { sampleAccounts, samplePosts } from "@/lib/sample-data";
 import { csvTemplate, parsePostsCsv } from "@/lib/csv";
@@ -33,9 +33,10 @@ export default function NewPostPage() {
   const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
-    const loaded = loadAccounts();
-    setAccounts(loaded);
-    setForm((current) => ({ ...current, accountId: loaded[0]?.id }));
+    loadAccountsData().then((loaded) => {
+      setAccounts(loaded);
+      setForm((current) => ({ ...current, accountId: loaded[0]?.id }));
+    });
   }, []);
 
   const setValue = (key: keyof InstagramPostInput, value: string | number) => {
@@ -56,7 +57,7 @@ export default function NewPostPage() {
     const text = await file.text();
     const accountIdByUsername = Object.fromEntries(accounts.map((account) => [account.username, account.id]));
     const posts = parsePostsCsv(text, accountIdByUsername);
-    upsertManyPosts(posts);
+    await upsertPostsData(posts);
     setMessage(`${posts.length}件をCSVから取り込みました。`);
   };
 
@@ -91,10 +92,10 @@ export default function NewPostPage() {
     }
   };
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const post = addPost(form);
-    router.push(`/posts/${post.id}`);
+    const post = await addPostData(form);
+    router.push(`/posts/detail?id=${post.id}`);
   };
 
   return (
@@ -186,7 +187,7 @@ export default function NewPostPage() {
             <h2 className="font-semibold">サンプルデータ</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">OZOPSのようなアウトドアブランドを想定した10件を追加します。</p>
             <div className="mt-4">
-              <Button variant="secondary" onClick={() => { upsertManyAccounts(sampleAccounts); upsertManyPosts(samplePosts); setAccounts(loadAccounts()); setMessage("サンプルアカウントと投稿データ10件を追加しました。"); }}>
+              <Button variant="secondary" onClick={async () => { await upsertAccountsData(sampleAccounts); await upsertPostsData(samplePosts); setAccounts(await loadAccountsData()); setMessage("サンプルアカウントと投稿データ10件を追加しました。"); }}>
                 サンプル10件を追加
               </Button>
             </div>
