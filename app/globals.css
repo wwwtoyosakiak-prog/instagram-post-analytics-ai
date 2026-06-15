@@ -41,3 +41,35 @@ td {
 tbody tr {
   @apply transition hover:bg-oat/60;
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+
+  header,
+  .print-hide {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-area {
+    display: block !important;
+    color: #17201c;
+  }
+
+  .print-area section,
+  .print-area div,
+  .print-area a {
+    box-shadow: none !important;
+  }
+
+  .print-area section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
