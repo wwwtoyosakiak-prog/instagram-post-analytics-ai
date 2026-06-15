@@ -3,19 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, PostType } from "@/lib/types";
-import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, weekdayJa } from "@/lib/metrics";
+import { loadAccountsData, loadAnalysesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { ImprovementTask, InstagramAccount, InstagramPost, PostType } from "@/lib/types";
+import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 
 export default function DashboardPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData()]).then(([loadedPosts, loadedAccounts, loadedTasks]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
+      setTasks(loadedTasks);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
@@ -24,6 +26,14 @@ export default function DashboardPage() {
 
   const data = useMemo(() => {
     const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
+    const targetPostIds = new Set(targetPosts.map((post) => post.id));
+    const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
+    const targetTasks = tasks.filter((task) => !task.postId || accountId === "all" || targetPostIds.has(task.postId));
+    const today = toDateKey(new Date());
+    const openTasks = targetTasks.filter((task) => task.status !== "done");
+    const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < today);
+    const completedTasks = targetTasks.filter((task) => task.status === "done");
+    const completionRate = targetTasks.length ? (completedTasks.length / targetTasks.length) * 100 : 0;
     const sorted = [...targetPosts].sort(byDateAsc);
     const typeData = (["image", "video", "reel", "carousel"] as PostType[]).map((type) => {
       const items = targetPosts.filter((post) => post.type === type);
@@ -40,19 +50,31 @@ export default function DashboardPage() {
     const categoryData = postCategoryOptions.map((category) => {
       const items = targetPosts.filter((post) => (post.category ?? "other") === category.value);
       const scores = items.map((post) => latestScoreByPostId[post.id]).filter((score): score is number => typeof score === "number");
+      const categoryPostIds = new Set(items.map((post) => post.id));
+      const categoryTasks = targetTasks.filter((task) => task.postId && categoryPostIds.has(task.postId));
       return {
         name: category.label,
         averageViews: Math.round(average(items.map((post) => post.views))),
         averageSaveRate: Number(average(items.map((post) => getMetrics(post).saveRate)).toFixed(2)),
         averageAiScore: Number(average(scores).toFixed(1)),
+        taskCount: categoryTasks.length,
+        openTaskCount: categoryTasks.filter((task) => task.status !== "done").length,
         count: items.length
       };
     });
+    const taskStatusData = (["todo", "doing", "done"] as const).map((status) => ({
+      name: taskStatusLabels[status],
+      count: targetTasks.filter((task) => task.status === status).length
+    }));
+    const taskCategoryData = categoryData.filter((item) => item.taskCount > 0);
+    const nextTask = [...openTasks].filter((task) => task.dueDate).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
     return {
       dailyViews: sorted.map((post) => ({ name: post.date.slice(5), views: post.views })),
       typeData,
       weekdayData,
       categoryData,
+      taskStatusData,
+      taskCategoryData,
       saveRank: [...targetPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
       likeRank: [...targetPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
       totalViews: targetPosts.reduce((sum, post) => sum + post.views, 0),
@@ -63,9 +85,15 @@ export default function DashboardPage() {
       bestCategory: [...categoryData].filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate)[0],
       bestAiScoreCategory: [...categoryData].filter((item) => item.averageAiScore > 0).sort((a, b) => b.averageAiScore - a.averageAiScore)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
+      taskCount: targetTasks.length,
+      openTaskCount: openTasks.length,
+      overdueTaskCount: overdueTasks.length,
+      completionRate,
+      nextTask,
+      nextTaskPost: nextTask?.postId ? postById[nextTask.postId] : undefined,
       count: targetPosts.length
     };
-  }, [posts, accountId, latestScoreByPostId]);
+  }, [posts, tasks, accountId, latestScoreByPostId]);
 
   return (
     <div>
@@ -96,6 +124,15 @@ export default function DashboardPage() {
               <Insight label="保存されやすいカテゴリ" value={data.bestCategory ? `${data.bestCategory.name} / ${data.bestCategory.averageSaveRate.toFixed(2)}%` : "データ不足"} />
               <Insight label="AI評価が高いカテゴリ" value={data.bestAiScoreCategory ? `${data.bestAiScoreCategory.name} / ${data.bestAiScoreCategory.averageAiScore.toFixed(1)}点` : "分析履歴なし"} />
               <Insight label="保存されやすい投稿" value={data.mostSavedPost ? `${data.mostSavedPost.date} / ${data.mostSavedPost.saves.toLocaleString()}保存` : "データ不足"} />
+            </div>
+          </Panel>
+          <Panel className="mb-6">
+            <h2 className="font-semibold">改善タスク進捗</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <Insight label="未完了タスク" value={`${data.openTaskCount}件`} />
+              <Insight label="完了率" value={`${data.completionRate.toFixed(1)}%`} />
+              <Insight label="期限切れ" value={`${data.overdueTaskCount}件`} />
+              <Insight label="次の期限" value={data.nextTask ? `${data.nextTask.dueDate} / ${data.nextTaskPost?.date ?? "投稿未紐づけ"}` : "期限付きタスクなし"} />
             </div>
           </Panel>
         </>
@@ -146,6 +183,26 @@ export default function DashboardPage() {
             <Bar dataKey="averageAiScore" name="平均AIスコア" fill="#5a4356" />
           </BarChart>
         </ChartPanel>
+        <ChartPanel title="改善タスクの状態別件数">
+          <BarChart data={data.taskStatusData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Bar dataKey="count" name="タスク数" fill="#b55d3e" />
+          </BarChart>
+        </ChartPanel>
+        <ChartPanel title="カテゴリ別の改善タスク数">
+          <BarChart data={data.taskCategoryData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="taskCount" name="全タスク" fill="#53624a" />
+            <Bar dataKey="openTaskCount" name="未完了" fill="#b55d3e" />
+          </BarChart>
+        </ChartPanel>
         <ChartPanel title="投稿タイプ別の平均エンゲージメント率">
           <BarChart data={data.typeData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -186,6 +243,13 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function Insight({ label, value }: { label: string; value: string }) {
