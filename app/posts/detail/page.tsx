@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { deletePostData, loadAccountsData, loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
 import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramPost } from "@/lib/types";
@@ -136,7 +137,7 @@ function PostDetailContent() {
           {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           {analysisMessage ? <p className="mb-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{analysisMessage}</p> : null}
           {analysis ? <AnalysisView analysis={analysis} /> : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
-          <AnalysisHistory analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
+          <AnalysisComparison analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
         </Panel>
       </div>
     </div>
@@ -183,11 +184,50 @@ function AnalysisView({ analysis }: { analysis: AiAnalysis }) {
   );
 }
 
-function AnalysisHistory({ analyses, onSelect }: { analyses: AiAnalysisRecord[]; onSelect: (analysis: AiAnalysisRecord) => void }) {
+function AnalysisComparison({ analyses, onSelect }: { analyses: AiAnalysisRecord[]; onSelect: (analysis: AiAnalysisRecord) => void }) {
   if (!analyses.length) return null;
+  const latest = analyses[0];
+  const previous = analyses[1] ?? null;
+  const chartData = [...analyses].reverse().map((item, index) => ({
+    name: `${index + 1}回目`,
+    score: item.score,
+    date: formatDateTime(item.createdAt)
+  }));
+
   return (
     <section className="mt-8 border-t border-stone-200 pt-5">
-      <h2 className="font-semibold">AI分析履歴</h2>
+      <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="font-semibold">AI分析比較</h2>
+          <p className="mt-1 text-sm text-stone-600">同じ投稿を再分析した履歴とスコア推移を確認できます。</p>
+        </div>
+        <p className="text-sm font-semibold text-stone-600">{analyses.length}件の分析履歴</p>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <CompareCard label="最新スコア" value={`${latest.score}/100`} />
+        <CompareCard label="前回との差分" value={typeof latest.scoreDelta === "number" ? `${latest.scoreDelta >= 0 ? "+" : ""}${latest.scoreDelta}` : "初回"} tone={typeof latest.scoreDelta === "number" && latest.scoreDelta < 0 ? "down" : "up"} />
+        <CompareCard label="最新分析日時" value={formatDateTime(latest.createdAt)} />
+      </div>
+
+      {analyses.length >= 2 ? (
+        <div className="mt-5 rounded-md border border-stone-200 bg-white/80 p-4">
+          <h3 className="font-semibold">スコア推移</h3>
+          <div className="mt-3 h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <XAxis dataKey="name" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip formatter={(value) => [`${value}点`, "投稿スコア"]} labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ""} />
+                <Line type="monotone" dataKey="score" stroke="#b4573f" strokeWidth={3} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : null}
+
+      {previous ? <AnalysisDiff latest={latest} previous={previous} /> : null}
+
       <div className="mt-3 grid gap-2">
         {analyses.map((item) => (
           <button
@@ -206,6 +246,43 @@ function AnalysisHistory({ analyses, onSelect }: { analyses: AiAnalysisRecord[];
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+function CompareCard({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "up" | "down" }) {
+  const toneClass = tone === "up" ? "bg-emerald-50 text-emerald-800" : tone === "down" ? "bg-red-50 text-red-800" : "bg-fog text-ink";
+  return (
+    <div className="rounded-md border border-stone-200 bg-white/80 p-3">
+      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
+      <p className={`mt-2 inline-flex rounded-md px-2 py-1 text-sm font-bold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function AnalysisDiff({ latest, previous }: { latest: AiAnalysisRecord; previous: AiAnalysisRecord }) {
+  return (
+    <div className="mt-5 rounded-md border border-stone-200 bg-white/80 p-4">
+      <h3 className="font-semibold">前回からの変化</h3>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <DiffList title="今回の改善案" items={latest.improvements} />
+        <DiffList title="前回の改善案" items={previous.improvements} muted />
+        <DiffList title="今回の投稿案" items={latest.nextIdeas} />
+        <DiffList title="前回の投稿案" items={previous.nextIdeas} muted />
+      </div>
+    </div>
+  );
+}
+
+function DiffList({ title, items, muted = false }: { title: string; items: string[]; muted?: boolean }) {
+  return (
+    <section>
+      <h4 className="text-sm font-semibold">{title}</h4>
+      <ul className="mt-2 grid gap-2">
+        {items.slice(0, 4).map((item) => (
+          <li key={item} className={`rounded-md px-3 py-2 text-sm ${muted ? "bg-stone-100 text-stone-600" : "bg-skyglass text-ink"}`}>{item}</li>
+        ))}
+      </ul>
     </section>
   );
 }
