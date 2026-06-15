@@ -7,7 +7,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { deletePostData, loadAccountsData, loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
 import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramPost } from "@/lib/types";
-import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
+import { formatPercent, getMetrics, postCategoryLabels, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
 export default function PostDetailPage() {
@@ -114,6 +114,7 @@ function PostDetailContent() {
             <div><dt className="font-semibold">データ登録日</dt><dd>{post.recordedDate ?? post.date}</dd></div>
             <div><dt className="font-semibold">アカウント</dt><dd>{account ? `${account.name}（@${account.username}）` : "未選択"}</dd></div>
             <div><dt className="font-semibold">投稿タイプ</dt><dd>{postTypeLabels[post.type]}</dd></div>
+            <div><dt className="font-semibold">投稿カテゴリ</dt><dd>{postCategoryLabels[post.category ?? "other"]}</dd></div>
             <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>
             <div><dt className="font-semibold">投稿URL</dt><dd className="break-all">{post.url || "未登録"}</dd></div>
             <div><dt className="font-semibold">投稿コメント</dt><dd className="leading-6">{post.caption}</dd></div>

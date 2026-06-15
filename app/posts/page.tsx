@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
 import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, PostType } from "@/lib/types";
-import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
+import { InstagramAccount, InstagramPost, PostCategory, PostType } from "@/lib/types";
+import { formatPercent, getMetrics, postCategoryLabels, postCategoryOptions, postTypeLabels } from "@/lib/metrics";
 
 type SortKey = "date" | "recordedDate" | "likes" | "saves" | "views" | "engagementRate";
 
@@ -14,6 +14,7 @@ export default function PostsPage() {
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [sort, setSort] = useState<SortKey>("date");
   const [type, setType] = useState<PostType | "all">("all");
+  const [category, setCategory] = useState<PostCategory | "all">("all");
   const [accountId, setAccountId] = useState("all");
 
   useEffect(() => {
@@ -27,13 +28,14 @@ export default function PostsPage() {
     return posts
       .filter((post) => accountId === "all" || post.accountId === accountId)
       .filter((post) => type === "all" || post.type === type)
+      .filter((post) => category === "all" || (post.category ?? "other") === category)
       .sort((a, b) => {
         if (sort === "date") return new Date(b.date).getTime() - new Date(a.date).getTime();
         if (sort === "recordedDate") return new Date(b.recordedDate ?? b.date).getTime() - new Date(a.recordedDate ?? a.date).getTime();
         if (sort === "engagementRate") return getMetrics(b).engagementRate - getMetrics(a).engagementRate;
         return b[sort] - a[sort];
       });
-  }, [posts, sort, type, accountId]);
+  }, [posts, sort, type, category, accountId]);
 
   const accountNameById = useMemo(() => Object.fromEntries(accounts.map((account) => [account.id, account.name])), [accounts]);
 
@@ -41,7 +43,7 @@ export default function PostsPage() {
     <div>
       <PageHeader title="投稿一覧" description="登録済み投稿を表で確認し、成果順に並び替えできます。" action={<ButtonLink href="/posts/new">投稿を追加</ButtonLink>} />
       <Panel>
-        <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <div className="mb-4 grid gap-3 md:grid-cols-4">
           <div>
             <label>アカウント</label>
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
@@ -72,6 +74,15 @@ export default function PostsPage() {
               <option value="carousel">カルーセル</option>
             </select>
           </div>
+          <div>
+            <label>投稿カテゴリ</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value as PostCategory | "all")}>
+              <option value="all">すべて</option>
+              {postCategoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="overflow-auto">
           <table>
@@ -81,6 +92,7 @@ export default function PostsPage() {
                 <th>データ登録日</th>
                 <th>アカウント</th>
                 <th>タイプ</th>
+                <th>カテゴリ</th>
                 <th>枚数</th>
                 <th>投稿コメント</th>
                 <th>ハッシュタグ</th>
@@ -102,6 +114,7 @@ export default function PostsPage() {
                     <td>{post.recordedDate ?? post.date}</td>
                     <td>{post.accountId ? accountNameById[post.accountId] ?? "未登録" : "未選択"}</td>
                     <td>{postTypeLabels[post.type]}</td>
+                    <td>{postCategoryLabels[post.category ?? "other"]}</td>
                     <td>{post.mediaCount ?? 1}</td>
                     <td className="max-w-sm">{post.caption}</td>
                     <td className="max-w-xs">{post.hashtags || "なし"}</td>

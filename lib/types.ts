@@ -1,4 +1,5 @@
 export type PostType = "image" | "video" | "reel" | "carousel";
+export type PostCategory = "product" | "howto" | "campaign" | "voice" | "recruit" | "store" | "sale" | "brand" | "other";
 
 export type InstagramAccountInput = {
   name: string;
@@ -24,6 +25,7 @@ export type InstagramPostInput = {
   caption: string;
   hashtags: string;
   type: PostType;
+  category: PostCategory;
   mediaCount: number;
   likes: number;
   comments: number;

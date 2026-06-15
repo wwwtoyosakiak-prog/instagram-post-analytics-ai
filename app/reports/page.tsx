@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
-import { average, formatPercent, getMetrics } from "@/lib/metrics";
+import { average, formatPercent, getMetrics, postCategoryOptions } from "@/lib/metrics";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -48,6 +48,19 @@ export default function ReportsPage() {
       nextMonthPolicy: ["保存されるノウハウ投稿を増やす", "リール冒頭で結論を見せる", "コメントを促す質問を入れる"]
     };
   }, [posts, month, accountId, aiSummary]);
+
+  const categoryData = useMemo(() => {
+    const monthly = posts.filter((post) => post.date.startsWith(month)).filter((post) => accountId === "all" || post.accountId === accountId);
+    return postCategoryOptions.map((category) => {
+      const items = monthly.filter((post) => (post.category ?? "other") === category.value);
+      return {
+        name: category.label,
+        count: items.length,
+        averageViews: Math.round(average(items.map((post) => post.views))),
+        averageSaveRate: average(items.map((post) => getMetrics(post).saveRate))
+      };
+    }).filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate);
+  }, [posts, month, accountId]);
 
   const displayReport = selectedReport ?? report;
 
@@ -131,6 +144,20 @@ export default function ReportsPage() {
         <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
         <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
       </div>
+      <Panel className="mt-6">
+        <h2 className="font-semibold">カテゴリ別の傾向</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {categoryData.map((item) => (
+            <div key={item.name} className="rounded-md border border-stone-200 bg-white/80 p-3">
+              <p className="font-semibold">{item.name}</p>
+              <p className="mt-2 text-sm text-stone-600">投稿数: {item.count}件</p>
+              <p className="mt-1 text-sm text-stone-600">平均表示数: {item.averageViews.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-stone-600">平均保存率: {formatPercent(item.averageSaveRate)}</p>
+            </div>
+          ))}
+          {!categoryData.length ? <p className="text-sm text-stone-500">カテゴリ付き投稿がありません。</p> : null}
+        </div>
+      </Panel>
       <Panel className="mt-6">
         <div className="mb-4 flex flex-wrap gap-2">
           <Button onClick={createAiReport} disabled={loading}>{loading ? "作成中..." : "AI総評を作成"}</Button>

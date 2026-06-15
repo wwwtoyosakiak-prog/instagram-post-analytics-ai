@@ -82,6 +82,12 @@ supabase/add-analysis-history.sql
 supabase/add-monthly-reports.sql
 ```
 
+すでに過去版の投稿テーブルを作成済みで、投稿カテゴリだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
+
+```text
+supabase/add-post-category.sql
+```
+
 ### 2. Vercelに環境変数を追加
 
 VercelのProject SettingsからEnvironment Variablesを開き、以下を追加します。
@@ -152,11 +158,11 @@ API連携後に追加しやすい分析:
 投稿登録ページからCSVを取り込めます。1行目は以下の列名にしてください。
 
 ```csv
-accountUsername,date,recordedDate,url,caption,hashtags,type,mediaCount,likes,comments,saves,shares,views,memo
-ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"
+accountUsername,date,recordedDate,url,caption,hashtags,type,category,mediaCount,likes,comments,saves,shares,views,memo
+ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,product,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"
 ```
 
-`accountUsername` は登録済みアカウントのユーザー名と一致すると投稿に紐づきます。`type` は `image`、`video`、`reel`、`carousel` のいずれかです。画像スクショはCSVでは取り込まず、フォームから登録します。
+`accountUsername` は登録済みアカウントのユーザー名と一致すると投稿に紐づきます。`type` は `image`、`video`、`reel`、`carousel` のいずれかです。`category` は `product`、`howto`、`campaign`、`voice`、`recruit`、`store`、`sale`、`brand`、`other` のいずれかです。画像スクショはCSVでは取り込まず、フォームから登録します。
 
 ## 登録できるアカウントデータ
 
@@ -177,6 +183,7 @@ ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量
 - 投稿コメント
 - ハッシュタグ
 - 投稿タイプ: 画像、動画、リール、カルーセル
+- 投稿カテゴリ: 商品紹介、ノウハウ、キャンペーン、お客様の声、採用、店舗紹介、セール告知、ブランド世界観、未分類
 - 投稿画像・動画の枚数
 - いいね数
 - コメント数

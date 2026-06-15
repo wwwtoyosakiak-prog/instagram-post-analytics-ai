@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMetrics } from "@/lib/metrics";
+import { getMetrics, postCategoryLabels } from "@/lib/metrics";
 import { InstagramAccount, InstagramPost, MonthlyReport } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 平均保存数: ${report.averageSaves.toFixed(1)}
 平均エンゲージメント率: ${report.averageEngagementRate.toFixed(2)}%
 投稿一覧:
-${posts.map((post) => `- ${post.date} ${post.type} views=${post.views} likes=${post.likes} saves=${post.saves} ER=${getMetrics(post).engagementRate.toFixed(2)}% caption=${post.caption}`).join("\n")}
+${posts.map((post) => `- ${post.date} category=${postCategoryLabels[post.category ?? "other"]} type=${post.type} views=${post.views} likes=${post.likes} saves=${post.saves} ER=${getMetrics(post).engagementRate.toFixed(2)}% caption=${post.caption}`).join("\n")}
 
 400字以内で、良かった点、課題、来月の方針を含めてください。`;
 

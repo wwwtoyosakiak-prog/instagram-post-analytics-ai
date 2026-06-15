@@ -1,4 +1,4 @@
-import { InstagramPost, PostMetrics, PostType } from "@/lib/types";
+import { InstagramPost, PostCategory, PostMetrics, PostType } from "@/lib/types";
 
 export const postTypeLabels: Record<PostType, string> = {
   image: "画像",
@@ -6,6 +6,20 @@ export const postTypeLabels: Record<PostType, string> = {
   reel: "リール",
   carousel: "カルーセル"
 };
+
+export const postCategoryLabels: Record<PostCategory, string> = {
+  product: "商品紹介",
+  howto: "ノウハウ",
+  campaign: "キャンペーン",
+  voice: "お客様の声",
+  recruit: "採用",
+  store: "店舗紹介",
+  sale: "セール告知",
+  brand: "ブランド世界観",
+  other: "未分類"
+};
+
+export const postCategoryOptions = Object.entries(postCategoryLabels).map(([value, label]) => ({ value: value as PostCategory, label }));
 
 export function getMetrics(post: Pick<InstagramPost, "likes" | "comments" | "saves" | "shares" | "views">): PostMetrics {
   const engagement = post.likes + post.comments + post.saves + post.shares;

@@ -22,6 +22,7 @@ create table if not exists public.instagram_posts (
   caption text not null,
   hashtags text,
   type text not null check (type in ('image', 'video', 'reel', 'carousel')),
+  category text not null default 'other' check (category in ('product', 'howto', 'campaign', 'voice', 'recruit', 'store', 'sale', 'brand', 'other')),
   media_count integer not null default 1,
   likes integer not null default 0,
   comments integer not null default 0,

@@ -4,7 +4,8 @@ import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import { loadAccountsData, loadPostsData, updatePostData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPostInput, PostType } from "@/lib/types";
+import { InstagramAccount, InstagramPostInput, PostCategory, PostType } from "@/lib/types";
+import { postCategoryOptions } from "@/lib/metrics";
 
 export default function EditPostPage() {
   return (
@@ -35,6 +36,7 @@ function EditPostContent() {
         caption: post.caption,
         hashtags: post.hashtags ?? "",
         type: post.type,
+        category: post.category ?? "other",
         mediaCount: post.mediaCount ?? 1,
         likes: post.likes,
         comments: post.comments,
@@ -99,6 +101,14 @@ function EditPostContent() {
               <option value="video">動画</option>
               <option value="reel">リール</option>
               <option value="carousel">カルーセル</option>
+            </select>
+          </div>
+          <div>
+            <label>投稿カテゴリ</label>
+            <select value={form.category} onChange={(e) => setValue("category", e.target.value as PostCategory)}>
+              {postCategoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
           <div>

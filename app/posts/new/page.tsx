@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import { addPostData, loadAccountsData, upsertAccountsData, upsertPostsData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPostInput, PostType } from "@/lib/types";
+import { InstagramAccount, InstagramPostInput, PostCategory, PostType } from "@/lib/types";
 import { sampleAccounts, samplePosts } from "@/lib/sample-data";
 import { csvTemplate, parsePostsCsv } from "@/lib/csv";
+import { postCategoryOptions } from "@/lib/metrics";
 
 const initialForm: InstagramPostInput = {
   date: new Date().toISOString().slice(0, 10),
@@ -16,6 +17,7 @@ const initialForm: InstagramPostInput = {
   caption: "",
   hashtags: "",
   type: "image",
+  category: "other",
   mediaCount: 1,
   likes: 0,
   comments: 0,
@@ -129,6 +131,14 @@ export default function NewPostPage() {
                 <option value="video">動画</option>
                 <option value="reel">リール</option>
                 <option value="carousel">カルーセル</option>
+              </select>
+            </div>
+            <div>
+              <label>投稿カテゴリ</label>
+              <select value={form.category} onChange={(e) => setValue("category", e.target.value as PostCategory)}>
+                {postCategoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
             <div>

@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyReport, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,6 +27,7 @@ type PostRow = {
   caption: string;
   hashtags: string | null;
   type: PostType;
+  category: PostCategory | null;
   media_count: number;
   likes: number;
   comments: number;
@@ -142,6 +143,7 @@ function mapPost(row: PostRow): InstagramPost {
     caption: row.caption,
     hashtags: row.hashtags ?? "",
     type: row.type,
+    category: row.category ?? "other",
     mediaCount: row.media_count,
     likes: row.likes,
     comments: row.comments,
@@ -164,6 +166,7 @@ function postToRow(input: InstagramPostInput) {
     caption: input.caption,
     hashtags: input.hashtags,
     type: input.type,
+    category: input.category ?? "other",
     media_count: input.mediaCount,
     likes: input.likes,
     comments: input.comments,

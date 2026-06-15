@@ -1,6 +1,6 @@
-import { InstagramPost, PostType } from "@/lib/types";
+import { InstagramPost, PostCategory, PostType } from "@/lib/types";
 
-const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
+const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "category", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
 
 function parseCsvLine(line: string) {
   const cells: string[] = [];
@@ -35,6 +35,8 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
     const value = (key: string) => cells[index[key]]?.trim() ?? "";
     const rawType = value("type");
     const type: PostType = rawType === "video" || rawType === "reel" || rawType === "carousel" ? rawType : "image";
+    const rawCategory = value("category");
+    const category: PostCategory = ["product", "howto", "campaign", "voice", "recruit", "store", "sale", "brand"].includes(rawCategory) ? rawCategory as PostCategory : "other";
     const now = new Date().toISOString();
     return {
       id: `csv-${Date.now()}-${rowIndex}`,
@@ -47,6 +49,7 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
       caption: value("caption"),
       hashtags: value("hashtags"),
       type,
+      category,
       mediaCount: Number(value("mediaCount")) || 1,
       likes: Number(value("likes")) || 0,
       comments: Number(value("comments")) || 0,
@@ -59,4 +62,4 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
 }
 
 export const csvTemplate = `${headers.join(",")}
-ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"`;
+ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,product,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"`;

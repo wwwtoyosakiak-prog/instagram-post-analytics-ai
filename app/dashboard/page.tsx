@@ -3,18 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
+import { loadAccountsData, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost, PostType } from "@/lib/types";
-import { average, byDateAsc, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
+import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, weekdayJa } from "@/lib/metrics";
 
 export default function DashboardPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
   useEffect(() => {
     Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
+      Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
+        setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
+      });
     });
   }, []);
 
@@ -33,10 +37,22 @@ export default function DashboardPage() {
       const items = targetPosts.filter((post) => weekdayJa(post.date) === day);
       return { name: day, averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2)) };
     });
+    const categoryData = postCategoryOptions.map((category) => {
+      const items = targetPosts.filter((post) => (post.category ?? "other") === category.value);
+      const scores = items.map((post) => latestScoreByPostId[post.id]).filter((score): score is number => typeof score === "number");
+      return {
+        name: category.label,
+        averageViews: Math.round(average(items.map((post) => post.views))),
+        averageSaveRate: Number(average(items.map((post) => getMetrics(post).saveRate)).toFixed(2)),
+        averageAiScore: Number(average(scores).toFixed(1)),
+        count: items.length
+      };
+    });
     return {
       dailyViews: sorted.map((post) => ({ name: post.date.slice(5), views: post.views })),
       typeData,
       weekdayData,
+      categoryData,
       saveRank: [...targetPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
       likeRank: [...targetPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
       totalViews: targetPosts.reduce((sum, post) => sum + post.views, 0),
@@ -44,10 +60,12 @@ export default function DashboardPage() {
       averageSaves: average(targetPosts.map((post) => post.saves)),
       bestType: [...typeData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       bestWeekday: [...weekdayData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
+      bestCategory: [...categoryData].filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate)[0],
+      bestAiScoreCategory: [...categoryData].filter((item) => item.averageAiScore > 0).sort((a, b) => b.averageAiScore - a.averageAiScore)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
       count: targetPosts.length
     };
-  }, [posts, accountId]);
+  }, [posts, accountId, latestScoreByPostId]);
 
   return (
     <div>
@@ -72,9 +90,11 @@ export default function DashboardPage() {
           </div>
           <Panel className="mb-6">
             <h2 className="font-semibold">読み取りポイント</h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-5">
               <Insight label="反応が良い投稿タイプ" value={data.bestType?.averageEngagementRate ? `${data.bestType.name} / ${data.bestType.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
               <Insight label="反応が良い曜日" value={data.bestWeekday?.averageEngagementRate ? `${data.bestWeekday.name}曜日 / ${data.bestWeekday.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
+              <Insight label="保存されやすいカテゴリ" value={data.bestCategory ? `${data.bestCategory.name} / ${data.bestCategory.averageSaveRate.toFixed(2)}%` : "データ不足"} />
+              <Insight label="AI評価が高いカテゴリ" value={data.bestAiScoreCategory ? `${data.bestAiScoreCategory.name} / ${data.bestAiScoreCategory.averageAiScore.toFixed(1)}点` : "分析履歴なし"} />
               <Insight label="保存されやすい投稿" value={data.mostSavedPost ? `${data.mostSavedPost.date} / ${data.mostSavedPost.saves.toLocaleString()}保存` : "データ不足"} />
             </div>
           </Panel>
@@ -97,6 +117,33 @@ export default function DashboardPage() {
             <YAxis />
             <Tooltip />
             <Bar dataKey="averageViews" name="平均表示数" fill="#53624a" />
+          </BarChart>
+        </ChartPanel>
+        <ChartPanel title="カテゴリ別の平均表示数">
+          <BarChart data={data.categoryData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="averageViews" name="平均表示数" fill="#4f6b57" />
+          </BarChart>
+        </ChartPanel>
+        <ChartPanel title="カテゴリ別の平均保存率">
+          <BarChart data={data.categoryData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="averageSaveRate" name="平均保存率" fill="#2f766d" />
+          </BarChart>
+        </ChartPanel>
+        <ChartPanel title="カテゴリ別の平均AIスコア">
+          <BarChart data={data.categoryData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis domain={[0, 100]} />
+            <Tooltip />
+            <Bar dataKey="averageAiScore" name="平均AIスコア" fill="#5a4356" />
           </BarChart>
         </ChartPanel>
         <ChartPanel title="投稿タイプ別の平均エンゲージメント率">
