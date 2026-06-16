@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
+import { Button, ButtonLink, PageHeader, Panel } from "@/components/ui";
+import { loadAccountsData, loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost, PostCategory, PostType } from "@/lib/types";
 import { formatPercent, getMetrics, postCategoryLabels, postCategoryOptions, postTypeLabels } from "@/lib/metrics";
 
@@ -19,6 +19,8 @@ export default function PostsPage() {
   const [accountId, setAccountId] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
 
   useEffect(() => {
     Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
@@ -45,10 +47,65 @@ export default function PostsPage() {
 
   const accountNameById = useMemo(() => Object.fromEntries(accounts.map((account) => [account.id, account.name])), [accounts]);
 
+  const analyzeFilteredPosts = async (onlyMissing: boolean) => {
+    const targets = filtered.filter((post) => !onlyMissing || typeof latestScoreByPostId[post.id] !== "number");
+    if (!targets.length) {
+      setAiMessage(onlyMissing ? "未分析の投稿はありません。" : "評価できる投稿がありません。");
+      return;
+    }
+    const limitedTargets = targets.slice(0, 10);
+    const confirmText = onlyMissing
+      ? `表示中の未分析投稿 ${limitedTargets.length}件をOpenAI APIで評価します。API料金が発生します。実行しますか？`
+      : `表示中の投稿 ${limitedTargets.length}件をOpenAI APIで再評価します。API料金が発生します。実行しますか？`;
+    if (!window.confirm(confirmText)) return;
+
+    setAiLoading(true);
+    setAiMessage(`AI評価を開始しました。0/${limitedTargets.length}件`);
+    let success = 0;
+    try {
+      for (const post of limitedTargets) {
+        const account = accounts.find((item) => item.id === post.accountId) ?? null;
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ post, account })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "AI評価に失敗しました。");
+        const saved = await saveAnalysisData(post.id, data.analysis);
+        const score = saved?.score ?? data.analysis?.score;
+        if (typeof score === "number") {
+          setLatestScoreByPostId((current) => ({ ...current, [post.id]: score }));
+        }
+        success += 1;
+        setAiMessage(`AI評価中です。${success}/${limitedTargets.length}件完了`);
+      }
+      setAiMessage(`AI評価が完了しました。${success}件の投稿を評価・保存しました。`);
+    } catch (error) {
+      setAiMessage(error instanceof Error ? `AI評価が途中で止まりました。${success}件完了。理由: ${error.message}` : `AI評価が途中で止まりました。${success}件完了。`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="投稿一覧" description="登録済み投稿を表またはカードで確認し、成果順に並び替えできます。" action={<ButtonLink href="/posts/new">投稿を追加</ButtonLink>} />
       <Panel>
+        <div className="mb-5 rounded-md border border-stone-200 bg-fog/80 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="font-semibold">実投稿のAI評価</h2>
+              <p className="mt-1 text-sm leading-6 text-stone-600">登録済みの投稿データとスクショをOpenAI APIで評価し、投稿スコア・改善案・投稿提案を保存します。</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => analyzeFilteredPosts(true)} disabled={aiLoading}>{aiLoading ? "評価中..." : "未分析をAI評価"}</Button>
+              <Button variant="secondary" onClick={() => analyzeFilteredPosts(false)} disabled={aiLoading}>表示中を再評価</Button>
+            </div>
+          </div>
+          {aiMessage ? <p className="mt-3 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{aiMessage}</p> : null}
+          <p className="mt-2 text-xs text-stone-500">料金を抑えるため、一度に評価する投稿は最大10件までです。対象は下の絞り込み条件に連動します。</p>
+        </div>
         <div className="mb-4 grid gap-3 md:grid-cols-5">
           <div>
             <label>アカウント</label>
