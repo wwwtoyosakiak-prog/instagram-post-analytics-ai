@@ -15,6 +15,8 @@ export default function ReportsPage() {
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [accountId, setAccountId] = useState("all");
   const [month, setMonth] = useState("");
+  const [fiscalYear, setFiscalYear] = useState(String(new Date().getFullYear()));
+  const [fiscalStartMonth, setFiscalStartMonth] = useState(4);
   const [aiSummary, setAiSummary] = useState("");
   const [categoryAiReport, setCategoryAiReport] = useState<CategoryAiReport | null>(null);
   const [savedReports, setSavedReports] = useState<MonthlyReportRecord[]>([]);
@@ -31,7 +33,9 @@ export default function ReportsPage() {
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
       setGoals(loadedGoals);
-      setMonth(loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7));
+      const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
+      setMonth(initialMonth);
+      setFiscalYear(String(getFiscalYear(initialMonth, fiscalStartMonth)));
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
       });
@@ -101,6 +105,60 @@ export default function ReportsPage() {
   const selectedGoal = useMemo(() => {
     return goals.find((goal) => goal.month === month && (goal.accountId ?? null) === (accountId === "all" ? null : accountId)) ?? null;
   }, [goals, month, accountId]);
+
+  const annualReport = useMemo(() => {
+    const months = fiscalMonths(Number(fiscalYear), fiscalStartMonth);
+    const monthSet = new Set(months);
+    const annualPosts = posts.filter((post) => monthSet.has(post.date.slice(0, 7))).filter((post) => accountId === "all" || post.accountId === accountId);
+    const annualTasks = tasks.filter((task) => task.dueDate && monthSet.has(task.dueDate.slice(0, 7)));
+    const annualGoals = goals.filter((goal) => monthSet.has(goal.month) && (goal.accountId ?? null) === (accountId === "all" ? null : accountId));
+    const ranked = [...annualPosts].sort((a, b) => getMetrics(b).engagementRate - getMetrics(a).engagementRate);
+    const monthlyRows = months.map((targetMonth) => {
+      const items = annualPosts.filter((post) => post.date.startsWith(targetMonth));
+      return {
+        month: targetMonth,
+        posts: items.length,
+        views: items.reduce((sum, post) => sum + post.views, 0),
+        saves: items.reduce((sum, post) => sum + post.saves, 0),
+        saveRate: average(items.map((post) => getMetrics(post).saveRate)),
+        engagementRate: average(items.map((post) => getMetrics(post).engagementRate))
+      };
+    });
+    const targetPosts = annualGoals.reduce((sum, goal) => sum + goal.targetPosts, 0);
+    const targetViews = annualGoals.reduce((sum, goal) => sum + goal.targetViews, 0);
+    const targetSaves = annualGoals.reduce((sum, goal) => sum + goal.targetSaves, 0);
+    return {
+      months,
+      posts: annualPosts,
+      tasks: annualTasks,
+      goals: annualGoals,
+      totalPosts: annualPosts.length,
+      totalViews: annualPosts.reduce((sum, post) => sum + post.views, 0),
+      totalSaves: annualPosts.reduce((sum, post) => sum + post.saves, 0),
+      averageSaveRate: average(annualPosts.map((post) => getMetrics(post).saveRate)),
+      averageEngagementRate: average(annualPosts.map((post) => getMetrics(post).engagementRate)),
+      averageAiScore: average(annualPosts.map((post) => latestAnalysisByPostId[post.id]?.score ?? 0).filter((score) => score > 0)),
+      topPosts: ranked.slice(0, 3),
+      needsWorkPosts: ranked.slice(-3).reverse(),
+      monthlyRows,
+      categoryRows: postCategoryOptions.map((category) => {
+        const items = annualPosts.filter((post) => (post.category ?? "other") === category.value);
+        return {
+          name: category.label,
+          count: items.length,
+          views: items.reduce((sum, post) => sum + post.views, 0),
+          saveRate: average(items.map((post) => getMetrics(post).saveRate)),
+          engagementRate: average(items.map((post) => getMetrics(post).engagementRate)),
+          aiScore: average(items.map((post) => latestAnalysisByPostId[post.id]?.score ?? 0).filter((score) => score > 0))
+        };
+      }).filter((item) => item.count > 0).sort((a, b) => b.views - a.views),
+      targetPosts,
+      targetViews,
+      targetSaves,
+      taskTotal: annualTasks.length,
+      taskDone: annualTasks.filter((task) => task.status === "done").length
+    };
+  }, [posts, tasks, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId]);
 
   const displayReport = selectedReport ?? report;
 
@@ -202,7 +260,7 @@ export default function ReportsPage() {
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label>対象月</label>
-            <input className="mt-1" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setSelectedReport(null); }} />
+            <input className="mt-1" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setFiscalYear(String(getFiscalYear(e.target.value, fiscalStartMonth))); setSelectedReport(null); }} />
           </div>
           <div>
             <label>アカウント</label>
@@ -212,6 +270,28 @@ export default function ReportsPage() {
                 <option key={account.id} value={account.id}>{account.name}</option>
               ))}
             </select>
+          </div>
+        </div>
+      </Panel>
+      <Panel className="mb-6">
+        <h2 className="font-semibold">年度集計</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div>
+            <label>対象年度</label>
+            <input className="mt-1" type="number" min="2000" max="2100" value={fiscalYear} onChange={(event) => setFiscalYear(event.target.value)} />
+          </div>
+          <div>
+            <label>年度の開始月</label>
+            <select className="mt-1" value={fiscalStartMonth} onChange={(event) => setFiscalStartMonth(Number(event.target.value))}>
+              <option value={1}>1月始まり</option>
+              <option value={4}>4月始まり</option>
+            </select>
+          </div>
+          <div>
+            <label>対象期間</label>
+            <div className="mt-1 rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-sm font-semibold text-ink">
+              {annualReport.months[0]} 〜 {annualReport.months[11]}
+            </div>
           </div>
         </div>
       </Panel>
@@ -237,6 +317,67 @@ export default function ReportsPage() {
           <p className="text-xs font-semibold uppercase text-clay">Instagram Analytics Report</p>
           <h1 className="mt-2 text-2xl font-bold text-ink">{displayReport.month} 月次レポート</h1>
           <p className="mt-2 text-sm text-stone-600">対象: {accounts.find((account) => account.id === accountId)?.name ?? "すべて"} / 出力日時: {formatDateTime(new Date().toISOString())}</p>
+        </Panel>
+
+        <Panel className="mb-6">
+          <h2 className="font-semibold">{fiscalYear}年度レポート</h2>
+          <p className="mt-2 text-sm text-stone-600">対象期間: {annualReport.months[0]} 〜 {annualReport.months[11]}</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-5">
+            <Stat label="年間投稿数" value={`${annualReport.totalPosts}件`} />
+            <Stat label="年間表示数" value={annualReport.totalViews.toLocaleString()} />
+            <Stat label="年間保存数" value={annualReport.totalSaves.toLocaleString()} />
+            <Stat label="平均保存率" value={formatPercent(annualReport.averageSaveRate)} />
+            <Stat label="平均ER" value={formatPercent(annualReport.averageEngagementRate)} />
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-4">
+            <GoalProgress label="投稿数 年度目標" actual={annualReport.totalPosts} target={annualReport.targetPosts} suffix="件" />
+            <GoalProgress label="表示数 年度目標" actual={annualReport.totalViews} target={annualReport.targetViews} suffix="" />
+            <GoalProgress label="保存数 年度目標" actual={annualReport.totalSaves} target={annualReport.targetSaves} suffix="" />
+            <ProgressCard label="改善タスク完了率" value={annualReport.taskTotal ? `${((annualReport.taskDone / annualReport.taskTotal) * 100).toFixed(1)}%` : "タスクなし"} />
+          </div>
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-stone-200 text-left text-stone-500">
+                  <th className="py-2 pr-4">月</th>
+                  <th className="py-2 pr-4">投稿</th>
+                  <th className="py-2 pr-4">表示数</th>
+                  <th className="py-2 pr-4">保存数</th>
+                  <th className="py-2 pr-4">保存率</th>
+                  <th className="py-2 pr-4">ER</th>
+                </tr>
+              </thead>
+              <tbody>
+                {annualReport.monthlyRows.map((row) => (
+                  <tr key={row.month} className="border-b border-stone-100">
+                    <td className="py-2 pr-4 font-semibold">{row.month}</td>
+                    <td className="py-2 pr-4">{row.posts}件</td>
+                    <td className="py-2 pr-4">{row.views.toLocaleString()}</td>
+                    <td className="py-2 pr-4">{row.saves.toLocaleString()}</td>
+                    <td className="py-2 pr-4">{formatPercent(row.saveRate)}</td>
+                    <td className="py-2 pr-4">{formatPercent(row.engagementRate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <AnnualRanking title="年度で伸びた投稿TOP3" posts={annualReport.topPosts} />
+            <AnnualRanking title="年度で改善が必要な投稿TOP3" posts={annualReport.needsWorkPosts} />
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {annualReport.categoryRows.map((item) => (
+              <div key={item.name} className="rounded-md border border-stone-200 bg-white/80 p-3">
+                <p className="font-semibold">{item.name}</p>
+                <p className="mt-2 text-sm text-stone-600">投稿数: {item.count}件</p>
+                <p className="mt-1 text-sm text-stone-600">表示数: {item.views.toLocaleString()}</p>
+                <p className="mt-1 text-sm text-stone-600">平均保存率: {formatPercent(item.saveRate)}</p>
+                <p className="mt-1 text-sm text-stone-600">平均ER: {formatPercent(item.engagementRate)}</p>
+                <p className="mt-1 text-sm text-stone-600">平均AIスコア: {item.aiScore ? `${item.aiScore.toFixed(1)}点` : "未分析"}</p>
+              </div>
+            ))}
+            {!annualReport.categoryRows.length ? <p className="text-sm text-stone-500">対象年度のカテゴリ付き投稿がありません。</p> : null}
+          </div>
         </Panel>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -368,6 +509,23 @@ function Ranking({ title, posts }: { title: string; posts: InstagramPost[] }) {
   );
 }
 
+function AnnualRanking({ title, posts }: { title: string; posts: InstagramPost[] }) {
+  return (
+    <div className="rounded-md border border-stone-200 bg-white/80 p-4">
+      <h3 className="mb-3 font-semibold">{title}</h3>
+      <div className="space-y-3">
+        {posts.map((post) => (
+          <Link href={`/posts/detail?id=${post.id}`} key={post.id} className="block rounded-md border border-stone-200 p-3 hover:border-moss">
+            <p className="text-sm font-semibold">{post.date} / ER {formatPercent(getMetrics(post).engagementRate)}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-stone-600">{post.caption}</p>
+          </Link>
+        ))}
+        {!posts.length ? <p className="text-sm text-stone-500">対象年度の投稿がありません。</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function ProgressCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-stone-200 bg-white/80 p-3">
@@ -396,4 +554,19 @@ function GoalProgress({ label, actual, target, suffix, decimal = false }: { labe
 function formatDateTime(value?: string) {
   if (!value) return "未記録";
   return new Date(value).toLocaleString("ja-JP");
+}
+
+function fiscalMonths(year: number, startMonth: number) {
+  return Array.from({ length: 12 }, (_, index) => {
+    const monthIndex = startMonth - 1 + index;
+    const targetYear = year + Math.floor(monthIndex / 12);
+    const targetMonth = (monthIndex % 12) + 1;
+    return `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
+  });
+}
+
+function getFiscalYear(month: string, startMonth: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  if (!year || !monthNumber) return new Date().getFullYear();
+  return monthNumber >= startMonth ? year : year - 1;
 }
