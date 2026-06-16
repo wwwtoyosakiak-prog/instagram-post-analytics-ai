@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, CategoryAiReport, ImprovementTask, InstagramAccount, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
+import { loadAccountsData, loadAnalysesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, CategoryAiReport, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics, postCategoryOptions, taskStatusLabels } from "@/lib/metrics";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
+  const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [accountId, setAccountId] = useState("all");
   const [month, setMonth] = useState("");
@@ -25,10 +26,11 @@ export default function ReportsPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData()]).then(([loadedPosts, loadedAccounts, loadedTasks]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
+      setGoals(loadedGoals);
       setMonth(loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7));
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
@@ -95,6 +97,10 @@ export default function ReportsPage() {
       completionRate: targetTasks.length ? (done / targetTasks.length) * 100 : 0
     };
   }, [tasks, monthlyPosts, month, accountId]);
+
+  const selectedGoal = useMemo(() => {
+    return goals.find((goal) => goal.month === month && (goal.accountId ?? null) === (accountId === "all" ? null : accountId)) ?? null;
+  }, [goals, month, accountId]);
 
   const displayReport = selectedReport ?? report;
 
@@ -239,6 +245,20 @@ export default function ReportsPage() {
           <Stat label="平均保存数" value={Math.round(displayReport.averageSaves).toLocaleString()} />
           <Stat label="平均エンゲージメント率" value={formatPercent(displayReport.averageEngagementRate)} />
         </div>
+        <Panel className="mt-6">
+          <h2 className="font-semibold">目標達成率</h2>
+          {selectedGoal ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-5">
+              <GoalProgress label="投稿数" actual={monthlyPosts.length} target={selectedGoal.targetPosts} suffix="件" />
+              <GoalProgress label="表示数" actual={displayReport.totalViews} target={selectedGoal.targetViews} suffix="" />
+              <GoalProgress label="保存数" actual={monthlyPosts.reduce((sum, post) => sum + post.saves, 0)} target={selectedGoal.targetSaves} suffix="" />
+              <GoalProgress label="平均保存率" actual={average(monthlyPosts.map((post) => getMetrics(post).saveRate))} target={selectedGoal.targetSaveRate} suffix="%" decimal />
+              <GoalProgress label="平均ER" actual={displayReport.averageEngagementRate} target={selectedGoal.targetEngagementRate} suffix="%" decimal />
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-stone-600">この月の目標は未設定です。目標管理ページで設定すると、レポートにも達成率が表示されます。</p>
+          )}
+        </Panel>
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
           <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
@@ -353,6 +373,22 @@ function ProgressCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border border-stone-200 bg-white/80 p-3">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
       <p className="mt-2 text-lg font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function GoalProgress({ label, actual, target, suffix, decimal = false }: { label: string; actual: number; target: number; suffix: string; decimal?: boolean }) {
+  const rate = target > 0 ? Math.min((actual / target) * 100, 999) : 0;
+  const actualText = decimal ? actual.toFixed(2) : Math.round(actual).toLocaleString();
+  const targetText = decimal ? target.toFixed(2) : Math.round(target).toLocaleString();
+  return (
+    <div className="rounded-md border border-stone-200 bg-white/80 p-3">
+      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
+      <p className="mt-2 text-lg font-bold text-ink">{target > 0 ? `${rate.toFixed(0)}%` : "未設定"}</p>
+      <p className="mt-1 text-xs text-stone-600">実績 {actualText}{suffix} / 目標 {targetText}{suffix}</p>
+      <div className="mt-3 h-2 rounded-full bg-stone-100">
+        <div className="h-2 rounded-full bg-moss" style={{ width: `${Math.min(rate, 100)}%` }} />
+      </div>
     </div>
   );
 }

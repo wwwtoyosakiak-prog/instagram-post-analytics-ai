@@ -2,25 +2,31 @@
 
 import {
   addAccount,
+  addGoal,
   addPost,
   addTask,
   deleteAccount,
+  deleteGoal,
   deletePost,
   deleteTask,
   loadAccounts,
+  loadGoals,
   loadPosts,
   loadTasks,
   saveAccounts,
+  saveGoals,
   savePosts,
   saveTasks,
   updateAccount,
+  updateGoal,
   updatePost,
   updateTask,
   upsertManyAccounts,
+  upsertManyGoals,
   upsertManyPosts,
   upsertManyTasks
 } from "@/lib/storage";
-import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput } from "@/lib/types";
+import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 
 type ServerStatus = {
@@ -190,10 +196,12 @@ export async function pushLocalBackupToServer() {
   const accounts = loadAccounts();
   const posts = loadPosts();
   const tasks = loadTasks();
+  const goals = loadGoals();
   await upsertAccountsData(accounts);
   await upsertPostsData(posts);
   await upsertTasksData(tasks);
-  return { accounts: accounts.length, posts: posts.length, tasks: tasks.length };
+  await upsertGoalsData(goals);
+  return { accounts: accounts.length, posts: posts.length, tasks: tasks.length, goals: goals.length };
 }
 
 export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord[]> {
@@ -312,5 +320,76 @@ export async function upsertTasksData(tasks: ImprovementTask[]) {
     if (!isServerStorageDisabled(error)) console.warn(error);
     upsertManyTasks(tasks);
     return tasks;
+  }
+}
+
+export async function loadGoalsData(accountId?: string, month?: string): Promise<MonthlyGoal[]> {
+  const params = new URLSearchParams();
+  if (accountId) params.set("accountId", accountId);
+  if (month) params.set("month", month);
+  try {
+    const data = await requestJson<{ goals: MonthlyGoal[] }>(`/api/data/goals?${params.toString()}`);
+    if (accountId || month) {
+      upsertManyGoals(data.goals);
+    } else {
+      saveGoals(data.goals);
+    }
+    return data.goals;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return loadGoals().filter((goal) => (!accountId || goal.accountId === accountId || (accountId === "all" && !goal.accountId)) && (!month || goal.month === month));
+  }
+}
+
+export async function addGoalData(input: MonthlyGoalInput) {
+  try {
+    const data = await requestJson<{ goal: MonthlyGoal }>("/api/data/goals", {
+      method: "POST",
+      body: JSON.stringify({ goal: input })
+    });
+    upsertManyGoals([data.goal]);
+    return data.goal;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return addGoal(input);
+  }
+}
+
+export async function updateGoalData(id: string, input: MonthlyGoalInput) {
+  try {
+    const data = await requestJson<{ goal: MonthlyGoal | null }>("/api/data/goals", {
+      method: "PUT",
+      body: JSON.stringify({ id, goal: input })
+    });
+    if (data.goal) upsertManyGoals([data.goal]);
+    return data.goal;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return updateGoal(id, input);
+  }
+}
+
+export async function deleteGoalData(id: string) {
+  try {
+    await requestJson<{ ok: true }>(`/api/data/goals?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    deleteGoal(id);
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    deleteGoal(id);
+  }
+}
+
+export async function upsertGoalsData(goals: MonthlyGoal[]) {
+  try {
+    const data = await requestJson<{ goals: MonthlyGoal[] }>("/api/data/goals", {
+      method: "POST",
+      body: JSON.stringify({ goals })
+    });
+    upsertManyGoals(data.goals);
+    return data.goals;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    upsertManyGoals(goals);
+    return goals;
   }
 }

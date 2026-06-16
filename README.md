@@ -72,6 +72,7 @@ supabase/schema.sql
 - `instagram_post_analyses`
 - `instagram_monthly_reports`
 - `instagram_improvement_tasks`
+- `instagram_monthly_goals`
 
 すでに過去版のSQLを実行済みで、AI分析履歴テーブルだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
 
@@ -89,6 +90,12 @@ supabase/add-monthly-reports.sql
 
 ```text
 supabase/add-improvement-tasks.sql
+```
+
+月間目標管理テーブルだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
+
+```text
+supabase/add-monthly-goals.sql
 ```
 
 すでに過去版の投稿テーブルを作成済みで、投稿カテゴリだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
@@ -134,8 +141,9 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 - AI分析結果CSV
 - 月次レポートCSV
 - 改善タスクCSV
+- 月間目標CSV
 
-CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結果、月次レポート、改善タスクは、Supabase保存が有効な場合に保存済みデータを取得して出力します。
+CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結果、月次レポート、改善タスク、月間目標は、Supabase保存が有効な場合に保存済みデータを取得して出力します。
 
 ## 将来のAPI・データベース連携
 
@@ -156,6 +164,7 @@ CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結
 - 投稿画像スクショの保存先URL
 - AI分析結果
 - 月次レポート結果
+- 月間目標
 - APIから取得した詳細インサイト
 
 API連携後に追加しやすい分析:
@@ -251,6 +260,18 @@ ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量
 - 状態別タスク数
 - カテゴリ別タスク数
 
+## 目標管理
+
+目標管理ページでは、月別・アカウント別に運用目標を保存できます。
+
+- 月間投稿数
+- 月間表示数
+- 月間保存数
+- 平均保存率
+- 平均エンゲージメント率
+
+保存した目標は、目標管理ページ、ダッシュボード、月次レポートで達成率として確認できます。PDF出力にも目標達成率が含まれます。
+
 ## カテゴリ別AIレポート
 
 月次レポートページでは、カテゴリ別の数値集計に加えて、AIによるカテゴリ別総評を作成できます。
@@ -266,6 +287,7 @@ ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量
 月次レポートページの「PDF出力」から、ブラウザの印刷機能を使ってPDF保存できます。
 
 - 月次レポート
+- 目標達成率
 - カテゴリ別AIレポート
 - 改善タスク進捗
 - 伸びた投稿TOP3

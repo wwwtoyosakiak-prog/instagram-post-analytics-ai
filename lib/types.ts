@@ -89,6 +89,23 @@ export type MonthlyReportRecord = MonthlyReport & {
   updatedAt: string;
 };
 
+export type MonthlyGoalInput = {
+  accountId?: string | null;
+  month: string;
+  targetPosts: number;
+  targetViews: number;
+  targetSaves: number;
+  targetSaveRate: number;
+  targetEngagementRate: number;
+  memo: string;
+};
+
+export type MonthlyGoal = MonthlyGoalInput & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ImprovementTaskStatus = "todo" | "doing" | "done";
 
 export type ImprovementTaskInput = {

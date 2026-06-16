@@ -1,4 +1,4 @@
-import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
+import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
 import { getMetrics, postCategoryLabels, postTypeLabels, taskStatusLabels } from "@/lib/metrics";
 
 const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "category", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
@@ -274,5 +274,38 @@ export function exportTasksCsv(tasks: ImprovementTask[], postById: Record<string
         task.updatedAt
       ];
     })
+  ]);
+}
+
+export function exportGoalsCsv(goals: MonthlyGoal[], accountNameById: Record<string, string> = {}) {
+  return createCsv([
+    [
+      "id",
+      "month",
+      "accountId",
+      "accountName",
+      "targetPosts",
+      "targetViews",
+      "targetSaves",
+      "targetSaveRate",
+      "targetEngagementRate",
+      "memo",
+      "createdAt",
+      "updatedAt"
+    ],
+    ...goals.map((goal) => [
+      goal.id,
+      goal.month,
+      goal.accountId ?? "",
+      goal.accountId ? accountNameById[goal.accountId] ?? "" : "すべて",
+      goal.targetPosts,
+      goal.targetViews,
+      goal.targetSaves,
+      goal.targetSaveRate,
+      goal.targetEngagementRate,
+      goal.memo,
+      goal.createdAt,
+      goal.updatedAt
+    ])
   ]);
 }

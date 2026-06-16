@@ -1,10 +1,11 @@
 "use client";
 
-import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput } from "@/lib/types";
+import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
 
 const POSTS_STORAGE_KEY = "instagram-ai-posts-v1";
 const ACCOUNTS_STORAGE_KEY = "instagram-ai-accounts-v1";
 const TASKS_STORAGE_KEY = "instagram-ai-tasks-v1";
+const GOALS_STORAGE_KEY = "instagram-ai-goals-v1";
 
 export type LocalBackup = {
   exportedAt: string;
@@ -12,6 +13,7 @@ export type LocalBackup = {
   accounts: InstagramAccount[];
   posts: InstagramPost[];
   tasks?: ImprovementTask[];
+  goals?: MonthlyGoal[];
 };
 
 export function loadPosts(): InstagramPost[] {
@@ -113,13 +115,59 @@ export function upsertManyTasks(nextTasks: ImprovementTask[]) {
   saveTasks([...nextTasks.filter((task) => !ids.has(task.id)), ...current]);
 }
 
+export function loadGoals(): MonthlyGoal[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(GOALS_STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as MonthlyGoal[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveGoals(goals: MonthlyGoal[]) {
+  window.localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+}
+
+export function addGoal(input: MonthlyGoalInput) {
+  const now = new Date().toISOString();
+  const goal: MonthlyGoal = {
+    ...input,
+    accountId: input.accountId || null,
+    id: crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now
+  };
+  saveGoals([goal, ...loadGoals()]);
+  return goal;
+}
+
+export function updateGoal(id: string, input: MonthlyGoalInput) {
+  const goals = loadGoals();
+  const updated = goals.map((goal) => (goal.id === id ? { ...goal, ...input, accountId: input.accountId || null, updatedAt: new Date().toISOString() } : goal));
+  saveGoals(updated);
+  return updated.find((goal) => goal.id === id) ?? null;
+}
+
+export function deleteGoal(id: string) {
+  saveGoals(loadGoals().filter((goal) => goal.id !== id));
+}
+
+export function upsertManyGoals(nextGoals: MonthlyGoal[]) {
+  const current = loadGoals();
+  const ids = new Set(current.map((goal) => goal.id));
+  saveGoals([...nextGoals.filter((goal) => !ids.has(goal.id)), ...current]);
+}
+
 export function exportLocalBackup(): LocalBackup {
   return {
     exportedAt: new Date().toISOString(),
     version: 1,
     accounts: loadAccounts(),
     posts: loadPosts(),
-    tasks: loadTasks()
+    tasks: loadTasks(),
+    goals: loadGoals()
   };
 }
 
@@ -127,12 +175,14 @@ export function importLocalBackup(backup: LocalBackup) {
   saveAccounts(Array.isArray(backup.accounts) ? backup.accounts : []);
   savePosts(Array.isArray(backup.posts) ? backup.posts : []);
   saveTasks(Array.isArray(backup.tasks) ? backup.tasks : []);
+  saveGoals(Array.isArray(backup.goals) ? backup.goals : []);
 }
 
 export function clearLocalData() {
   saveAccounts([]);
   savePosts([]);
   saveTasks([]);
+  saveGoals([]);
 }
 
 export function loadAccounts(): InstagramAccount[] {

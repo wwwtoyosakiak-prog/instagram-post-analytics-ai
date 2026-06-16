@@ -3,21 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { ImprovementTask, InstagramAccount, InstagramPost, PostType } from "@/lib/types";
+import { loadAccountsData, loadAnalysesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, PostType } from "@/lib/types";
 import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 
 export default function DashboardPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
+  const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData()]).then(([loadedPosts, loadedAccounts, loadedTasks]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
+      setGoals(loadedGoals);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
@@ -26,6 +28,16 @@ export default function DashboardPage() {
 
   const data = useMemo(() => {
     const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
+    const currentMonthKey = currentMonth();
+    const monthlyPosts = targetPosts.filter((post) => post.date.startsWith(currentMonthKey));
+    const monthlyActual = {
+      posts: monthlyPosts.length,
+      views: monthlyPosts.reduce((sum, post) => sum + post.views, 0),
+      saves: monthlyPosts.reduce((sum, post) => sum + post.saves, 0),
+      saveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
+      engagementRate: average(monthlyPosts.map((post) => getMetrics(post).engagementRate))
+    };
+    const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && (goal.accountId ?? null) === (accountId === "all" ? null : accountId)) ?? null;
     const targetPostIds = new Set(targetPosts.map((post) => post.id));
     const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
     const targetTasks = tasks.filter((task) => !task.postId || accountId === "all" || targetPostIds.has(task.postId));
@@ -85,6 +97,9 @@ export default function DashboardPage() {
       bestCategory: [...categoryData].filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate)[0],
       bestAiScoreCategory: [...categoryData].filter((item) => item.averageAiScore > 0).sort((a, b) => b.averageAiScore - a.averageAiScore)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
+      currentMonthKey,
+      monthlyActual,
+      selectedGoal,
       taskCount: targetTasks.length,
       openTaskCount: openTasks.length,
       overdueTaskCount: overdueTasks.length,
@@ -93,7 +108,7 @@ export default function DashboardPage() {
       nextTaskPost: nextTask?.postId ? postById[nextTask.postId] : undefined,
       count: targetPosts.length
     };
-  }, [posts, tasks, accountId, latestScoreByPostId]);
+  }, [posts, tasks, goals, accountId, latestScoreByPostId]);
 
   return (
     <div>
@@ -134,6 +149,20 @@ export default function DashboardPage() {
               <Insight label="期限切れ" value={`${data.overdueTaskCount}件`} />
               <Insight label="次の期限" value={data.nextTask ? `${data.nextTask.dueDate} / ${data.nextTaskPost?.date ?? "投稿未紐づけ"}` : "期限付きタスクなし"} />
             </div>
+          </Panel>
+          <Panel className="mb-6">
+            <h2 className="font-semibold">今月の目標達成率</h2>
+            {data.selectedGoal ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-5">
+                <Progress label="投稿数" actual={data.monthlyActual.posts} target={data.selectedGoal.targetPosts} suffix="件" />
+                <Progress label="表示数" actual={data.monthlyActual.views} target={data.selectedGoal.targetViews} suffix="" />
+                <Progress label="保存数" actual={data.monthlyActual.saves} target={data.selectedGoal.targetSaves} suffix="" />
+                <Progress label="平均保存率" actual={data.monthlyActual.saveRate} target={data.selectedGoal.targetSaveRate} suffix="%" decimal />
+                <Progress label="平均ER" actual={data.monthlyActual.engagementRate} target={data.selectedGoal.targetEngagementRate} suffix="%" decimal />
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-stone-600">{data.currentMonthKey} の目標は未設定です。目標管理ページで設定できます。</p>
+            )}
           </Panel>
         </>
       ) : null}
@@ -252,11 +281,31 @@ function toDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 function Insight({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
       <p className="mt-2 text-base font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function Progress({ label, actual, target, suffix, decimal = false }: { label: string; actual: number; target: number; suffix: string; decimal?: boolean }) {
+  const rate = target > 0 ? Math.min((actual / target) * 100, 999) : 0;
+  const actualText = decimal ? actual.toFixed(2) : Math.round(actual).toLocaleString();
+  const targetText = decimal ? target.toFixed(2) : Math.round(target).toLocaleString();
+  return (
+    <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
+      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
+      <p className="mt-2 text-lg font-bold text-ink">{target > 0 ? `${rate.toFixed(0)}%` : "未設定"}</p>
+      <p className="mt-1 text-xs text-stone-600">実績 {actualText}{suffix} / 目標 {targetText}{suffix}</p>
+      <div className="mt-3 h-2 rounded-full bg-white">
+        <div className="h-2 rounded-full bg-moss" style={{ width: `${Math.min(rate, 100)}%` }} />
+      </div>
     </div>
   );
 }
