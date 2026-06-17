@@ -13,6 +13,9 @@ type AccountRow = {
   industry: string | null;
   target_audience: string | null;
   goal: string | null;
+  openai_api_key_env_name: string | null;
+  openai_model: string | null;
+  analysis_instructions: string | null;
   memo: string | null;
   created_at: string;
   updated_at: string;
@@ -143,6 +146,9 @@ function mapAccount(row: AccountRow): InstagramAccount {
     industry: row.industry ?? "",
     targetAudience: row.target_audience ?? "",
     goal: row.goal ?? "",
+    openaiApiKeyEnvName: row.openai_api_key_env_name ?? "",
+    openaiModel: row.openai_model ?? "",
+    analysisInstructions: row.analysis_instructions ?? "",
     memo: row.memo ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -157,6 +163,9 @@ function accountToRow(input: InstagramAccountInput) {
     industry: input.industry,
     target_audience: input.targetAudience,
     goal: input.goal,
+    openai_api_key_env_name: input.openaiApiKeyEnvName,
+    openai_model: input.openaiModel,
+    analysis_instructions: input.analysisInstructions,
     memo: input.memo
   };
 }

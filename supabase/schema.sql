@@ -8,6 +8,9 @@ create table if not exists public.instagram_accounts (
   industry text,
   target_audience text,
   goal text,
+  openai_api_key_env_name text,
+  openai_model text,
+  analysis_instructions text,
   memo text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

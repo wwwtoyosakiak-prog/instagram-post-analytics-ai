@@ -11,6 +11,9 @@ export const sampleAccounts: InstagramAccount[] = [
     industry: "アウトドア用品",
     targetAudience: "週末キャンプを楽しむ30代から40代の会社員、キャンプ初心者",
     goal: "ブランド認知、EC流入、保存されるノウハウ投稿の強化",
+    openaiApiKeyEnvName: "",
+    openaiModel: "",
+    analysisInstructions: "初心者にも伝わるアウトドア投稿か、保存したくなる実用性があるかを重視して評価する。",
     memo: "軽量・機能性・初心者でも扱いやすい世界観を重視"
   }
 ];

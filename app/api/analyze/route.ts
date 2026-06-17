@@ -6,9 +6,15 @@ export async function POST(request: Request) {
   const { post, account } = (await request.json()) as { post?: InstagramPost; account?: InstagramAccount | null };
   if (!post) return NextResponse.json({ error: "投稿データがありません。" }, { status: 400 });
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKeyEnvName = account?.openaiApiKeyEnvName?.trim();
+  const apiKey = apiKeyEnvName ? process.env[apiKeyEnvName] : process.env.OPENAI_API_KEY;
+  const model = account?.openaiModel?.trim() || process.env.OPENAI_MODEL || "gpt-4.1-mini";
   if (!apiKey) {
-    return NextResponse.json({ error: ".env.local に OPENAI_API_KEY を設定してください。APIキーなしの場合はサンプル分析を使えます。" }, { status: 400 });
+    return NextResponse.json({
+      error: apiKeyEnvName
+        ? `.env.local またはVercelに ${apiKeyEnvName} を設定してください。`
+        : ".env.local に OPENAI_API_KEY を設定してください。APIキーなしの場合はサンプル分析を使えます。"
+    }, { status: 400 });
   }
 
   const metrics = getMetrics(post);
@@ -20,6 +26,7 @@ export async function POST(request: Request) {
 - 業種: ${account?.industry || "未設定"}
 - ターゲット: ${account?.targetAudience || "未設定"}
 - 運用目的: ${account?.goal || "未設定"}
+- アカウント専用の分析方針: ${account?.analysisInstructions || "未設定"}
 - 投稿日: ${post.date}
 - データ登録日: ${post.recordedDate ?? post.date}
 - 投稿URL: ${post.url || "なし"}
@@ -65,7 +72,7 @@ export async function POST(request: Request) {
       Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+      model,
       input: [{ role: "user", content }],
       text: { format: { type: "json_object" } }
     })
@@ -77,5 +84,5 @@ export async function POST(request: Request) {
   }
 
   const raw = data.output_text ?? data.output?.flatMap((item: { content?: { text?: string }[] }) => item.content ?? []).map((item: { text?: string }) => item.text).join("");
-  return NextResponse.json({ analysis: JSON.parse(raw) });
+  return NextResponse.json({ analysis: JSON.parse(raw), model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
 }

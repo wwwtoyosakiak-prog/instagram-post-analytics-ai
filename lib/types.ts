@@ -8,6 +8,9 @@ export type InstagramAccountInput = {
   industry: string;
   targetAudience: string;
   goal: string;
+  openaiApiKeyEnvName: string;
+  openaiModel: string;
+  analysisInstructions: string;
   memo: string;
 };
 
