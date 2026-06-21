@@ -34,9 +34,33 @@ create table if not exists public.instagram_posts (
   views integer not null default 0,
   memo text,
   screenshot text,
+  media_type text,
+  media_url text,
+  thumbnail_url text,
+  permalink text,
+  "timestamp" timestamptz,
+  username text,
+  like_count bigint not null default 0,
+  comments_count bigint not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists public.instagram_post_insight_snapshots (
+  id text primary key default gen_random_uuid()::text,
+  post_id text not null references public.instagram_posts(id) on delete cascade,
+  captured_at timestamptz not null default now(),
+  views bigint not null default 0,
+  reach bigint not null default 0,
+  saved bigint not null default 0,
+  shares bigint not null default 0,
+  total_interactions bigint not null default 0,
+  like_count bigint not null default 0,
+  comments_count bigint not null default 0
+);
+
+create index if not exists instagram_post_insight_snapshots_post_captured_idx
+  on public.instagram_post_insight_snapshots (post_id, captured_at desc);
 
 create table if not exists public.instagram_post_analyses (
   id text primary key default gen_random_uuid()::text,
@@ -135,6 +159,7 @@ for each row execute function public.set_updated_at();
 
 alter table public.instagram_accounts enable row level security;
 alter table public.instagram_posts enable row level security;
+alter table public.instagram_post_insight_snapshots enable row level security;
 alter table public.instagram_post_analyses enable row level security;
 alter table public.instagram_monthly_reports enable row level security;
 alter table public.instagram_improvement_tasks enable row level security;
