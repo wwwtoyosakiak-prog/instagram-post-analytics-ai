@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,6 +58,19 @@ type AnalysisRow = {
   score: number;
   score_delta: number | null;
   created_at: string;
+};
+
+type InsightSnapshotRow = {
+  id: string;
+  post_id: string;
+  captured_at: string;
+  views: number;
+  reach: number;
+  saved: number;
+  shares: number;
+  total_interactions: number;
+  like_count: number;
+  comments_count: number;
 };
 
 type MonthlyReportRow = {
@@ -231,6 +244,21 @@ function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
     score: row.score,
     scoreDelta: row.score_delta,
     createdAt: row.created_at
+  };
+}
+
+function mapInsightSnapshot(row: InsightSnapshotRow): InstagramInsightSnapshot {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    capturedAt: row.captured_at,
+    views: Number(row.views),
+    reach: Number(row.reach),
+    saved: Number(row.saved),
+    shares: Number(row.shares),
+    totalInteractions: Number(row.total_interactions),
+    likeCount: Number(row.like_count),
+    commentsCount: Number(row.comments_count)
   };
 }
 
@@ -441,6 +469,13 @@ export async function createAnalysisInSupabase(postId: string, analysis: AiAnaly
     body: JSON.stringify(analysisToRow(postId, analysis, scoreDelta))
   });
   return mapAnalysis(rows[0]);
+}
+
+export async function getLatestInsightSnapshotFromSupabase(postId: string) {
+  const rows = await supabaseRequest<InsightSnapshotRow[]>(
+    `instagram_post_insight_snapshots?post_id=eq.${encodeURIComponent(postId)}&select=*&order=captured_at.desc&limit=1`
+  );
+  return rows[0] ? mapInsightSnapshot(rows[0]) : null;
 }
 
 export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {

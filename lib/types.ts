@@ -45,6 +45,19 @@ export type InstagramPost = InstagramPostInput & {
   updatedAt: string;
 };
 
+export type InstagramInsightSnapshot = {
+  id: string;
+  postId: string;
+  capturedAt: string;
+  views: number;
+  reach: number;
+  saved: number;
+  shares: number;
+  totalInteractions: number;
+  likeCount: number;
+  commentsCount: number;
+};
+
 export type PostMetrics = {
   engagement: number;
   engagementRate: number;

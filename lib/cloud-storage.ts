@@ -26,7 +26,7 @@ import {
   upsertManyPosts,
   upsertManyTasks
 } from "@/lib/storage";
-import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
+import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 
 type ServerStatus = {
@@ -211,6 +211,16 @@ export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
     return [];
+  }
+}
+
+export async function loadLatestInsightData(postId: string): Promise<InstagramInsightSnapshot | null> {
+  try {
+    const data = await requestJson<{ insight: InstagramInsightSnapshot | null }>(`/api/data/insights?postId=${encodeURIComponent(postId)}`);
+    return data.insight;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return null;
   }
 }
 

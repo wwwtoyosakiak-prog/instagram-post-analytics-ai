@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
-import { AiAnalysis, AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost } from "@/lib/types";
+import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadLatestInsightData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postCategoryLabels, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
@@ -27,19 +27,24 @@ function PostDetailContent() {
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
+  const [latestInsight, setLatestInsight] = useState<InstagramInsightSnapshot | null>(null);
+  const [insightLoading, setInsightLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [savingAnalysis, setSavingAnalysis] = useState(false);
   const [error, setError] = useState("");
   const [analysisMessage, setAnalysisMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id)]).then(([posts, accounts, analyses, loadedTasks]) => {
+    setInsightLoading(true);
+    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id), loadLatestInsightData(id)]).then(([posts, accounts, analyses, loadedTasks, insight]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
       setAccount(accounts.find((item) => item.id === foundPost?.accountId) ?? null);
       setAnalysisHistory(analyses);
       setAnalysis(analyses[0] ?? null);
       setTasks(loadedTasks);
+      setLatestInsight(insight);
+      setInsightLoading(false);
     });
   }, [id]);
 
@@ -123,6 +128,7 @@ function PostDetailContent() {
         <Stat label="保存率" value={formatPercent(metrics.saveRate)} />
         <Stat label="コメント率" value={formatPercent(metrics.commentRate)} />
       </div>
+      <LatestInsightSection insight={latestInsight} loading={insightLoading} />
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <Panel>
           {post.screenshot ? <img src={post.screenshot} alt="投稿画像" className="mb-4 max-h-[520px] w-full rounded-md object-contain" /> : <div className="mb-4 rounded-md bg-stone-100 p-8 text-center text-sm text-stone-500">画像スクショ未登録</div>}
@@ -164,6 +170,35 @@ function PostDetailContent() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+function LatestInsightSection({ insight, loading }: { insight: InstagramInsightSnapshot | null; loading: boolean }) {
+  return (
+    <section className="mt-7 border-y border-stone-200 py-6">
+      <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-ink">最新のInstagramインサイト</h2>
+          <p className="mt-1 text-sm text-stone-600">Instagram Graph APIから同期した最新値です。</p>
+        </div>
+        {insight ? <p className="text-xs font-semibold text-stone-500">取得日時: {formatDateTime(insight.capturedAt)}</p> : null}
+      </div>
+      {loading ? (
+        <p className="text-sm text-stone-600">インサイトを読み込んでいます。</p>
+      ) : insight ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Stat label="閲覧数" value={insight.views.toLocaleString()} />
+          <Stat label="リーチ" value={insight.reach.toLocaleString()} />
+          <Stat label="保存数" value={insight.saved.toLocaleString()} />
+          <Stat label="シェア数" value={insight.shares.toLocaleString()} />
+          <Stat label="総インタラクション" value={insight.totalInteractions.toLocaleString()} />
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">
+          この投稿のインサイトはまだありません。Graph APIページで同期後、再度確認してください。
+        </div>
+      )}
+    </section>
   );
 }
 
