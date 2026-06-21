@@ -24,6 +24,8 @@ export default function AccountsPage() {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const refresh = async () => setAccounts(await loadAccountsData());
 
@@ -37,17 +39,26 @@ export default function AccountsPage() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    setSaving(true);
+    setError("");
     const input = { ...form, username: form.username.replace(/^@/, "") };
-    if (editingId) {
-      await updateAccountData(editingId, input);
-      setMessage("アカウントを更新しました。");
-    } else {
-      await addAccountData(input);
-      setMessage("アカウントを登録しました。");
+    try {
+      if (editingId) {
+        await updateAccountData(editingId, input);
+        setMessage("アカウントを更新しました。");
+      } else {
+        await addAccountData(input);
+        setMessage("アカウントを登録しました。");
+      }
+      setForm(initialForm);
+      setEditingId(null);
+      await refresh();
+    } catch (caught) {
+      setMessage("");
+      setError(caught instanceof Error ? `保存に失敗しました: ${caught.message}` : "アカウントの保存に失敗しました。");
+    } finally {
+      setSaving(false);
     }
-    setForm(initialForm);
-    setEditingId(null);
-    await refresh();
   };
 
   const startEdit = (account: InstagramAccount) => {
@@ -75,16 +86,28 @@ export default function AccountsPage() {
 
   const removeAccount = async (account: InstagramAccount) => {
     if (!window.confirm(`${account.name} を削除しますか？投稿データ自体は削除されません。`)) return;
-    await deleteAccountData(account.id);
-    if (editingId === account.id) cancelEdit();
-    setMessage("アカウントを削除しました。");
-    await refresh();
+    setError("");
+    try {
+      await deleteAccountData(account.id);
+      if (editingId === account.id) cancelEdit();
+      setMessage("アカウントを削除しました。");
+      await refresh();
+    } catch (caught) {
+      setMessage("");
+      setError(caught instanceof Error ? `削除に失敗しました: ${caught.message}` : "アカウントの削除に失敗しました。");
+    }
   };
 
   const addSamples = async () => {
-    await upsertAccountsData(sampleAccounts);
-    setMessage("サンプルアカウントを追加しました。");
-    await refresh();
+    setError("");
+    try {
+      await upsertAccountsData(sampleAccounts);
+      setMessage("サンプルアカウントを追加しました。");
+      await refresh();
+    } catch (caught) {
+      setMessage("");
+      setError(caught instanceof Error ? `追加に失敗しました: ${caught.message}` : "サンプルアカウントの追加に失敗しました。");
+    }
   };
 
   return (
@@ -148,12 +171,13 @@ export default function AccountsPage() {
               <textarea rows={3} value={form.memo} onChange={(e) => setValue("memo", e.target.value)} />
             </div>
             <div className="flex flex-wrap gap-2 md:col-span-2">
-              <Button type="submit">{editingId ? "変更を保存" : "登録する"}</Button>
+              <Button type="submit" disabled={saving}>{saving ? "保存中..." : editingId ? "変更を保存" : "登録する"}</Button>
               {editingId ? <Button variant="secondary" onClick={cancelEdit}>キャンセル</Button> : null}
               <Button variant="secondary" onClick={addSamples}>サンプルアカウントを追加</Button>
             </div>
           </form>
           {message ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}
+          {error ? <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm leading-6 text-red-800">{error}</p> : null}
         </Panel>
         <Panel>
           <h2 className="font-semibold">登録済みアカウント</h2>

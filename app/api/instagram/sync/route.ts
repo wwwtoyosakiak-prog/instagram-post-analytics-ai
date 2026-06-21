@@ -43,11 +43,17 @@ type GraphInsightsResponse = {
 
 type SyncError = {
   postId?: string;
-  stage: "media" | "insights" | "post_save" | "snapshot_save";
+  stage: "media" | "insights" | "account_save" | "post_save" | "snapshot_save";
   message: string;
   code?: number;
   subcode?: number;
   traceId?: string;
+};
+
+type SyncedAccount = {
+  id: string;
+  name: string;
+  username: string;
 };
 
 const MEDIA_FIELDS = [
@@ -110,6 +116,31 @@ async function supabaseRequest<T>(path: string, init: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount | null> {
+  const username = posts.find((post) => post.username)?.username?.replace(/^@/, "").trim();
+  if (!username) return null;
+
+  const existing = await supabaseRequest<SyncedAccount[]>(
+    `instagram_accounts?username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
+    { method: "GET" }
+  );
+  if (existing[0]) return existing[0];
+
+  const created = await supabaseRequest<SyncedAccount[]>("instagram_accounts", {
+    method: "POST",
+    body: JSON.stringify({
+      name: username,
+      username,
+      profile_url: `https://www.instagram.com/${encodeURIComponent(username)}/`,
+      industry: "",
+      target_audience: "",
+      goal: "",
+      memo: "Instagram Graph API同期時に自動登録"
+    })
+  });
+  return created[0] ?? null;
+}
+
 function toSyncError(error: unknown, stage: SyncError["stage"], postId?: string): SyncError {
   const graphError = error && typeof error === "object" && "graphError" in error
     ? (error as { graphError?: GraphError }).graphError
@@ -163,7 +194,7 @@ function legacyPostType(mediaType: string | undefined) {
   return "image";
 }
 
-async function syncPost(post: GraphMedia, config: InstagramGraphConfig, capturedAt: string) {
+async function syncPost(post: GraphMedia, config: InstagramGraphConfig, capturedAt: string, accountId: string | null) {
   const errors: SyncError[] = [];
   const timestamp = post.timestamp || capturedAt;
   const date = timestamp.slice(0, 10);
@@ -174,6 +205,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify({
         id: post.id,
+        account_id: accountId,
         caption: post.caption || "",
         media_type: post.media_type || null,
         media_url: post.media_url || null,
@@ -257,11 +289,20 @@ async function handler() {
   }
 
   const capturedAt = new Date().toISOString();
+  let syncedAccount: SyncedAccount | null = null;
+  try {
+    syncedAccount = await findOrCreateAccount(posts);
+  } catch (error) {
+    const detail = toSyncError(error, "account_save");
+    logSyncError(detail);
+    return NextResponse.json({ error: "Instagramアカウントの保存に失敗しました。", details: [detail] }, { status: 500 });
+  }
+
   const results = [];
   const concurrency = 5;
   for (let index = 0; index < posts.length; index += concurrency) {
     results.push(...await Promise.all(
-      posts.slice(index, index + concurrency).map((post) => syncPost(post, config, capturedAt))
+      posts.slice(index, index + concurrency).map((post) => syncPost(post, config, capturedAt, syncedAccount?.id ?? null))
     ));
   }
 
@@ -273,6 +314,7 @@ async function handler() {
     savedSnapshots: results.filter((result) => result.snapshotSaved).length,
     failedPosts: results.filter((result) => result.errors.length > 0).length,
     apiMode: config.mode,
+    account: syncedAccount,
     capturedAt,
     errors
   }, { status: errors.length ? 207 : 200 });

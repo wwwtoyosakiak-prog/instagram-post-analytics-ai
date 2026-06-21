@@ -95,7 +95,7 @@ export async function addAccountData(input: InstagramAccountInput) {
     upsertManyAccounts([data.account]);
     return data.account;
   } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
+    if (!isServerStorageDisabled(error)) throw error;
     return addAccount(input);
   }
 }
@@ -109,7 +109,7 @@ export async function updateAccountData(id: string, input: InstagramAccountInput
     if (data.account) upsertManyAccounts([data.account]);
     return data.account;
   } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
+    if (!isServerStorageDisabled(error)) throw error;
     return updateAccount(id, input);
   }
 }
@@ -119,7 +119,7 @@ export async function deleteAccountData(id: string) {
     await requestJson<{ ok: true }>(`/api/data/accounts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     deleteAccount(id);
   } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
+    if (!isServerStorageDisabled(error)) throw error;
     deleteAccount(id);
   }
 }
@@ -133,7 +133,7 @@ export async function upsertAccountsData(accounts: InstagramAccount[]) {
     upsertManyAccounts(data.accounts);
     return data.accounts;
   } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
+    if (!isServerStorageDisabled(error)) throw error;
     upsertManyAccounts(accounts);
     return accounts;
   }
