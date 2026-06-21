@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isSupabaseConfigured, listLatestInsightSnapshotsFromSupabase } from "@/lib/supabase-admin";
 
 type InstagramApiPost = {
   id: string;
@@ -21,10 +22,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: ".env.local に OPENAI_API_KEY を設定してください。" }, { status: 400 });
   }
 
+  const latestInsights = isSupabaseConfigured ? await listLatestInsightSnapshotsFromSupabase() : [];
+  const insightByPostId = new Map(latestInsights.map((insight) => [insight.postId, insight]));
+
   const prompt = `Instagramビジネスアカウントの投稿本文を分析し、改善案を日本語でJSONだけ返してください。
 
 投稿一覧:
-${targetPosts.map((post) => `- id=${post.id}, timestamp=${post.timestamp ?? "不明"}, media_type=${post.media_type ?? "不明"}, caption=${post.caption}`).join("\n")}
+${targetPosts.map((post) => {
+  const insight = insightByPostId.get(post.id);
+  const engagementRate = insight?.views ? ((insight.totalInteractions / insight.views) * 100).toFixed(2) : "未取得";
+  const saveRate = insight?.views ? ((insight.saved / insight.views) * 100).toFixed(2) : "未取得";
+  return `- id=${post.id}, timestamp=${post.timestamp ?? "不明"}, media_type=${post.media_type ?? "不明"}, views=${insight?.views ?? "未取得"}, reach=${insight?.reach ?? "未取得"}, saved=${insight?.saved ?? "未取得"}, shares=${insight?.shares ?? "未取得"}, total_interactions=${insight?.totalInteractions ?? "未取得"}, engagement_rate=${engagementRate}%, save_rate=${saveRate}%, caption=${post.caption}`;
+}).join("\n")}
 
 返却形式:
 {

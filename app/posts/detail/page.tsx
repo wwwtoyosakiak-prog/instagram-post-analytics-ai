@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadLatestInsightData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
+import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadInsightData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
 import { AiAnalysis, AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postCategoryLabels, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
@@ -28,6 +28,7 @@ function PostDetailContent() {
   const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [latestInsight, setLatestInsight] = useState<InstagramInsightSnapshot | null>(null);
+  const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [insightLoading, setInsightLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [savingAnalysis, setSavingAnalysis] = useState(false);
@@ -36,14 +37,15 @@ function PostDetailContent() {
 
   useEffect(() => {
     setInsightLoading(true);
-    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id), loadLatestInsightData(id)]).then(([posts, accounts, analyses, loadedTasks, insight]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id), loadInsightData(id)]).then(([posts, accounts, analyses, loadedTasks, insightData]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
       setAccount(accounts.find((item) => item.id === foundPost?.accountId) ?? null);
       setAnalysisHistory(analyses);
       setAnalysis(analyses[0] ?? null);
       setTasks(loadedTasks);
-      setLatestInsight(insight);
+      setLatestInsight(insightData.insight);
+      setInsightHistory(insightData.insights);
       setInsightLoading(false);
     });
   }, [id]);
@@ -129,6 +131,7 @@ function PostDetailContent() {
         <Stat label="コメント率" value={formatPercent(metrics.commentRate)} />
       </div>
       <LatestInsightSection insight={latestInsight} loading={insightLoading} />
+      <InsightTrend snapshots={insightHistory} />
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <Panel>
           {post.screenshot ? <img src={post.screenshot} alt="投稿画像" className="mb-4 max-h-[520px] w-full rounded-md object-contain" /> : <div className="mb-4 rounded-md bg-stone-100 p-8 text-center text-sm text-stone-500">画像スクショ未登録</div>}
@@ -170,6 +173,41 @@ function PostDetailContent() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) {
+  if (!snapshots.length) return null;
+  const rows = [...snapshots].reverse().map((snapshot) => ({
+    date: new Date(snapshot.capturedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    閲覧数: snapshot.views,
+    リーチ: snapshot.reach,
+    保存数: snapshot.saved,
+    シェア数: snapshot.shares
+  }));
+
+  return (
+    <section className="mt-7">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-ink">インサイト推移</h2>
+        <p className="mt-1 text-sm text-stone-600">同期ごとの数値変化を確認できます。現在 {snapshots.length} 回分です。</p>
+      </div>
+      <div className="h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={rows} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" minTickGap={28} />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="閲覧数" stroke="#53624a" strokeWidth={3} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="リーチ" stroke="#b55d3e" strokeWidth={3} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="保存数" stroke="#266b65" strokeWidth={2} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="シェア数" stroke="#8b6f47" strokeWidth={2} dot={{ r: 3 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
   );
 }
 

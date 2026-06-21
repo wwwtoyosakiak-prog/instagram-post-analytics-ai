@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLatestInsightSnapshotFromSupabase, isSupabaseConfigured } from "@/lib/supabase-admin";
+import { isSupabaseConfigured, listInsightSnapshotsFromSupabase } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured) {
@@ -11,6 +11,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "postId is required." }, { status: 400 });
   }
 
-  const insight = await getLatestInsightSnapshotFromSupabase(postId);
-  return NextResponse.json({ insight });
+  const insights = await listInsightSnapshotsFromSupabase(postId);
+  return NextResponse.json({ insight: insights[0] ?? null, insights });
 }

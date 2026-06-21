@@ -44,6 +44,10 @@ export async function POST(request: Request) {
 - エンゲージメント率: ${metrics.engagementRate.toFixed(2)}%
 - 保存率: ${metrics.saveRate.toFixed(2)}%
 - コメント率: ${metrics.commentRate.toFixed(2)}%
+- APIインサイト取得日時: ${post.latestInsight?.capturedAt ?? "未取得"}
+- APIリーチ: ${post.latestInsight?.reach ?? "未取得"}
+- API総インタラクション: ${post.latestInsight?.totalInteractions ?? "未取得"}
+- 数値データの出典: ${post.latestInsight ? "Instagram Graph APIの最新同期値" : "手入力値"}
 - メモ: ${post.memo || "なし"}
 
 返却形式:

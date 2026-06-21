@@ -43,6 +43,7 @@ export type InstagramPost = InstagramPostInput & {
   id: string;
   createdAt: string;
   updatedAt: string;
+  latestInsight?: InstagramInsightSnapshot;
 };
 
 export type InstagramInsightSnapshot = {

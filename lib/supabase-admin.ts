@@ -415,8 +415,25 @@ export async function upsertAccountsInSupabase(accounts: InstagramAccount[]) {
 }
 
 export async function listPostsFromSupabase() {
-  const rows = await supabaseRequest<PostRow[]>("instagram_posts?select=*&order=date.desc");
-  return rows.map(mapPost);
+  const [rows, latestInsights] = await Promise.all([
+    supabaseRequest<PostRow[]>("instagram_posts?select=*&order=date.desc"),
+    listLatestInsightSnapshotsFromSupabase()
+  ]);
+  const insightByPostId = new Map(latestInsights.map((insight) => [insight.postId, insight]));
+  return rows.map((row) => {
+    const post = mapPost(row);
+    const insight = insightByPostId.get(post.id);
+    if (!insight) return post;
+    return {
+      ...post,
+      views: insight.views,
+      saves: insight.saved,
+      shares: insight.shares,
+      likes: insight.likeCount,
+      comments: insight.commentsCount,
+      latestInsight: insight
+    };
+  });
 }
 
 export async function createPostInSupabase(input: InstagramPostInput) {
@@ -471,11 +488,22 @@ export async function createAnalysisInSupabase(postId: string, analysis: AiAnaly
   return mapAnalysis(rows[0]);
 }
 
-export async function getLatestInsightSnapshotFromSupabase(postId: string) {
+export async function listInsightSnapshotsFromSupabase(postId: string) {
   const rows = await supabaseRequest<InsightSnapshotRow[]>(
-    `instagram_post_insight_snapshots?post_id=eq.${encodeURIComponent(postId)}&select=*&order=captured_at.desc&limit=1`
+    `instagram_post_insight_snapshots?post_id=eq.${encodeURIComponent(postId)}&select=*&order=captured_at.desc`
   );
-  return rows[0] ? mapInsightSnapshot(rows[0]) : null;
+  return rows.map(mapInsightSnapshot);
+}
+
+export async function listLatestInsightSnapshotsFromSupabase() {
+  const rows = await supabaseRequest<InsightSnapshotRow[]>(
+    "instagram_post_insight_snapshots?select=*&order=captured_at.desc"
+  );
+  const latestByPostId = new Map<string, InstagramInsightSnapshot>();
+  for (const row of rows) {
+    if (!latestByPostId.has(row.post_id)) latestByPostId.set(row.post_id, mapInsightSnapshot(row));
+  }
+  return [...latestByPostId.values()];
 }
 
 export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {

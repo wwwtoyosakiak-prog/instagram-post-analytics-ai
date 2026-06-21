@@ -27,12 +27,24 @@ type CaptionAnalysis = {
   hashtagAdvice: string[];
 };
 
+type SyncResult = {
+  success: boolean;
+  fetchedPosts: number;
+  savedPosts: number;
+  savedSnapshots: number;
+  failedPosts: number;
+  capturedAt: string;
+  errors: Array<{ postId?: string; stage: string; message: string }>;
+};
+
 export default function InstagramApiPage() {
   const [profile, setProfile] = useState<InstagramProfile | null>(null);
   const [posts, setPosts] = useState<InstagramApiPost[]>([]);
   const [analysis, setAnalysis] = useState<CaptionAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [message, setMessage] = useState("");
 
   const dailyRows = useMemo(() => {
@@ -94,6 +106,24 @@ export default function InstagramApiPage() {
     }
   };
 
+  const syncPosts = async () => {
+    setSyncing(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/instagram/sync", { method: "POST" });
+      const data = (await response.json()) as SyncResult & { error?: string };
+      if (!response.ok && response.status !== 207) throw new Error(data.error ?? "Instagram同期に失敗しました。");
+      setSyncResult(data);
+      setMessage(data.success
+        ? `${data.savedPosts}件の投稿と${data.savedSnapshots}件のインサイトを保存しました。`
+        : `${data.savedPosts}件を保存しましたが、${data.failedPosts}件でエラーが発生しました。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Instagram同期に失敗しました。");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Instagram Graph API連携" description="Instagramビジネスアカウントの投稿をサーバー側で取得し、投稿本文をAI分析します。" />
@@ -105,11 +135,39 @@ export default function InstagramApiPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={fetchPosts} disabled={loading}>{loading ? "取得中..." : "Graph APIから取得"}</Button>
+            <Button variant="secondary" onClick={syncPosts} disabled={syncing}>{syncing ? "同期中..." : "Supabaseへ同期"}</Button>
             <Button variant="secondary" onClick={analyzePosts} disabled={analyzing || !posts.length}>{analyzing ? "分析中..." : "投稿本文をAI分析"}</Button>
           </div>
         </div>
         {message ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}
       </Panel>
+
+      {syncResult ? (
+        <section className="mb-6 border-y border-stone-200 py-5">
+          <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="font-semibold">最新の同期結果</h2>
+              <p className="mt-1 text-sm text-stone-600">最終同期: {formatDate(syncResult.capturedAt)}</p>
+            </div>
+            <p className={`text-sm font-semibold ${syncResult.success ? "text-emerald-700" : "text-red-700"}`}>
+              {syncResult.success ? "同期成功" : "一部失敗"}
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <SyncMetric label="取得投稿" value={syncResult.fetchedPosts} />
+            <SyncMetric label="投稿保存" value={syncResult.savedPosts} />
+            <SyncMetric label="履歴保存" value={syncResult.savedSnapshots} />
+            <SyncMetric label="失敗" value={syncResult.failedPosts} />
+          </div>
+          {syncResult.errors.length ? (
+            <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800">
+              {syncResult.errors.slice(0, 5).map((error, index) => (
+                <p key={`${error.postId ?? "sync"}-${index}`}>{error.postId ? `${error.postId}: ` : ""}{error.message}</p>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="mb-6 grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         <Stat label="取得投稿数" value={`${totals.postCount}件`} />
@@ -185,6 +243,15 @@ export default function InstagramApiPage() {
           {!posts.length ? <p className="py-8 text-center text-sm text-stone-500">まだ投稿を取得していません。</p> : null}
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function SyncMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="border-l-2 border-moss px-3 py-1">
+      <p className="text-xs font-semibold text-stone-500">{label}</p>
+      <p className="mt-1 text-xl font-bold text-ink">{value.toLocaleString()}件</p>
     </div>
   );
 }

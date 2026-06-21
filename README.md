@@ -112,6 +112,16 @@ INSTAGRAM_GRAPH_API_MODE=instagram_login
 
 Metaの「Instagramでメッセージとコンテンツを管理」から発行した `instagram_business_*` 権限のトークンは、`INSTAGRAM_GRAPH_API_MODE=instagram_login` を設定します。この方式では `/me/media` を使うため、`INSTAGRAM_BUSINESS_ACCOUNT_ID` は不要です。従来のFacebookログイン方式を使う場合は `INSTAGRAM_GRAPH_API_MODE=facebook_login` とアカウントIDを設定します。
 
+### 自動同期
+
+`vercel.json` により、Vercel Cronが毎日午前6時ごろ（日本時間）に `/api/instagram/sync` を実行します。VercelのEnvironment Variablesに推測されにくい長い文字列を設定してください。
+
+```env
+CRON_SECRET=replace-with-a-long-random-string
+```
+
+Graph APIページの「Supabaseへ同期」では手動同期もできます。投稿詳細には最新値と同期履歴グラフを表示し、一覧・ダッシュボード・レポート・AI分析では最新のAPI値を優先します。
+
 ## アカウント別のAI/API設定
 
 アカウント登録ページで、アカウントごとにAI分析用の設定を管理できます。

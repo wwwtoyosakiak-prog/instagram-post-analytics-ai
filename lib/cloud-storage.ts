@@ -214,13 +214,12 @@ export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord
   }
 }
 
-export async function loadLatestInsightData(postId: string): Promise<InstagramInsightSnapshot | null> {
+export async function loadInsightData(postId: string): Promise<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }> {
   try {
-    const data = await requestJson<{ insight: InstagramInsightSnapshot | null }>(`/api/data/insights?postId=${encodeURIComponent(postId)}`);
-    return data.insight;
+    return await requestJson<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }>(`/api/data/insights?postId=${encodeURIComponent(postId)}`);
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
-    return null;
+    return { insight: null, insights: [] };
   }
 }
 
