@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createInstagramGraphUrl, getInstagramGraphConfig } from "@/lib/instagram-graph";
 
 type InstagramMedia = {
   id: string;
@@ -12,47 +13,55 @@ type InstagramProfileResponse = {
   followers_count?: number;
   follows_count?: number;
   media_count?: number;
-  media?: {
-    data?: InstagramMedia[];
-    paging?: {
-      next?: string;
-    };
-  };
   error?: {
     message?: string;
   };
 };
 
-export async function GET() {
-  const accessToken = process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN;
-  const instagramBusinessAccountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
-  const version = process.env.INSTAGRAM_GRAPH_API_VERSION || "v23.0";
+type InstagramMediaResponse = {
+  data?: InstagramMedia[];
+  error?: { message?: string };
+};
 
-  if (!accessToken || !instagramBusinessAccountId) {
+export async function GET() {
+  let config;
+  try {
+    config = getInstagramGraphConfig();
+  } catch (error) {
     return NextResponse.json(
-      { error: ".env.local またはVercelに INSTAGRAM_GRAPH_ACCESS_TOKEN と INSTAGRAM_BUSINESS_ACCOUNT_ID を設定してください。" },
+      { error: error instanceof Error ? error.message : "Instagram API設定が不正です。" },
       { status: 400 }
     );
   }
 
-  const fields = "followers_count,follows_count,media_count,media.limit(100){id,caption,timestamp,media_type,permalink}";
-  const url = new URL(`https://graph.facebook.com/${version}/${instagramBusinessAccountId}`);
-  url.searchParams.set("fields", fields);
-  url.searchParams.set("access_token", accessToken);
+  const profileUrl = createInstagramGraphUrl(config, config.accountResource);
+  profileUrl.searchParams.set("fields", "followers_count,follows_count,media_count");
+  profileUrl.searchParams.set("access_token", config.accessToken);
 
-  const response = await fetch(url.toString(), { cache: "no-store" });
-  const data = (await response.json()) as InstagramProfileResponse;
+  const mediaUrl = createInstagramGraphUrl(config, `${config.accountResource}/media`);
+  mediaUrl.searchParams.set("fields", "id,caption,timestamp,media_type,permalink");
+  mediaUrl.searchParams.set("limit", "100");
+  mediaUrl.searchParams.set("access_token", config.accessToken);
 
-  if (!response.ok) {
-    return NextResponse.json({ error: data.error?.message ?? "Instagram Graph APIの取得に失敗しました。" }, { status: response.status });
+  const [profileResponse, mediaResponse] = await Promise.all([
+    fetch(profileUrl, { cache: "no-store" }),
+    fetch(mediaUrl, { cache: "no-store" })
+  ]);
+  const profile = (await profileResponse.json()) as InstagramProfileResponse;
+  const media = (await mediaResponse.json()) as InstagramMediaResponse;
+
+  if (!profileResponse.ok || !mediaResponse.ok) {
+    const status = !profileResponse.ok ? profileResponse.status : mediaResponse.status;
+    return NextResponse.json({ error: profile.error?.message ?? media.error?.message ?? "Instagram Graph APIの取得に失敗しました。" }, { status });
   }
 
   return NextResponse.json({
     profile: {
-      followers_count: data.followers_count ?? 0,
-      follows_count: data.follows_count ?? 0,
-      media_count: data.media_count ?? 0
+      followers_count: profile.followers_count ?? 0,
+      follows_count: profile.follows_count ?? 0,
+      media_count: profile.media_count ?? 0
     },
-    posts: data.media?.data ?? []
+    posts: media.data ?? [],
+    apiMode: config.mode
   });
 }

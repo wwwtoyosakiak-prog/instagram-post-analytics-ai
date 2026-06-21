@@ -43,6 +43,7 @@ OPENAI_API_KEY=sk-your-api-key
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_API_KEY_OZOPS=sk-account-specific-key
 INSTAGRAM_GRAPH_ACCESS_TOKEN=your-instagram-graph-api-token
+INSTAGRAM_GRAPH_API_MODE=instagram_login
 INSTAGRAM_BUSINESS_ACCOUNT_ID=your-instagram-business-account-id
 INSTAGRAM_GRAPH_API_VERSION=v23.0
 SUPABASE_URL=https://your-project-ref.supabase.co
@@ -63,6 +64,7 @@ Instagram Graph APIを使う場合は、ローカルでは `.env.local`、Vercel
 
 ```env
 INSTAGRAM_GRAPH_ACCESS_TOKEN=your-instagram-graph-api-token
+INSTAGRAM_GRAPH_API_MODE=instagram_login
 INSTAGRAM_BUSINESS_ACCOUNT_ID=your-instagram-business-account-id
 INSTAGRAM_GRAPH_API_VERSION=v23.0
 ```
@@ -103,9 +105,12 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 INSTAGRAM_GRAPH_API_VERSION=v23.0
 INSTAGRAM_BUSINESS_ACCOUNT_ID=your-instagram-business-account-id
 INSTAGRAM_GRAPH_ACCESS_TOKEN=your-instagram-graph-api-token
+INSTAGRAM_GRAPH_API_MODE=instagram_login
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` と `INSTAGRAM_GRAPH_ACCESS_TOKEN` はVercelのサーバー側だけで使用します。`NEXT_PUBLIC_` は付けず、GitHubへコミットしないでください。
+
+Metaの「Instagramでメッセージとコンテンツを管理」から発行した `instagram_business_*` 権限のトークンは、`INSTAGRAM_GRAPH_API_MODE=instagram_login` を設定します。この方式では `/me/media` を使うため、`INSTAGRAM_BUSINESS_ACCOUNT_ID` は不要です。従来のFacebookログイン方式を使う場合は `INSTAGRAM_GRAPH_API_MODE=facebook_login` とアカウントIDを設定します。
 
 ## アカウント別のAI/API設定
 

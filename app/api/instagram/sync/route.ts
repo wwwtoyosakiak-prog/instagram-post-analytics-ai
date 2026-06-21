@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createInstagramGraphUrl, getInstagramGraphConfig, InstagramGraphConfig } from "@/lib/instagram-graph";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -123,11 +124,11 @@ function toSyncError(error: unknown, stage: SyncError["stage"], postId?: string)
   };
 }
 
-async function fetchAllMedia(accountId: string, version: string, accessToken: string) {
-  const firstUrl = new URL(`https://graph.facebook.com/${version}/${accountId}/media`);
+async function fetchAllMedia(config: InstagramGraphConfig) {
+  const firstUrl = createInstagramGraphUrl(config, `${config.accountResource}/media`);
   firstUrl.searchParams.set("fields", MEDIA_FIELDS);
   firstUrl.searchParams.set("limit", "100");
-  firstUrl.searchParams.set("access_token", accessToken);
+  firstUrl.searchParams.set("access_token", config.accessToken);
 
   const posts: GraphMedia[] = [];
   let nextUrl: URL | null = firstUrl;
@@ -139,10 +140,10 @@ async function fetchAllMedia(accountId: string, version: string, accessToken: st
   return posts;
 }
 
-async function fetchInsights(postId: string, version: string, accessToken: string) {
-  const url = new URL(`https://graph.facebook.com/${version}/${postId}/insights`);
+async function fetchInsights(postId: string, config: InstagramGraphConfig) {
+  const url = createInstagramGraphUrl(config, `${postId}/insights`);
   url.searchParams.set("metric", INSIGHT_METRICS);
-  url.searchParams.set("access_token", accessToken);
+  url.searchParams.set("access_token", config.accessToken);
   const response = await graphRequest<GraphInsightsResponse>(url);
   const values = Object.fromEntries(
     (response.data || []).map((metric) => [metric.name, Number(metric.values?.[0]?.value || 0)])
@@ -162,7 +163,7 @@ function legacyPostType(mediaType: string | undefined) {
   return "image";
 }
 
-async function syncPost(post: GraphMedia, version: string, accessToken: string, capturedAt: string) {
+async function syncPost(post: GraphMedia, config: InstagramGraphConfig, capturedAt: string) {
   const errors: SyncError[] = [];
   const timestamp = post.timestamp || capturedAt;
   const date = timestamp.slice(0, 10);
@@ -201,7 +202,7 @@ async function syncPost(post: GraphMedia, version: string, accessToken: string, 
 
   let insights;
   try {
-    insights = await fetchInsights(post.id, version, accessToken);
+    insights = await fetchInsights(post.id, config);
   } catch (error) {
     const detail = toSyncError(error, "insights", post.id);
     logSyncError(detail);
@@ -230,23 +231,25 @@ async function syncPost(post: GraphMedia, version: string, accessToken: string, 
 }
 
 async function handler() {
-  const accessToken = process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN;
-  const accountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
-  const version = process.env.INSTAGRAM_GRAPH_API_VERSION || "v23.0";
-
   const missing = [
     !process.env.SUPABASE_URL && "SUPABASE_URL",
     !process.env.SUPABASE_SERVICE_ROLE_KEY && "SUPABASE_SERVICE_ROLE_KEY",
-    !accountId && "INSTAGRAM_BUSINESS_ACCOUNT_ID",
-    !accessToken && "INSTAGRAM_GRAPH_ACCESS_TOKEN"
+    !process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN && "INSTAGRAM_GRAPH_ACCESS_TOKEN"
   ].filter(Boolean);
   if (missing.length) {
     return NextResponse.json({ error: `環境変数が不足しています: ${missing.join(", ")}` }, { status: 500 });
   }
 
+  let config: InstagramGraphConfig;
+  try {
+    config = getInstagramGraphConfig();
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Instagram API設定が不正です。" }, { status: 500 });
+  }
+
   let posts: GraphMedia[];
   try {
-    posts = await fetchAllMedia(accountId!, version, accessToken!);
+    posts = await fetchAllMedia(config);
   } catch (error) {
     const detail = toSyncError(error, "media");
     logSyncError(detail);
@@ -258,7 +261,7 @@ async function handler() {
   const concurrency = 5;
   for (let index = 0; index < posts.length; index += concurrency) {
     results.push(...await Promise.all(
-      posts.slice(index, index + concurrency).map((post) => syncPost(post, version, accessToken!, capturedAt))
+      posts.slice(index, index + concurrency).map((post) => syncPost(post, config, capturedAt))
     ));
   }
 
@@ -269,6 +272,7 @@ async function handler() {
     savedPosts: results.filter((result) => result.postSaved).length,
     savedSnapshots: results.filter((result) => result.snapshotSaved).length,
     failedPosts: results.filter((result) => result.errors.length > 0).length,
+    apiMode: config.mode,
     capturedAt,
     errors
   }, { status: errors.length ? 207 : 200 });
