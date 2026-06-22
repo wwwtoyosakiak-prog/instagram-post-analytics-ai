@@ -29,8 +29,10 @@ export default function ReportsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [reportGeneratedAt, setReportGeneratedAt] = useState("");
 
   useEffect(() => {
+    setReportGeneratedAt(new Date().toISOString());
     Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadCategoriesData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedCategories, loadedInsights]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
@@ -329,7 +331,7 @@ export default function ReportsPage() {
         <Panel className="hidden print:block">
           <p className="text-xs font-semibold uppercase text-clay">Instagram Analytics Report</p>
           <h1 className="mt-2 text-2xl font-bold text-ink">{displayReport.month} 月次レポート</h1>
-          <p className="mt-2 text-sm text-stone-600">対象: {accounts.find((account) => account.id === accountId)?.name ?? "すべて"} / 出力日時: {formatDateTime(new Date().toISOString())}</p>
+          <p className="mt-2 text-sm text-stone-600">対象: {accounts.find((account) => account.id === accountId)?.name ?? "すべて"} / 出力日時: {formatDateTime(reportGeneratedAt)}</p>
         </Panel>
 
         <Panel className="mb-6">
