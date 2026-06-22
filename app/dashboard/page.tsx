@@ -7,6 +7,7 @@ import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
 import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostCategoryDefinition, PostType } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
+import { calculateInsightGrowth } from "@/lib/insight-growth";
 
 type GrowthAnalysis = {
   summary: string;
@@ -78,6 +79,14 @@ export default function DashboardPage() {
         return { hour: `${hour}:00`, views, growth, postCount: snapshots.size };
       });
   }, [posts, insightHistory, accountId, insightDate]);
+
+  const periodGrowth = useMemo(() => {
+    const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
+    return {
+      week: calculateInsightGrowth(targetPosts, insightHistory, 7),
+      month: calculateInsightGrowth(targetPosts, insightHistory, 30)
+    };
+  }, [posts, insightHistory, accountId]);
 
   const growingVideos = useMemo(() => {
     const periodDays = videoPeriod === "day" ? 1 : videoPeriod === "week" ? 7 : 30;
@@ -479,6 +488,16 @@ export default function DashboardPage() {
           <p className="mt-5 rounded-md bg-fog p-4 text-sm text-stone-600">選択日の同期履歴はまだありません。</p>
         )}
       </Panel>
+      <section className="mt-6 border-y border-stone-200 py-6">
+        <div>
+          <h2 className="font-semibold">週・月の伸び</h2>
+          <p className="mt-1 text-sm text-stone-600">Instagram APIの同期履歴から、期間内の増加数を比較します。</p>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <GrowthSummaryPanel title="直近7日" summary={periodGrowth.week} />
+          <GrowthSummaryPanel title="直近30日" summary={periodGrowth.month} />
+        </div>
+      </section>
     </div>
   );
 }
@@ -500,6 +519,32 @@ function GrowthPattern({ title, items }: { title: string; items: string[] }) {
         {items.map((item) => <li key={item}>{item}</li>)}
       </ul>
     </section>
+  );
+}
+
+function GrowthSummaryPanel({ title, summary }: { title: string; summary: ReturnType<typeof calculateInsightGrowth> }) {
+  return (
+    <div className="rounded-md border border-stone-200 bg-white/80 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-ink">{title}</h3>
+        <span className="text-xs text-stone-500">対象 {summary.syncedPosts}投稿</span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Insight label="閲覧増加" value={`+${summary.viewsGrowth.toLocaleString()}`} />
+        <Insight label="成長率" value={`+${summary.viewsGrowthRate.toFixed(1)}%`} />
+        <Insight label="保存増加" value={`+${summary.savedGrowth.toLocaleString()}`} />
+        <Insight label="シェア増加" value={`+${summary.sharesGrowth.toLocaleString()}`} />
+      </div>
+      <div className="mt-4 grid gap-2">
+        {summary.topPosts.map((item, index) => (
+          <Link key={item.post.id} href={`/posts/detail?id=${item.post.id}`} className="flex items-center justify-between gap-3 border-t border-stone-100 pt-2 text-sm hover:text-clay">
+            <span className="line-clamp-1">{index + 1}. {videoTitle(item.post)}</span>
+            <span className="shrink-0 font-semibold">+{item.viewsGrowth.toLocaleString()}</span>
+          </Link>
+        ))}
+        {!summary.topPosts.length ? <p className="text-sm text-stone-500">この期間の同期履歴はまだありません。</p> : null}
+      </div>
+    </div>
   );
 }
 

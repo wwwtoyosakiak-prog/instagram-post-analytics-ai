@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, CategoryAiReport, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition } from "@/lib/types";
+import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, CategoryAiReport, ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition } from "@/lib/types";
 import { average, formatPercent, getMetrics, taskStatusLabels } from "@/lib/metrics";
+import { calculateInsightGrowth, InsightGrowthSummary } from "@/lib/insight-growth";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -13,6 +14,7 @@ export default function ReportsPage() {
   const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
+  const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [accountId, setAccountId] = useState("all");
   const [month, setMonth] = useState("");
@@ -29,12 +31,13 @@ export default function ReportsPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedCategories]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadCategoriesData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedCategories, loadedInsights]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
       setGoals(loadedGoals);
       setCategories(loadedCategories);
+      setInsightHistory(loadedInsights);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
       setMonth(initialMonth);
       setFiscalYear(String(getFiscalYear(initialMonth, fiscalStartMonth)));
@@ -163,6 +166,14 @@ export default function ReportsPage() {
   }, [posts, tasks, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId, categories]);
 
   const displayReport = selectedReport ?? report;
+
+  const growthReport = useMemo(() => {
+    const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
+    return {
+      week: calculateInsightGrowth(targetPosts, insightHistory, 7),
+      month: calculateInsightGrowth(targetPosts, insightHistory, 30)
+    };
+  }, [posts, insightHistory, accountId]);
 
   const createAiReport = async () => {
     const account = accounts.find((item) => item.id === accountId) ?? null;
@@ -402,6 +413,14 @@ export default function ReportsPage() {
             <p className="mt-3 text-sm text-stone-600">この月の目標は未設定です。目標管理ページで設定すると、レポートにも達成率が表示されます。</p>
           )}
         </Panel>
+        <Panel className="mt-6">
+          <h2 className="font-semibold">週次・月次の伸びレポート</h2>
+          <p className="mt-2 text-sm text-stone-600">Instagram APIの同期履歴を基準に、閲覧数などの増加を集計しています。</p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <GrowthReportBlock title="直近7日" summary={growthReport.week} />
+            <GrowthReportBlock title="直近30日" summary={growthReport.month} />
+          </div>
+        </Panel>
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
           <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
@@ -533,6 +552,32 @@ function ProgressCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border border-stone-200 bg-white/80 p-3">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
       <p className="mt-2 text-lg font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function GrowthReportBlock({ title, summary }: { title: string; summary: InsightGrowthSummary }) {
+  return (
+    <div className="rounded-md border border-stone-200 bg-white/80 p-4">
+      <h3 className="font-semibold">{title}</h3>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <p>閲覧増加: <strong>+{summary.viewsGrowth.toLocaleString()}</strong></p>
+        <p>成長率: <strong>+{summary.viewsGrowthRate.toFixed(1)}%</strong></p>
+        <p>リーチ増加: <strong>+{summary.reachGrowth.toLocaleString()}</strong></p>
+        <p>保存増加: <strong>+{summary.savedGrowth.toLocaleString()}</strong></p>
+        <p>シェア増加: <strong>+{summary.sharesGrowth.toLocaleString()}</strong></p>
+        <p>総反応増加: <strong>+{summary.interactionsGrowth.toLocaleString()}</strong></p>
+      </div>
+      <h4 className="mt-4 text-sm font-semibold">伸びた投稿TOP3</h4>
+      <div className="mt-2 grid gap-2">
+        {summary.topPosts.map((item, index) => (
+          <Link key={item.post.id} href={`/posts/detail?id=${item.post.id}`} className="flex justify-between gap-3 border-t border-stone-100 pt-2 text-sm hover:text-clay">
+            <span className="line-clamp-1">{index + 1}. {item.post.caption || item.post.date}</span>
+            <span className="shrink-0 font-semibold">+{item.viewsGrowth.toLocaleString()}</span>
+          </Link>
+        ))}
+        {!summary.topPosts.length ? <p className="text-sm text-stone-500">同期履歴がまだありません。</p> : null}
+      </div>
     </div>
   );
 }
