@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { PageHeader, Panel, Stat } from "@/components/ui";
+import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
 import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostType } from "@/lib/types";
 import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
+
+type GrowthAnalysis = {
+  summary: string;
+  openingPatterns: string[];
+  themes: string[];
+  formatPatterns: string[];
+  hashtagPatterns: string[];
+  nextActions: string[];
+};
 
 export default function DashboardPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -17,6 +26,9 @@ export default function DashboardPage() {
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
+  const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
+  const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
+  const [growthAnalysisError, setGrowthAnalysisError] = useState("");
   useEffect(() => {
     Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights]) => {
       setPosts(loadedPosts);
@@ -55,6 +67,28 @@ export default function DashboardPage() {
       return [{ post, growth, views: latest.views, reach: latest.reach, snapshotCount: snapshots.length }];
     }).sort((a, b) => b.growth - a.growth || b.views - a.views).slice(0, 5);
   }, [posts, insightHistory, accountId, videoPeriod]);
+
+  const analyzeGrowingVideos = async () => {
+    if (!growingVideos.length) return;
+    if (!window.confirm("上位動画の共通点をOpenAI APIで分析します。API料金が発生します。実行しますか？")) return;
+    setGrowthAnalysisLoading(true);
+    setGrowthAnalysisError("");
+    try {
+      const account = accounts.find((item) => item.id === accountId) ?? null;
+      const response = await fetch("/api/instagram/growth-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ posts: growingVideos, period: videoPeriod, account })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "共通点分析に失敗しました。");
+      setGrowthAnalysis(data.analysis);
+    } catch (error) {
+      setGrowthAnalysisError(error instanceof Error ? error.message : "共通点分析に失敗しました。");
+    } finally {
+      setGrowthAnalysisLoading(false);
+    }
+  };
 
   const data = useMemo(() => {
     const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
@@ -172,7 +206,11 @@ export default function DashboardPage() {
                   <button
                     key={period}
                     type="button"
-                    onClick={() => setVideoPeriod(period)}
+                    onClick={() => {
+                      setVideoPeriod(period);
+                      setGrowthAnalysis(null);
+                      setGrowthAnalysisError("");
+                    }}
                     className={`h-9 min-w-16 rounded px-3 text-sm font-semibold transition ${videoPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
                   >
                     {period === "day" ? "日" : period === "week" ? "週" : "月"}
@@ -186,9 +224,14 @@ export default function DashboardPage() {
                   <Link
                     key={item.post.id}
                     href={`/posts/detail?id=${item.post.id}`}
-                    className="grid gap-3 border-b border-stone-200 px-2 py-4 transition hover:bg-white/60 md:grid-cols-[52px_1fr_auto] md:items-center"
+                    className="grid gap-3 border-b border-stone-200 px-2 py-4 transition hover:bg-white/60 md:grid-cols-[52px_64px_1fr_auto] md:items-center"
                   >
                     <span className="text-2xl font-bold text-clay">{index + 1}</span>
+                    {getPostPreview(item.post) ? (
+                      <img src={getPostPreview(item.post)} alt="投稿サムネイル" className="h-16 w-16 rounded-md object-cover" />
+                    ) : (
+                      <span className="flex h-16 w-16 items-center justify-center rounded-md bg-fog text-[10px] text-stone-500">画像なし</span>
+                    )}
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-ink">{videoTitle(item.post)}</span>
                       <span className="mt-1 block text-xs text-stone-500">投稿日 {item.post.date} / リーチ {item.reach.toLocaleString()}</span>
@@ -204,6 +247,25 @@ export default function DashboardPage() {
               <p className="mt-5 rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">この期間に同期された動画データがありません。</p>
             )}
             <p className="mt-3 text-xs leading-5 text-stone-500">期間内の履歴が1回だけの場合は、現在の閲覧数を増加値として表示します。継続同期すると実際の差分になります。</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button onClick={analyzeGrowingVideos} disabled={!growingVideos.length || growthAnalysisLoading}>
+                {growthAnalysisLoading ? "共通点を分析中..." : "上位動画の共通点をAI分析"}
+              </Button>
+              {growthAnalysisError ? <p className="text-sm text-red-700">{growthAnalysisError}</p> : null}
+            </div>
+            {growthAnalysis ? (
+              <div className="mt-6 border-t border-stone-200 pt-5">
+                <h3 className="font-semibold text-ink">AIによる共通点分析</h3>
+                <p className="mt-2 text-sm leading-6 text-stone-700">{growthAnalysis.summary}</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <GrowthPattern title="冒頭文・フック" items={growthAnalysis.openingPatterns} />
+                  <GrowthPattern title="テーマ" items={growthAnalysis.themes} />
+                  <GrowthPattern title="動画形式・構成" items={growthAnalysis.formatPatterns} />
+                  <GrowthPattern title="ハッシュタグ" items={growthAnalysis.hashtagPatterns} />
+                  <GrowthPattern title="次回アクション" items={growthAnalysis.nextActions} />
+                </div>
+              </div>
+            ) : null}
           </section>
           <Panel className="mb-6">
             <h2 className="font-semibold">読み取りポイント</h2>
@@ -351,6 +413,21 @@ export default function DashboardPage() {
 function videoTitle(post: InstagramPost) {
   const firstLine = post.caption.split("\n").map((line) => line.trim()).find(Boolean);
   return firstLine || `${post.date}の動画投稿`;
+}
+
+function getPostPreview(post: InstagramPost) {
+  return post.screenshot || post.thumbnailUrl || post.mediaUrl || "";
+}
+
+function GrowthPattern({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section className="border-l-2 border-clay pl-4">
+      <h4 className="text-sm font-semibold text-ink">{title}</h4>
+      <ul className="mt-2 grid gap-2 text-sm leading-6 text-stone-700">
+        {items.map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </section>
+  );
 }
 
 function toDateKey(date: Date) {

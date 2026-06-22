@@ -159,6 +159,7 @@ export default function PostsPage() {
             <table>
               <thead>
                 <tr>
+                  <th>投稿</th>
                   <th>投稿日</th>
                   <th>データ登録日</th>
                   <th>アカウント</th>
@@ -181,6 +182,7 @@ export default function PostsPage() {
                   const metrics = getMetrics(post);
                   return (
                     <tr key={post.id}>
+                      <td><PostThumbnail post={post} className="h-14 w-14" /></td>
                       <td>{post.date}</td>
                       <td>{post.recordedDate ?? post.date}</td>
                       <td>{post.accountId ? accountNameById[post.accountId] ?? "未登録" : "未選択"}</td>
@@ -226,8 +228,8 @@ function PostCard({ post, accountName, aiScore }: { post: InstagramPost; account
   return (
     <Link href={`/posts/detail?id=${post.id}`} className="group overflow-hidden rounded-lg border border-stone-200 bg-white/82 shadow-panel transition hover:border-moss hover:bg-white">
       <div className="aspect-[4/3] bg-fog">
-        {post.screenshot ? (
-          <img src={post.screenshot} alt="投稿画像" className="h-full w-full object-cover transition group-hover:scale-[1.02]" />
+        {getPostPreview(post) ? (
+          <img src={getPostPreview(post)} alt="投稿サムネイル" className="h-full w-full object-cover transition group-hover:scale-[1.02]" />
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-stone-500">画像スクショ未登録</div>
         )}
@@ -249,6 +251,19 @@ function PostCard({ post, accountName, aiScore }: { post: InstagramPost; account
       </div>
     </Link>
   );
+}
+
+function PostThumbnail({ post, className }: { post: InstagramPost; className: string }) {
+  const preview = getPostPreview(post);
+  return preview ? (
+    <img src={preview} alt="投稿サムネイル" className={`${className} rounded-md object-cover`} />
+  ) : (
+    <span className={`${className} flex items-center justify-center rounded-md bg-fog text-[10px] text-stone-500`}>画像なし</span>
+  );
+}
+
+function getPostPreview(post: InstagramPost) {
+  return post.screenshot || post.thumbnailUrl || post.mediaUrl || "";
 }
 
 function CardMetric({ label, value }: { label: string; value: string }) {

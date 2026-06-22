@@ -39,6 +39,10 @@ type PostRow = {
   views: number;
   memo: string | null;
   screenshot: string | null;
+  media_type: string | null;
+  media_url: string | null;
+  thumbnail_url: string | null;
+  username: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -202,6 +206,10 @@ function mapPost(row: PostRow): InstagramPost {
     views: row.views,
     memo: row.memo ?? "",
     screenshot: row.screenshot ?? undefined,
+    mediaUrl: row.media_url ?? undefined,
+    thumbnailUrl: row.thumbnail_url ?? undefined,
+    mediaType: row.media_type ?? undefined,
+    instagramUsername: row.username ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -224,7 +232,11 @@ function postToRow(input: InstagramPostInput) {
     shares: input.shares,
     views: input.views,
     memo: input.memo,
-    screenshot: input.screenshot ?? null
+    screenshot: input.screenshot ?? null,
+    media_url: input.mediaUrl,
+    thumbnail_url: input.thumbnailUrl,
+    media_type: input.mediaType,
+    username: input.instagramUsername
   };
 }
 

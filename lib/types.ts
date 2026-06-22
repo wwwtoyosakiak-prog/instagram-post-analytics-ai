@@ -37,6 +37,10 @@ export type InstagramPostInput = {
   views: number;
   memo: string;
   screenshot?: string;
+  mediaUrl?: string;
+  thumbnailUrl?: string;
+  mediaType?: string;
+  instagramUsername?: string;
 };
 
 export type InstagramPost = InstagramPostInput & {
