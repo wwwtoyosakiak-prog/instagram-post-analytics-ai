@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
+  const [insightDate, setInsightDate] = useState("");
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
@@ -37,12 +38,46 @@ export default function DashboardPage() {
       setTasks(loadedTasks);
       setGoals(loadedGoals);
       setInsightHistory(loadedInsights);
+      const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
+      if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
       setCategories(loadedCategories);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
     });
   }, []);
+
+  const hourlyInsightData = useMemo(() => {
+    if (!insightDate) return [];
+    const targetPostIds = new Set(
+      posts
+        .filter((post) => accountId === "all" || post.accountId === accountId)
+        .map((post) => post.id)
+    );
+    const snapshotsByHour = new Map<string, Map<string, InstagramInsightSnapshot>>();
+
+    for (const snapshot of insightHistory) {
+      if (!targetPostIds.has(snapshot.postId)) continue;
+      const captured = toTokyoDateHour(snapshot.capturedAt);
+      if (captured.date !== insightDate) continue;
+      const postsInHour = snapshotsByHour.get(captured.hour) ?? new Map<string, InstagramInsightSnapshot>();
+      const current = postsInHour.get(snapshot.postId);
+      if (!current || new Date(snapshot.capturedAt).getTime() > new Date(current.capturedAt).getTime()) {
+        postsInHour.set(snapshot.postId, snapshot);
+      }
+      snapshotsByHour.set(captured.hour, postsInHour);
+    }
+
+    let previousViews: number | null = null;
+    return [...snapshotsByHour.entries()]
+      .sort(([hourA], [hourB]) => hourA.localeCompare(hourB))
+      .map(([hour, snapshots]) => {
+        const views = [...snapshots.values()].reduce((sum, snapshot) => sum + snapshot.views, 0);
+        const growth = previousViews === null ? 0 : Math.max(views - previousViews, 0);
+        previousViews = views;
+        return { hour: `${hour}:00`, views, growth, postCount: snapshots.size };
+      });
+  }, [posts, insightHistory, accountId, insightDate]);
 
   const growingVideos = useMemo(() => {
     const periodDays = videoPeriod === "day" ? 1 : videoPeriod === "week" ? 7 : 30;
@@ -415,6 +450,35 @@ export default function DashboardPage() {
           </BarChart>
         </ChartPanel>
       </div>
+      <Panel className="mt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="font-semibold">時間別の閲覧数変化</h2>
+            <p className="mt-1 text-sm text-stone-600">自動同期で保存したインサイトを、選択日の1時間ごとに表示します。</p>
+          </div>
+          <div className="w-full sm:w-52">
+            <label htmlFor="insight-date">表示する日</label>
+            <input id="insight-date" type="date" value={insightDate} onChange={(event) => setInsightDate(event.target.value)} />
+          </div>
+        </div>
+        {hourlyInsightData.length ? (
+          <div className="mt-5 h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={hourlyInsightData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="hour" />
+                <YAxis />
+                <Tooltip formatter={(value: number, name: string) => [Number(value).toLocaleString(), name]} />
+                <Legend />
+                <Line type="monotone" dataKey="views" name="合計閲覧数" stroke="#b55d3e" strokeWidth={2} />
+                <Line type="monotone" dataKey="growth" name="前回からの増加" stroke="#2f766d" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="mt-5 rounded-md bg-fog p-4 text-sm text-stone-600">選択日の同期履歴はまだありません。</p>
+        )}
+      </Panel>
     </div>
   );
 }
@@ -444,6 +508,23 @@ function toDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function toTokyoDateHour(iso: string) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(new Date(iso)).map((part) => [part.type, part.value])
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: parts.hour
+  };
 }
 
 function currentMonth() {
