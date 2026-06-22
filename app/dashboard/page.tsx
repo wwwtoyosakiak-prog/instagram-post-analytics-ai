@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, PostType } from "@/lib/types";
+import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostType } from "@/lib/types";
 import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 
 export default function DashboardPage() {
@@ -12,19 +13,48 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
+  const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
+  const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
       setGoals(loadedGoals);
+      setInsightHistory(loadedInsights);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
     });
   }, []);
+
+  const growingVideos = useMemo(() => {
+    const periodDays = videoPeriod === "day" ? 1 : videoPeriod === "week" ? 7 : 30;
+    const cutoff = Date.now() - periodDays * 24 * 60 * 60 * 1000;
+    const targetPosts = posts.filter((post) =>
+      (post.type === "video" || post.type === "reel") &&
+      (accountId === "all" || post.accountId === accountId)
+    );
+    const snapshotsByPostId = new Map<string, InstagramInsightSnapshot[]>();
+    for (const snapshot of insightHistory) {
+      const current = snapshotsByPostId.get(snapshot.postId) ?? [];
+      current.push(snapshot);
+      snapshotsByPostId.set(snapshot.postId, current);
+    }
+
+    return targetPosts.flatMap((post) => {
+      const snapshots = (snapshotsByPostId.get(post.id) ?? [])
+        .filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= cutoff)
+        .sort((a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime());
+      if (!snapshots.length) return [];
+      const first = snapshots[0];
+      const latest = snapshots[snapshots.length - 1];
+      const growth = snapshots.length >= 2 ? Math.max(latest.views - first.views, 0) : latest.views;
+      return [{ post, growth, views: latest.views, reach: latest.reach, snapshotCount: snapshots.length }];
+    }).sort((a, b) => b.growth - a.growth || b.views - a.views).slice(0, 5);
+  }, [posts, insightHistory, accountId, videoPeriod]);
 
   const data = useMemo(() => {
     const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
@@ -131,6 +161,50 @@ export default function DashboardPage() {
             <Stat label="平均ER" value={`${data.averageEngagementRate.toFixed(2)}%`} />
             <Stat label="平均保存数" value={Math.round(data.averageSaves).toLocaleString()} />
           </div>
+          <section className="mb-6 border-y border-stone-200 py-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-ink">伸びている動画ランキング</h2>
+                <p className="mt-1 text-sm text-stone-600">同期履歴から期間内の閲覧数増加を比較します。</p>
+              </div>
+              <div className="grid grid-cols-3 gap-1 rounded-md border border-stone-200 bg-white/80 p-1" aria-label="動画ランキング期間">
+                {(["day", "week", "month"] as const).map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    onClick={() => setVideoPeriod(period)}
+                    className={`h-9 min-w-16 rounded px-3 text-sm font-semibold transition ${videoPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
+                  >
+                    {period === "day" ? "日" : period === "week" ? "週" : "月"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {growingVideos.length ? (
+              <div className="mt-5 grid gap-2">
+                {growingVideos.map((item, index) => (
+                  <Link
+                    key={item.post.id}
+                    href={`/posts/detail?id=${item.post.id}`}
+                    className="grid gap-3 border-b border-stone-200 px-2 py-4 transition hover:bg-white/60 md:grid-cols-[52px_1fr_auto] md:items-center"
+                  >
+                    <span className="text-2xl font-bold text-clay">{index + 1}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-ink">{videoTitle(item.post)}</span>
+                      <span className="mt-1 block text-xs text-stone-500">投稿日 {item.post.date} / リーチ {item.reach.toLocaleString()}</span>
+                    </span>
+                    <span className="text-left md:text-right">
+                      <span className="block text-lg font-bold text-ink">+{item.growth.toLocaleString()} 閲覧</span>
+                      <span className="mt-1 block text-xs text-stone-500">現在 {item.views.toLocaleString()} / 履歴 {item.snapshotCount}回</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-5 rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">この期間に同期された動画データがありません。</p>
+            )}
+            <p className="mt-3 text-xs leading-5 text-stone-500">期間内の履歴が1回だけの場合は、現在の閲覧数を増加値として表示します。継続同期すると実際の差分になります。</p>
+          </section>
           <Panel className="mb-6">
             <h2 className="font-semibold">読み取りポイント</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-5">
@@ -272,6 +346,11 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function videoTitle(post: InstagramPost) {
+  const firstLine = post.caption.split("\n").map((line) => line.trim()).find(Boolean);
+  return firstLine || `${post.date}の動画投稿`;
 }
 
 function toDateKey(date: Date) {

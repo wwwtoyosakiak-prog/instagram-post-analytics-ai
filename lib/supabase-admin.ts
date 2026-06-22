@@ -495,6 +495,13 @@ export async function listInsightSnapshotsFromSupabase(postId: string) {
   return rows.map(mapInsightSnapshot);
 }
 
+export async function listAllInsightSnapshotsFromSupabase() {
+  const rows = await supabaseRequest<InsightSnapshotRow[]>(
+    "instagram_post_insight_snapshots?select=*&order=captured_at.asc"
+  );
+  return rows.map(mapInsightSnapshot);
+}
+
 export async function listLatestInsightSnapshotsFromSupabase() {
   const rows = await supabaseRequest<InsightSnapshotRow[]>(
     "instagram_post_insight_snapshots?select=*&order=captured_at.desc"

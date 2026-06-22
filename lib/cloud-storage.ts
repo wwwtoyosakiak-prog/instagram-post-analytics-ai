@@ -223,6 +223,16 @@ export async function loadInsightData(postId: string): Promise<{ insight: Instag
   }
 }
 
+export async function loadAllInsightData(): Promise<InstagramInsightSnapshot[]> {
+  try {
+    const data = await requestJson<{ insights: InstagramInsightSnapshot[] }>("/api/data/insights?all=true");
+    return data.insights;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return [];
+  }
+}
+
 export async function saveAnalysisData(postId: string, analysis: AiAnalysis): Promise<AiAnalysisRecord | null> {
   try {
     const data = await requestJson<{ analysis: AiAnalysisRecord }>("/api/data/analyses", {
