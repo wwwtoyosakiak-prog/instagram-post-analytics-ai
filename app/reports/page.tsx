@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, CategoryAiReport, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
-import { average, formatPercent, getMetrics, postCategoryOptions, taskStatusLabels } from "@/lib/metrics";
+import { loadAccountsData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, CategoryAiReport, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition } from "@/lib/types";
+import { average, formatPercent, getMetrics, taskStatusLabels } from "@/lib/metrics";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
@@ -28,11 +29,12 @@ export default function ReportsPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedCategories]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
       setGoals(loadedGoals);
+      setCategories(loadedCategories);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
       setMonth(initialMonth);
       setFiscalYear(String(getFiscalYear(initialMonth, fiscalStartMonth)));
@@ -68,7 +70,7 @@ export default function ReportsPage() {
   }, [posts, month, accountId]);
 
   const categoryData = useMemo(() => {
-    return postCategoryOptions.map((category) => {
+    return categories.map((category) => {
       const items = monthlyPosts.filter((post) => (post.category ?? "other") === category.value);
       return {
         name: category.label,
@@ -80,7 +82,7 @@ export default function ReportsPage() {
         sampleCaptions: items.slice(0, 3).map((post) => post.caption)
       };
     }).filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate);
-  }, [monthlyPosts, latestAnalysisByPostId]);
+  }, [monthlyPosts, latestAnalysisByPostId, categories]);
 
   const taskProgress = useMemo(() => {
     const monthlyPostIds = new Set(monthlyPosts.map((post) => post.id));
@@ -141,7 +143,7 @@ export default function ReportsPage() {
       topPosts: ranked.slice(0, 3),
       needsWorkPosts: ranked.slice(-3).reverse(),
       monthlyRows,
-      categoryRows: postCategoryOptions.map((category) => {
+      categoryRows: categories.map((category) => {
         const items = annualPosts.filter((post) => (post.category ?? "other") === category.value);
         return {
           name: category.label,
@@ -158,7 +160,7 @@ export default function ReportsPage() {
       taskTotal: annualTasks.length,
       taskDone: annualTasks.filter((task) => task.status === "done").length
     };
-  }, [posts, tasks, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId]);
+  }, [posts, tasks, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId, categories]);
 
   const displayReport = selectedReport ?? report;
 

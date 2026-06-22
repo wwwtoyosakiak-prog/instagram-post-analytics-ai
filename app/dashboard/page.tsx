@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostType } from "@/lib/types";
-import { average, byDateAsc, getMetrics, postCategoryOptions, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
+import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostCategoryDefinition, PostType } from "@/lib/types";
+import { average, byDateAsc, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 
 type GrowthAnalysis = {
   summary: string;
@@ -20,6 +20,7 @@ type GrowthAnalysis = {
 export default function DashboardPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
@@ -30,12 +31,13 @@ export default function DashboardPage() {
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights, loadedCategories]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
       setGoals(loadedGoals);
       setInsightHistory(loadedInsights);
+      setCategories(loadedCategories);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
@@ -123,7 +125,7 @@ export default function DashboardPage() {
       const items = targetPosts.filter((post) => weekdayJa(post.date) === day);
       return { name: day, averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2)) };
     });
-    const categoryData = postCategoryOptions.map((category) => {
+    const categoryData = categories.map((category) => {
       const items = targetPosts.filter((post) => (post.category ?? "other") === category.value);
       const scores = items.map((post) => latestScoreByPostId[post.id]).filter((score): score is number => typeof score === "number");
       const categoryPostIds = new Set(items.map((post) => post.id));
@@ -172,7 +174,7 @@ export default function DashboardPage() {
       nextTaskPost: nextTask?.postId ? postById[nextTask.postId] : undefined,
       count: targetPosts.length
     };
-  }, [posts, tasks, goals, accountId, latestScoreByPostId]);
+  }, [posts, tasks, goals, accountId, latestScoreByPostId, categories]);
 
   return (
     <div>

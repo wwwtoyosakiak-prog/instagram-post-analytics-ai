@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, PostCategory, PostType } from "@/lib/types";
-import { formatPercent, getMetrics, postCategoryLabels, postCategoryOptions, postTypeLabels } from "@/lib/metrics";
+import { loadAccountsData, loadAnalysesData, loadCategoriesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
+import { InstagramAccount, InstagramPost, PostCategoryDefinition, PostType } from "@/lib/types";
+import { formatPercent, getMetrics, getPostCategoryLabel, postTypeLabels } from "@/lib/metrics";
 
 type SortKey = "date" | "recordedDate" | "likes" | "saves" | "views" | "engagementRate";
 type ViewMode = "table" | "cards";
@@ -13,9 +13,10 @@ type ViewMode = "table" | "cards";
 export default function PostsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [sort, setSort] = useState<SortKey>("date");
   const [type, setType] = useState<PostType | "all">("all");
-  const [category, setCategory] = useState<PostCategory | "all">("all");
+  const [category, setCategory] = useState<string>("all");
   const [accountId, setAccountId] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
@@ -23,9 +24,10 @@ export default function PostsPage() {
   const [aiMessage, setAiMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedCategories]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
+      setCategories(loadedCategories);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
@@ -139,9 +141,9 @@ export default function PostsPage() {
           </div>
           <div>
             <label>投稿カテゴリ</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value as PostCategory | "all")}>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="all">すべて</option>
-              {postCategoryOptions.map((option) => (
+              {categories.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
@@ -187,7 +189,7 @@ export default function PostsPage() {
                       <td>{post.recordedDate ?? post.date}</td>
                       <td>{post.accountId ? accountNameById[post.accountId] ?? "未登録" : "未選択"}</td>
                       <td>{postTypeLabels[post.type]}</td>
-                      <td>{postCategoryLabels[post.category ?? "other"]}</td>
+                      <td>{getPostCategoryLabel(post.category, categories)}</td>
                       <td>{post.mediaCount ?? 1}</td>
                       <td className="max-w-sm">{post.caption}</td>
                       <td className="max-w-xs">{post.hashtags || "なし"}</td>
@@ -213,6 +215,7 @@ export default function PostsPage() {
                 post={post}
                 accountName={post.accountId ? accountNameById[post.accountId] : undefined}
                 aiScore={latestScoreByPostId[post.id]}
+                categoryLabel={getPostCategoryLabel(post.category, categories)}
               />
             ))}
             {!filtered.length ? <p className="py-8 text-center text-sm text-stone-500 md:col-span-2 xl:col-span-3">投稿がありません。</p> : null}
@@ -223,7 +226,7 @@ export default function PostsPage() {
   );
 }
 
-function PostCard({ post, accountName, aiScore }: { post: InstagramPost; accountName?: string; aiScore?: number }) {
+function PostCard({ post, accountName, aiScore, categoryLabel }: { post: InstagramPost; accountName?: string; aiScore?: number; categoryLabel: string }) {
   const metrics = getMetrics(post);
   return (
     <Link href={`/posts/detail?id=${post.id}`} className="group overflow-hidden rounded-lg border border-stone-200 bg-white/82 shadow-panel transition hover:border-moss hover:bg-white">
@@ -236,7 +239,7 @@ function PostCard({ post, accountName, aiScore }: { post: InstagramPost; account
       </div>
       <div className="p-4">
         <div className="mb-3 flex flex-wrap gap-2 text-xs font-semibold">
-          <span className="rounded-full bg-ink px-2 py-1 text-white">{postCategoryLabels[post.category ?? "other"]}</span>
+          <span className="rounded-full bg-ink px-2 py-1 text-white">{categoryLabel}</span>
           <span className="rounded-full bg-fog px-2 py-1 text-stone-700">{postTypeLabels[post.type]}</span>
           <span className="rounded-full bg-skyglass px-2 py-1 text-ink">AI {typeof aiScore === "number" ? `${aiScore}点` : "未分析"}</span>
         </div>

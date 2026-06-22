@@ -3,9 +3,8 @@
 import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { loadAccountsData, loadPostsData, updatePostData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPostInput, PostCategory, PostType } from "@/lib/types";
-import { postCategoryOptions } from "@/lib/metrics";
+import { loadAccountsData, loadCategoriesData, loadPostsData, updatePostData } from "@/lib/cloud-storage";
+import { InstagramAccount, InstagramPostInput, PostCategoryDefinition, PostType } from "@/lib/types";
 
 export default function EditPostPage() {
   return (
@@ -20,12 +19,14 @@ function EditPostContent() {
   const router = useRouter();
   const id = params.get("id") ?? "";
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [form, setForm] = useState<InstagramPostInput | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadAccountsData(), loadPostsData()]).then(([loadedAccounts, posts]) => {
+    Promise.all([loadAccountsData(), loadPostsData(), loadCategoriesData()]).then(([loadedAccounts, posts, loadedCategories]) => {
       setAccounts(loadedAccounts);
+      setCategories(loadedCategories);
       const post = posts.find((item) => item.id === id);
       if (!post) return;
       setForm({
@@ -105,8 +106,8 @@ function EditPostContent() {
           </div>
           <div>
             <label>投稿カテゴリ</label>
-            <select value={form.category} onChange={(e) => setValue("category", e.target.value as PostCategory)}>
-              {postCategoryOptions.map((option) => (
+            <select value={form.category} onChange={(e) => setValue("category", e.target.value)}>
+              {categories.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>

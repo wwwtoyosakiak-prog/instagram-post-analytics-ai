@@ -1,5 +1,15 @@
 export type PostType = "image" | "video" | "reel" | "carousel";
-export type PostCategory = "product" | "howto" | "campaign" | "voice" | "recruit" | "store" | "sale" | "brand" | "other";
+export type PostCategory = string;
+
+export type PostCategoryDefinition = {
+  id: string;
+  value: string;
+  label: string;
+  sortOrder: number;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type InstagramAccountInput = {
   name: string;

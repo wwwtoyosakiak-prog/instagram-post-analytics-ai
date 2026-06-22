@@ -4,23 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp, Users } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost } from "@/lib/types";
-import { average, formatPercent, getMetrics, postCategoryLabels, taskStatusLabels } from "@/lib/metrics";
+import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadCategoriesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, PostCategoryDefinition } from "@/lib/types";
+import { average, formatPercent, getMetrics, getPostCategoryLabel, taskStatusLabels } from "@/lib/metrics";
 
 export default function Home() {
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
+  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [serverStorageEnabled, setServerStorageEnabled] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadAccountsData(), loadPostsData(), loadTasksData(), getServerStorageStatus()]).then(([loadedAccounts, loadedPosts, loadedTasks, status]) => {
+    Promise.all([loadAccountsData(), loadPostsData(), loadTasksData(), getServerStorageStatus(), loadCategoriesData()]).then(([loadedAccounts, loadedPosts, loadedTasks, status, loadedCategories]) => {
       setAccounts(loadedAccounts);
       setPosts(loadedPosts);
       setTasks(loadedTasks);
       setServerStorageEnabled(status.serverStorageEnabled);
+      setCategories(loadedCategories);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
       });
@@ -98,7 +100,7 @@ export default function Home() {
             <WorkItem
               icon={<ClipboardList size={17} />}
               title="次に確認すべき投稿"
-              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${postCategoryLabels[summary.nextPostToCheck.category ?? "other"]} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
+              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${getPostCategoryLabel(summary.nextPostToCheck.category, categories)} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
               href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/posts/new"}
             />
           </div>

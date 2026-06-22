@@ -1,4 +1,4 @@
-import { ImprovementTaskStatus, InstagramPost, PostCategory, PostMetrics, PostType } from "@/lib/types";
+import { ImprovementTaskStatus, InstagramPost, PostCategoryDefinition, PostMetrics, PostType } from "@/lib/types";
 
 export const postTypeLabels: Record<PostType, string> = {
   image: "画像",
@@ -7,7 +7,7 @@ export const postTypeLabels: Record<PostType, string> = {
   carousel: "カルーセル"
 };
 
-export const postCategoryLabels: Record<PostCategory, string> = {
+export const postCategoryLabels: Record<string, string> = {
   product: "商品紹介",
   howto: "ノウハウ",
   campaign: "キャンペーン",
@@ -19,7 +19,12 @@ export const postCategoryLabels: Record<PostCategory, string> = {
   other: "未分類"
 };
 
-export const postCategoryOptions = Object.entries(postCategoryLabels).map(([value, label]) => ({ value: value as PostCategory, label }));
+export const postCategoryOptions = Object.entries(postCategoryLabels).map(([value, label], index) => ({ value, label, sortOrder: index, isSystem: true }));
+
+export function getPostCategoryLabel(value: string | undefined, categories: Pick<PostCategoryDefinition, "value" | "label">[] = []) {
+  const categoryValue = value || "other";
+  return categories.find((category) => category.value === categoryValue)?.label ?? postCategoryLabels[categoryValue] ?? categoryValue;
+}
 
 export const taskStatusLabels: Record<ImprovementTaskStatus, string> = {
   todo: "対応前",

@@ -191,6 +191,14 @@ supabase/add-account-ai-settings.sql
 supabase/add-post-category.sql
 ```
 
+カテゴリの追加・名称変更・一覧管理を有効にする場合は、以下のファイルをSQL Editorで1回実行します。
+
+```text
+supabase/add-dynamic-post-categories.sql
+```
+
+実行後、サイト上部の「カテゴリ」から追加・名称変更・一覧確認ができます。投稿のカテゴリは、投稿一覧の「開く」から詳細画面へ進み、「投稿を編集」で後から変更できます。
+
 ### 2. Vercelに環境変数を追加
 
 VercelのProject SettingsからEnvironment Variablesを開き、以下を追加します。
@@ -312,7 +320,7 @@ ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量
 - 投稿コメント
 - ハッシュタグ
 - 投稿タイプ: 画像、動画、リール、カルーセル
-- 投稿カテゴリ: 商品紹介、ノウハウ、キャンペーン、お客様の声、採用、店舗紹介、セール告知、ブランド世界観、未分類
+- 投稿カテゴリ: 初期カテゴリに加えて、カテゴリ管理画面から自由に追加・名称変更可能
 - 投稿画像・動画の枚数
 - いいね数
 - コメント数

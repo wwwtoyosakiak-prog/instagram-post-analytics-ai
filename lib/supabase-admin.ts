@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategory, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -30,7 +30,7 @@ type PostRow = {
   caption: string;
   hashtags: string | null;
   type: PostType;
-  category: PostCategory | null;
+  category: string | null;
   media_count: number;
   likes: number;
   comments: number;
@@ -75,6 +75,16 @@ type InsightSnapshotRow = {
   total_interactions: number;
   like_count: number;
   comments_count: number;
+};
+
+type CategoryRow = {
+  id: string;
+  value: string;
+  label: string;
+  sort_order: number;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 type MonthlyReportRow = {
@@ -274,6 +284,18 @@ function mapInsightSnapshot(row: InsightSnapshotRow): InstagramInsightSnapshot {
   };
 }
 
+function mapCategory(row: CategoryRow): PostCategoryDefinition {
+  return {
+    id: row.id,
+    value: row.value,
+    label: row.label,
+    sortOrder: row.sort_order,
+    isSystem: row.is_system,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 function analysisToRow(postId: string, analysis: AiAnalysis, scoreDelta: number | null) {
   return {
     post_id: postId,
@@ -387,6 +409,45 @@ function goalToRow(input: MonthlyGoalInput) {
 export async function listAccountsFromSupabase() {
   const rows = await supabaseRequest<AccountRow[]>("instagram_accounts?select=*&order=created_at.desc");
   return rows.map(mapAccount);
+}
+
+export async function listCategoriesFromSupabase() {
+  const rows = await supabaseRequest<CategoryRow[]>("instagram_post_categories?select=*&order=sort_order.asc,created_at.asc");
+  return rows.map(mapCategory);
+}
+
+export async function createCategoryInSupabase(label: string) {
+  const current = await listCategoriesFromSupabase();
+  const rows = await supabaseRequest<CategoryRow[]>("instagram_post_categories", {
+    method: "POST",
+    body: JSON.stringify({
+      value: `custom-${crypto.randomUUID()}`,
+      label,
+      sort_order: current.length ? Math.max(...current.map((item) => item.sortOrder)) + 1 : 0,
+      is_system: false
+    })
+  });
+  return mapCategory(rows[0]);
+}
+
+export async function updateCategoryInSupabase(id: string, label: string) {
+  const rows = await supabaseRequest<CategoryRow[]>(`instagram_post_categories?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ label })
+  });
+  return rows[0] ? mapCategory(rows[0]) : null;
+}
+
+export async function deleteCategoryFromSupabase(id: string) {
+  const rows = await supabaseRequest<CategoryRow[]>(`instagram_post_categories?id=eq.${encodeURIComponent(id)}&select=*`);
+  const category = rows[0];
+  if (!category) return;
+  if (category.is_system) throw new Error("初期カテゴリは削除できません。");
+  await supabaseRequest<void>(`instagram_posts?category=eq.${encodeURIComponent(category.value)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ category: "other" })
+  });
+  await supabaseRequest<void>(`instagram_post_categories?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function createAccountInSupabase(input: InstagramAccountInput) {

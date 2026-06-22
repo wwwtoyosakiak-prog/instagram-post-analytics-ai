@@ -4,11 +4,10 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { addPostData, loadAccountsData, upsertAccountsData, upsertPostsData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPostInput, PostCategory, PostType } from "@/lib/types";
+import { addPostData, loadAccountsData, loadCategoriesData, upsertAccountsData, upsertPostsData } from "@/lib/cloud-storage";
+import { InstagramAccount, InstagramPostInput, PostCategoryDefinition, PostType } from "@/lib/types";
 import { sampleAccounts, samplePosts } from "@/lib/sample-data";
 import { csvTemplate, parsePostsCsv } from "@/lib/csv";
-import { postCategoryOptions } from "@/lib/metrics";
 
 const initialForm: InstagramPostInput = {
   date: new Date().toISOString().slice(0, 10),
@@ -31,13 +30,15 @@ export default function NewPostPage() {
   const router = useRouter();
   const [form, setForm] = useState<InstagramPostInput>(initialForm);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [message, setMessage] = useState("");
   const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
-    loadAccountsData().then((loaded) => {
-      setAccounts(loaded);
-      setForm((current) => ({ ...current, accountId: loaded[0]?.id }));
+    Promise.all([loadAccountsData(), loadCategoriesData()]).then(([loadedAccounts, loadedCategories]) => {
+      setAccounts(loadedAccounts);
+      setCategories(loadedCategories);
+      setForm((current) => ({ ...current, accountId: loadedAccounts[0]?.id }));
     });
   }, []);
 
@@ -135,8 +136,8 @@ export default function NewPostPage() {
             </div>
             <div>
               <label>投稿カテゴリ</label>
-              <select value={form.category} onChange={(e) => setValue("category", e.target.value as PostCategory)}>
-                {postCategoryOptions.map((option) => (
+              <select value={form.category} onChange={(e) => setValue("category", e.target.value)}>
+                {categories.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>

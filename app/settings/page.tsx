@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, pushLocalBackupToServer } from "@/lib/cloud-storage";
+import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, pushLocalBackupToServer } from "@/lib/cloud-storage";
 import { exportAccountsCsv, exportAnalysesCsv, exportGoalsCsv, exportMonthlyReportsCsv, exportPostsCsv, exportTasksCsv } from "@/lib/csv";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
 
@@ -90,16 +90,16 @@ export default function SettingsPage() {
     setDataMessage("");
     try {
       const exportedAt = new Date().toISOString().slice(0, 10);
-      const [accounts, posts, reports, tasks, goals] = await Promise.all([loadAccountsData(), loadPostsData(), loadMonthlyReportsData(), loadTasksData(), loadGoalsData()]);
+      const [accounts, posts, reports, tasks, goals, categories] = await Promise.all([loadAccountsData(), loadPostsData(), loadMonthlyReportsData(), loadTasksData(), loadGoalsData(), loadCategoriesData()]);
       const analyses = (await Promise.all(posts.map((post) => loadAnalysesData(post.id)))).flat();
       const accountNameById = Object.fromEntries(accounts.map((account) => [account.id, account.name]));
       const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
 
       downloadCsv(exportAccountsCsv(accounts), `instagram-ai-accounts-${exportedAt}.csv`);
-      downloadCsv(exportPostsCsv(posts, accountNameById), `instagram-ai-posts-${exportedAt}.csv`);
-      downloadCsv(exportAnalysesCsv(analyses, postById), `instagram-ai-analyses-${exportedAt}.csv`);
+      downloadCsv(exportPostsCsv(posts, accountNameById, categories), `instagram-ai-posts-${exportedAt}.csv`);
+      downloadCsv(exportAnalysesCsv(analyses, postById, categories), `instagram-ai-analyses-${exportedAt}.csv`);
       downloadCsv(exportMonthlyReportsCsv(reports), `instagram-ai-monthly-reports-${exportedAt}.csv`);
-      downloadCsv(exportTasksCsv(tasks, postById), `instagram-ai-tasks-${exportedAt}.csv`);
+      downloadCsv(exportTasksCsv(tasks, postById, categories), `instagram-ai-tasks-${exportedAt}.csv`);
       downloadCsv(exportGoalsCsv(goals, accountNameById), `instagram-ai-goals-${exportedAt}.csv`);
       setDataMessage(`CSVを書き出しました。アカウント${accounts.length}件、投稿${posts.length}件、AI分析${analyses.length}件、月次レポート${reports.length}件、改善タスク${tasks.length}件、目標${goals.length}件。`);
     } catch {
