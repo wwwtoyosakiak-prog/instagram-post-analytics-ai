@@ -6,7 +6,7 @@ import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContai
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
 import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostCategoryDefinition, PostType } from "@/lib/types";
-import { average, byDateAsc, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
+import { average, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 
 type GrowthAnalysis = {
   summary: string;
@@ -112,7 +112,14 @@ export default function DashboardPage() {
     const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < today);
     const completedTasks = targetTasks.filter((task) => task.status === "done");
     const completionRate = targetTasks.length ? (completedTasks.length / targetTasks.length) * 100 : 0;
-    const sorted = [...targetPosts].sort(byDateAsc);
+    const dailyViews = Array.from(
+      targetPosts.reduce((daily, post) => {
+        daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
+        return daily;
+      }, new Map<string, number>())
+    )
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([date, views]) => ({ name: date.slice(5), date, views }));
     const typeData = (["image", "video", "reel", "carousel"] as PostType[]).map((type) => {
       const items = targetPosts.filter((post) => post.type === type);
       return {
@@ -147,7 +154,7 @@ export default function DashboardPage() {
     const taskCategoryData = categoryData.filter((item) => item.taskCount > 0);
     const nextTask = [...openTasks].filter((task) => task.dueDate).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
     return {
-      dailyViews: sorted.map((post) => ({ name: post.date.slice(5), views: post.views })),
+      dailyViews,
       typeData,
       weekdayData,
       categoryData,
