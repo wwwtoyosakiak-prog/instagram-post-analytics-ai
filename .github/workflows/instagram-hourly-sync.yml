@@ -1,0 +1,36 @@
+name: Instagram hourly sync
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: instagram-hourly-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sync Instagram posts and insights
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SYNC_URL: https://instagram-post-analytics-ai.vercel.app/api/instagram/sync
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "GitHub Actions secret CRON_SECRET is not configured."
+            exit 1
+          fi
+
+          response=$(curl \
+            --silent \
+            --show-error \
+            --fail-with-body \
+            --max-time 180 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$SYNC_URL")
+
+          echo "$response" | jq .
+          echo "$response" | jq -e '.success == true'
