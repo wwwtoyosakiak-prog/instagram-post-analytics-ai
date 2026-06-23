@@ -34,8 +34,20 @@ export default function DashboardPage() {
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
-  useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData(), loadCategoriesData(), loadSyncRunsData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights, loadedCategories, loadedSyncRuns]) => {
+  const [syncingNow, setSyncingNow] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncErrorMessage, setSyncErrorMessage] = useState("");
+
+  const refreshDashboard = async () => {
+    const [loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights, loadedCategories, loadedSyncRuns] = await Promise.all([
+      loadPostsData(),
+      loadAccountsData(),
+      loadTasksData(),
+      loadGoalsData(),
+      loadAllInsightData(),
+      loadCategoriesData(),
+      loadSyncRunsData()
+    ]);
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
@@ -48,7 +60,10 @@ export default function DashboardPage() {
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
       });
-    });
+  };
+
+  useEffect(() => {
+    refreshDashboard();
   }, []);
 
   const hourlyInsightData = useMemo(() => {
@@ -139,6 +154,27 @@ export default function DashboardPage() {
     }
   };
 
+  const runSyncNow = async () => {
+    setSyncingNow(true);
+    setSyncMessage("");
+    setSyncErrorMessage("");
+    try {
+      const response = await fetch("/api/instagram/sync", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok && response.status !== 207) {
+        throw new Error(data.error ?? "同期に失敗しました。");
+      }
+      await refreshDashboard();
+      setSyncMessage(data.success
+        ? `${data.savedPosts}件の投稿と${data.savedSnapshots}件の履歴を保存しました。`
+        : `${data.savedPosts}件を保存しましたが、一部でエラーが発生しました。`);
+    } catch (error) {
+      setSyncErrorMessage(error instanceof Error ? error.message : "同期に失敗しました。");
+    } finally {
+      setSyncingNow(false);
+    }
+  };
+
   const data = useMemo(() => {
     const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
     const todayKey = toTokyoDateKey(new Date());
@@ -146,6 +182,11 @@ export default function DashboardPage() {
     const currentMonthKey = currentMonth();
     const monthlyPosts = targetPosts.filter((post) => post.date.startsWith(currentMonthKey));
     const todayPosts = targetPosts.filter((post) => post.date === todayKey);
+    const yesterdayKey = shiftTokyoDateKey(todayKey, -1);
+    const previousDayPosts = targetPosts.filter((post) => post.date === yesterdayKey);
+    const last7 = filterPostsByPeriod(targetPosts, "7", todayKey);
+    const prev7Range = getPreviousRangeKeys(todayKey, 7);
+    const previous7Posts = targetPosts.filter((post) => post.date >= prev7Range.start && post.date <= prev7Range.end);
     const latestTodayPost = [...todayPosts].sort((a, b) => {
       const byUpdated = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       if (byUpdated !== 0) return byUpdated;
@@ -239,8 +280,19 @@ export default function DashboardPage() {
       graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "全期間",
       todayPosts,
       todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
+      todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
+      todayEngagementRate: average(todayPosts.map((post) => getMetrics(post).engagementRate)),
       latestTodayPost,
-      todayKey
+      todayKey,
+      previousDayViews: previousDayPosts.reduce((sum, post) => sum + post.views, 0),
+      previousDaySaves: previousDayPosts.reduce((sum, post) => sum + post.saves, 0),
+      previousDayEngagementRate: average(previousDayPosts.map((post) => getMetrics(post).engagementRate)),
+      last7Views: last7.reduce((sum, post) => sum + post.views, 0),
+      last7Saves: last7.reduce((sum, post) => sum + post.saves, 0),
+      last7EngagementRate: average(last7.map((post) => getMetrics(post).engagementRate)),
+      previous7Views: previous7Posts.reduce((sum, post) => sum + post.views, 0),
+      previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
+      previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
   }, [posts, tasks, goals, accountId, latestScoreByPostId, categories, graphPeriod]);
 
@@ -250,6 +302,11 @@ export default function DashboardPage() {
   const showPastSyncError = Boolean(latestSyncError && latestSyncRun && latestSyncRun.id !== latestSyncError.id);
   const pastSyncError = showPastSyncError ? latestSyncError : null;
   const syncMonitor = useMemo(() => getSyncMonitor(new Date(), latestScheduledSyncRun?.finishedAt), [latestScheduledSyncRun?.finishedAt]);
+  const showTodayMissingAlert = Boolean(
+    latestSyncRun?.status === "success" &&
+    data.todayPosts.length === 0 &&
+    new Date().getHours() >= 12
+  );
 
   return (
     <div>
@@ -290,6 +347,11 @@ export default function DashboardPage() {
                 title="同期状況"
                 description="自動反映のタイミングと、最後の同期結果をすぐ確認できます。"
               />
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button onClick={runSyncNow} disabled={syncingNow}>{syncingNow ? "同期中..." : "今すぐ再実行"}</Button>
+                {syncMessage ? <p className="text-sm text-emerald-700">{syncMessage}</p> : null}
+                {syncErrorMessage ? <p className="text-sm text-red-700">{syncErrorMessage}</p> : null}
+              </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <Insight label="最終同期時刻" value={latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"} />
                 <Insight label="次回同期予定" value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())} />
@@ -341,6 +403,12 @@ export default function DashboardPage() {
                 <Insight label="今日の投稿件数" value={`${data.todayPosts.length}件`} />
                 <Insight label="今日の表示数合計" value={data.todayViews.toLocaleString()} />
               </div>
+              {showTodayMissingAlert ? (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  <p className="font-semibold">今日の投稿が未取得の可能性があります</p>
+                  <p className="mt-1">同期は成功していますが、{data.todayKey} の投稿が0件です。今日投稿している場合は、再同期かアカウント紐づけを確認してください。</p>
+                </div>
+              ) : null}
               <div className="mt-4 rounded-xl border border-stone-200/80 bg-white/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">直近投稿</p>
                 {data.latestTodayPost ? (
@@ -355,6 +423,78 @@ export default function DashboardPage() {
               </div>
             </Panel>
           </div>
+          <Panel className="mb-6">
+            <SectionLead
+              eyebrow="Compare"
+              title="前回比"
+              description="表示数、保存数、ER の前日比と前週比をひと目で比較できます。"
+            />
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <CompareStat
+                label="表示数"
+                currentDay={data.todayViews}
+                previousDay={data.previousDayViews}
+                currentWeek={data.last7Views}
+                previousWeek={data.previous7Views}
+              />
+              <CompareStat
+                label="保存数"
+                currentDay={data.todaySaves}
+                previousDay={data.previousDaySaves}
+                currentWeek={data.last7Saves}
+                previousWeek={data.previous7Saves}
+              />
+              <CompareStat
+                label="平均ER"
+                currentDay={data.todayEngagementRate}
+                previousDay={data.previousDayEngagementRate}
+                currentWeek={data.last7EngagementRate}
+                previousWeek={data.previous7EngagementRate}
+                suffix="%"
+                decimal
+              />
+            </div>
+          </Panel>
+          <Panel className="mb-6">
+            <SectionLead
+              eyebrow="History"
+              title="同期履歴一覧"
+              description="直近20回の実行結果を確認できます。失敗時の原因もここから追えます。"
+            />
+            <div className="mt-4 overflow-auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>実行時刻</th>
+                    <th>種別</th>
+                    <th>状態</th>
+                    <th>取得</th>
+                    <th>投稿保存</th>
+                    <th>履歴保存</th>
+                    <th>エラー内容</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {syncRuns.map((run) => (
+                    <tr key={run.id}>
+                      <td>{formatDateTimeJst(run.finishedAt)}</td>
+                      <td>{run.triggerType === "manual" ? "手動" : "自動"}</td>
+                      <td>{syncStatusLabel(run.status)}</td>
+                      <td>{run.fetchedPosts.toLocaleString()}件</td>
+                      <td>{run.savedPosts.toLocaleString()}件</td>
+                      <td>{run.savedSnapshots.toLocaleString()}件</td>
+                      <td>{run.errorSummary || "-"}</td>
+                    </tr>
+                  ))}
+                  {!syncRuns.length ? (
+                    <tr>
+                      <td colSpan={7} className="text-center text-stone-500">同期履歴はまだありません。</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
           <section className="mb-6 border-y border-stone-200 py-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
@@ -764,13 +904,25 @@ function getSyncMonitor(now: Date, latestScheduledFinishedAt?: string) {
   const nextScheduledAt = getNextScheduledSyncTime(now);
   const latestScheduledAtMs = latestScheduledFinishedAt ? new Date(latestScheduledFinishedAt).getTime() : 0;
   const expectedAtMs = expectedScheduledAt.getTime();
-  const graceMs = 8 * 60 * 1000;
+  const graceMs = 15 * 60 * 1000;
   const isDelayed = now.getTime() >= expectedAtMs + graceMs && latestScheduledAtMs < expectedAtMs;
   return {
     expectedScheduledAt,
     nextScheduledAt,
     isDelayed
   };
+}
+
+function shiftTokyoDateKey(dateKey: string, offsetDays: number) {
+  const base = new Date(`${dateKey}T00:00:00+09:00`);
+  base.setDate(base.getDate() + offsetDays);
+  return toTokyoDateKey(base);
+}
+
+function getPreviousRangeKeys(todayKey: string, days: number) {
+  const end = shiftTokyoDateKey(todayKey, -days);
+  const start = shiftTokyoDateKey(todayKey, -(days * 2) + 1);
+  return { start, end };
 }
 
 function formatDateTimeJst(value: string) {
@@ -805,6 +957,48 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-lg font-bold text-ink">{value}</p>
     </div>
   );
+}
+
+function CompareStat({
+  label,
+  currentDay,
+  previousDay,
+  currentWeek,
+  previousWeek,
+  suffix = "",
+  decimal = false
+}: {
+  label: string;
+  currentDay: number;
+  previousDay: number;
+  currentWeek: number;
+  previousWeek: number;
+  suffix?: string;
+  decimal?: boolean;
+}) {
+  const renderValue = (value: number) => decimal ? `${value.toFixed(2)}${suffix}` : `${Math.round(value).toLocaleString()}${suffix}`;
+  return (
+    <div className="rounded-xl border border-stone-200/80 bg-fog/70 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</p>
+      <div className="mt-3 grid gap-3">
+        <div className="rounded-lg bg-white/80 p-3">
+          <p className="text-xs font-semibold text-stone-500">前日比</p>
+          <p className="mt-1 text-sm font-bold text-ink">{renderValue(currentDay)} / {renderValue(previousDay)}</p>
+          <p className="mt-1 text-xs text-stone-600">差分 {renderDelta(currentDay - previousDay, suffix, decimal)}</p>
+        </div>
+        <div className="rounded-lg bg-white/80 p-3">
+          <p className="text-xs font-semibold text-stone-500">前週比</p>
+          <p className="mt-1 text-sm font-bold text-ink">{renderValue(currentWeek)} / {renderValue(previousWeek)}</p>
+          <p className="mt-1 text-xs text-stone-600">差分 {renderDelta(currentWeek - previousWeek, suffix, decimal)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderDelta(value: number, suffix = "", decimal = false) {
+  const prefix = value > 0 ? "+" : "";
+  return decimal ? `${prefix}${value.toFixed(2)}${suffix}` : `${prefix}${Math.round(value).toLocaleString()}${suffix}`;
 }
 
 function SectionLead({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
