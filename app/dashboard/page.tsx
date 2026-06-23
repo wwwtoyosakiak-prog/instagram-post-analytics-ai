@@ -321,6 +321,7 @@ export default function DashboardPage() {
 
     if (!latestScheduledSyncRun && latestSyncRun?.triggerType === "manual") {
       return {
+        action: "GitHub Actions と CRON_SECRET の一致確認を優先してください。",
         title: "手動同期は動いていますが、自動同期だけ記録されていません",
         summary: "Instagram API や保存処理ではなく、自動実行の起動経路に問題がある可能性が高い状態です。",
         checks: [
@@ -333,6 +334,7 @@ export default function DashboardPage() {
 
     if (!latestScheduledSyncRun) {
       return {
+        action: "自動同期の起動設定と秘密鍵の設定有無を確認してください。",
         title: "自動同期の履歴がまだ 1 件もありません",
         summary: "GitHub Actions から Vercel の同期 API まで到達できていない可能性があります。",
         checks: [
@@ -344,6 +346,7 @@ export default function DashboardPage() {
     }
 
     return {
+      action: "直近の Actions 実行ログと認証設定のずれを確認してください。",
       title: "前回の自動同期以降、次の定時実行が記録されていません",
       summary: "前回までは自動同期できていたため、一時的な実行失敗か認証ずれの可能性があります。",
       checks: [
@@ -416,6 +419,10 @@ export default function DashboardPage() {
                   </p>
                   {syncDiagnosis ? (
                     <div className="mt-3 grid gap-3 rounded-lg border border-amber-200/80 bg-white/60 p-3">
+                      <div className="rounded-md border border-amber-100 bg-amber-50/80 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">今やること</p>
+                        <p className="mt-1 text-sm font-semibold text-amber-950">{syncDiagnosis.action}</p>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold tracking-[0.12em] text-amber-900">推定原因</span>
                         <p className="text-xs font-semibold text-amber-900">{syncDiagnosis.title}</p>
@@ -423,7 +430,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-amber-800">{syncDiagnosis.summary}</p>
                       <div className="rounded-md border border-amber-100 bg-amber-50/70 p-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">確認順</p>
-                        <ol className="mt-2 grid gap-1 text-xs text-amber-800">
+                        <ol className="mt-2 grid gap-2 text-xs text-amber-800">
                           {syncDiagnosis.checks.map((item, index) => <li key={item}>{index + 1}. {item}</li>)}
                         </ol>
                       </div>
