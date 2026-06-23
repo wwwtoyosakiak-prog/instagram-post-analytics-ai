@@ -414,17 +414,25 @@ export default function DashboardPage() {
                   <p className="mt-1 text-xs text-amber-700">
                     最終自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}
                   </p>
-                  <p className="mt-1 text-xs text-amber-700">
-                    {syncDiagnosis?.summary || "GitHub Actions の実行履歴、`CRON_SECRET`、Vercel の環境変数を確認してください。"}
-                  </p>
                   {syncDiagnosis ? (
-                    <div className="mt-3 rounded-lg border border-amber-200/80 bg-white/60 p-3">
-                      <p className="text-xs font-semibold text-amber-900">{syncDiagnosis.title}</p>
-                      <ul className="mt-2 grid gap-1 text-xs text-amber-800">
-                        {syncDiagnosis.checks.map((item) => <li key={item}>・{item}</li>)}
-                      </ul>
+                    <div className="mt-3 grid gap-3 rounded-lg border border-amber-200/80 bg-white/60 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold tracking-[0.12em] text-amber-900">推定原因</span>
+                        <p className="text-xs font-semibold text-amber-900">{syncDiagnosis.title}</p>
+                      </div>
+                      <p className="text-xs text-amber-800">{syncDiagnosis.summary}</p>
+                      <div className="rounded-md border border-amber-100 bg-amber-50/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">確認順</p>
+                        <ol className="mt-2 grid gap-1 text-xs text-amber-800">
+                          {syncDiagnosis.checks.map((item, index) => <li key={item}>{index + 1}. {item}</li>)}
+                        </ol>
+                      </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <p className="mt-1 text-xs text-amber-700">
+                      GitHub Actions の実行履歴、`CRON_SECRET`、Vercel の環境変数を確認してください。
+                    </p>
+                  )}
                 </div>
               ) : null}
               {latestSyncRun ? (
