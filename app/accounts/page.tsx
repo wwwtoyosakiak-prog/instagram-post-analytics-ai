@@ -119,11 +119,11 @@ export default function AccountsPage() {
           <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
             <div>
               <label>アカウント名</label>
-              <input value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="OZOPS Outdoor" required />
+              <input value={form.name} onChange={(e) => setValue("name", e.target.value)} required />
             </div>
             <div>
               <label>ユーザー名</label>
-              <input value={form.username} onChange={(e) => setValue("username", e.target.value)} placeholder="ozops_outdoor" required />
+              <input value={form.username} onChange={(e) => setValue("username", e.target.value)} required />
             </div>
             <div className="md:col-span-2">
               <label>プロフィールURL</label>
