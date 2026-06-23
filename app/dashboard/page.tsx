@@ -247,6 +247,7 @@ export default function DashboardPage() {
   const latestSyncRun = syncRuns[0] ?? null;
   const latestSyncError = syncRuns.find((run) => run.status !== "success") ?? null;
   const showPastSyncError = Boolean(latestSyncError && latestSyncRun && latestSyncRun.id !== latestSyncError.id);
+  const pastSyncError = showPastSyncError ? latestSyncError : null;
   const nextSyncAt = useMemo(() => getNextScheduledSyncTime(new Date()), []);
 
   return (
@@ -315,11 +316,11 @@ export default function DashboardPage() {
                   <p className="mt-2 text-xs text-amber-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
-              {latestSyncRun?.status === "success" && showPastSyncError ? (
+              {latestSyncRun?.status === "success" && pastSyncError ? (
                 <div className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-4 text-sm leading-6 text-stone-700">
                   <p className="font-semibold text-ink">前回の失敗履歴</p>
-                  <p className="mt-1">{latestSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
-                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
+                  <p className="mt-1">{pastSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
+                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(pastSyncError.finishedAt)}</p>
                 </div>
               ) : null}
             </Panel>
