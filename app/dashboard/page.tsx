@@ -246,6 +246,7 @@ export default function DashboardPage() {
 
   const latestSyncRun = syncRuns[0] ?? null;
   const latestSyncError = syncRuns.find((run) => run.status !== "success") ?? null;
+  const showPastSyncError = Boolean(latestSyncError && latestSyncRun && latestSyncRun.id !== latestSyncError.id);
   const nextSyncAt = useMemo(() => getNextScheduledSyncTime(new Date()), []);
 
   return (
@@ -300,11 +301,25 @@ export default function DashboardPage() {
                   <MiniMetric label="失敗" value={`${latestSyncRun.failedPosts}件`} />
                 </div>
               ) : null}
-              {latestSyncError ? (
+              {latestSyncRun?.status === "failed" && latestSyncError ? (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
-                  <p className="font-semibold">直近の同期エラー</p>
+                  <p className="font-semibold">最新の同期エラー</p>
                   <p className="mt-1">{latestSyncError.errorSummary || "同期でエラーが発生しました。"}</p>
                   <p className="mt-2 text-xs text-red-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
+                </div>
+              ) : null}
+              {latestSyncRun?.status === "partial" && latestSyncError ? (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  <p className="font-semibold">最新の同期で一部エラーが発生しました</p>
+                  <p className="mt-1">{latestSyncError.errorSummary || "一部のデータ保存に失敗しました。"}</p>
+                  <p className="mt-2 text-xs text-amber-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
+                </div>
+              ) : null}
+              {latestSyncRun?.status === "success" && showPastSyncError ? (
+                <div className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-4 text-sm leading-6 text-stone-700">
+                  <p className="font-semibold text-ink">前回の失敗履歴</p>
+                  <p className="mt-1">{latestSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
+                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
             </Panel>
