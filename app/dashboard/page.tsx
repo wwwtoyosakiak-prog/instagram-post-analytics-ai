@@ -316,6 +316,43 @@ export default function DashboardPage() {
     data.todayPosts.length === 0 &&
     new Date().getHours() >= 12
   );
+  const syncDiagnosis = useMemo(() => {
+    if (!syncMonitor.isDelayed) return null;
+
+    if (!latestScheduledSyncRun && latestSyncRun?.triggerType === "manual") {
+      return {
+        title: "手動同期は動いていますが、自動同期だけ記録されていません",
+        summary: "Instagram API や保存処理ではなく、自動実行の起動経路に問題がある可能性が高い状態です。",
+        checks: [
+          "GitHub Actions の Instagram hourly sync が 20:17 台に実行されているか",
+          "GitHub Actions 側の CRON_SECRET が設定されているか",
+          "Vercel 側の CRON_SECRET と同じ値になっているか"
+        ]
+      };
+    }
+
+    if (!latestScheduledSyncRun) {
+      return {
+        title: "自動同期の履歴がまだ 1 件もありません",
+        summary: "GitHub Actions から Vercel の同期 API まで到達できていない可能性があります。",
+        checks: [
+          "GitHub Actions のワークフローが有効か",
+          "GitHub Secrets に CRON_SECRET が入っているか",
+          "Vercel の環境変数に CRON_SECRET が入っているか"
+        ]
+      };
+    }
+
+    return {
+      title: "前回の自動同期以降、次の定時実行が記録されていません",
+      summary: "前回までは自動同期できていたため、一時的な実行失敗か認証ずれの可能性があります。",
+      checks: [
+        "直近の GitHub Actions 実行ログで curl が失敗していないか",
+        "CRON_SECRET を最近変更していないか",
+        "Vercel 側のデプロイ後に環境変数が反映されているか"
+      ]
+    };
+  }, [latestScheduledSyncRun, latestSyncRun, syncMonitor.isDelayed]);
 
   return (
     <div>
@@ -378,8 +415,16 @@ export default function DashboardPage() {
                     最終自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}
                   </p>
                   <p className="mt-1 text-xs text-amber-700">
-                    GitHub Actions の実行履歴、`CRON_SECRET`、Vercel の環境変数を確認してください。
+                    {syncDiagnosis?.summary || "GitHub Actions の実行履歴、`CRON_SECRET`、Vercel の環境変数を確認してください。"}
                   </p>
+                  {syncDiagnosis ? (
+                    <div className="mt-3 rounded-lg border border-amber-200/80 bg-white/60 p-3">
+                      <p className="text-xs font-semibold text-amber-900">{syncDiagnosis.title}</p>
+                      <ul className="mt-2 grid gap-1 text-xs text-amber-800">
+                        {syncDiagnosis.checks.map((item) => <li key={item}>・{item}</li>)}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {latestSyncRun ? (
