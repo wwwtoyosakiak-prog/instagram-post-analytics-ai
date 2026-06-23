@@ -316,6 +316,15 @@ export default function DashboardPage() {
     data.todayPosts.length === 0 &&
     new Date().getHours() >= 12
   );
+  const syncStatusValue = syncMonitor.isDelayed
+    ? "同期遅延"
+    : latestScheduledSyncRun
+      ? syncStatusLabel(latestScheduledSyncRun.status)
+      : latestSyncRun?.triggerType === "manual"
+        ? "手動のみ"
+        : latestSyncRun
+          ? syncStatusLabel(latestSyncRun.status)
+          : "履歴なし";
   const syncDiagnosis = useMemo(() => {
     if (!syncMonitor.isDelayed) return null;
 
@@ -405,7 +414,7 @@ export default function DashboardPage() {
                 <Insight label="最終同期時刻" value={latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"} />
                 <Insight label="最終自動同期" value={latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"} />
                 <Insight label="次回同期予定" value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())} />
-                <Insight label="同期状態" value={syncMonitor.isDelayed ? "同期遅延" : latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "履歴なし"} />
+                <Insight label="同期状態" value={syncStatusValue} />
               </div>
               {syncMonitor.isDelayed ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
