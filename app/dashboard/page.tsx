@@ -361,8 +361,9 @@ export default function DashboardPage() {
                 {syncMessage ? <p className="text-sm text-emerald-700">{syncMessage}</p> : null}
                 {syncErrorMessage ? <p className="text-sm text-red-700">{syncErrorMessage}</p> : null}
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Insight label="最終同期時刻" value={latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"} />
+                <Insight label="最終自動同期" value={latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"} />
                 <Insight label="次回同期予定" value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())} />
                 <Insight label="同期状態" value={syncMonitor.isDelayed ? "同期遅延" : latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "履歴なし"} />
               </div>
@@ -371,7 +372,10 @@ export default function DashboardPage() {
                   <p className="font-semibold">定時同期が遅れています</p>
                   <p className="mt-1">予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の自動同期がまだ記録されていません。</p>
                   <p className="mt-2 text-xs text-amber-700">
-                    最後の自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}
+                    最終同期時刻: {latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    最終自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}
                   </p>
                   <p className="mt-1 text-xs text-amber-700">
                     GitHub Actions の実行履歴、`CRON_SECRET`、Vercel の環境変数を確認してください。
