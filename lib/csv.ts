@@ -75,11 +75,12 @@ function createCsv(rows: unknown[][]) {
 
 export function exportAccountsCsv(accounts: InstagramAccount[]) {
   return createCsv([
-    ["id", "accountName", "username", "profileUrl", "industry", "targetAudience", "goal", "openaiApiKeyEnvName", "openaiModel", "analysisInstructions", "memo", "createdAt", "updatedAt"],
+    ["id", "accountName", "username", "instagramApiUsername", "profileUrl", "industry", "targetAudience", "goal", "openaiApiKeyEnvName", "openaiModel", "analysisInstructions", "memo", "createdAt", "updatedAt"],
     ...accounts.map((account) => [
       account.id,
       account.name,
       account.username,
+      account.instagramApiUsername ?? "",
       account.profileUrl,
       account.industry,
       account.targetAudience,

@@ -4,6 +4,7 @@ create table if not exists public.instagram_accounts (
   id text primary key default gen_random_uuid()::text,
   name text not null,
   username text not null,
+  instagram_api_username text,
   profile_url text,
   industry text,
   target_audience text,

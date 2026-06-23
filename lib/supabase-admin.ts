@@ -9,6 +9,7 @@ type AccountRow = {
   id: string;
   name: string;
   username: string;
+  instagram_api_username: string | null;
   profile_url: string | null;
   industry: string | null;
   target_audience: string | null;
@@ -169,6 +170,7 @@ function mapAccount(row: AccountRow): InstagramAccount {
     id: row.id,
     name: row.name,
     username: row.username,
+    instagramApiUsername: row.instagram_api_username ?? "",
     profileUrl: row.profile_url ?? "",
     industry: row.industry ?? "",
     targetAudience: row.target_audience ?? "",
@@ -186,6 +188,7 @@ function accountToRow(input: InstagramAccountInput) {
   return {
     name: input.name,
     username: input.username,
+    instagram_api_username: input.instagramApiUsername || null,
     profile_url: input.profileUrl,
     industry: input.industry,
     target_audience: input.targetAudience,

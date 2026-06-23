@@ -136,11 +136,14 @@ Graph APIページの「Supabaseへ同期」では手動同期もできます。
 
 アカウント登録ページで、アカウントごとにAI分析用の設定を管理できます。
 
+- Instagram APIユーザー名
 - APIキー環境変数名
 - 使用モデル
 - アカウント専用の分析方針
 
 APIキー本体はアプリ画面やブラウザには保存しません。`.env.local` またはVercelのEnvironment Variablesに `OPENAI_API_KEY_OZOPS` のような環境変数を追加し、アカウント編集画面にはその環境変数名だけを登録します。
+
+Instagram Graph APIで取得しているアカウントを既存の管理アカウントへ明示的に紐づけたい場合は、アカウント編集画面の「Instagram APIユーザー名」に、Graph APIが返すユーザー名を登録します。未設定の場合は、従来どおりアカウントの `username` と照合します。
 
 アカウント側のAPIキー環境変数名が未設定の場合は、共通の `OPENAI_API_KEY` を使います。使用モデルが未設定の場合は、共通の `OPENAI_MODEL`、それも未設定なら `gpt-4.1-mini` を使います。
 
@@ -193,6 +196,12 @@ supabase/add-monthly-goals.sql
 
 ```text
 supabase/add-account-ai-settings.sql
+```
+
+Instagram Graph APIの同期先アカウントを明示的に紐づけるカラムだけ追加したい場合は、以下のファイルをSQL Editorで実行します。
+
+```text
+supabase/add-account-instagram-api-username.sql
 ```
 
 すでに過去版の投稿テーブルを作成済みで、投稿カテゴリだけ追加したい場合は、以下のファイルをSQL Editorで実行します。

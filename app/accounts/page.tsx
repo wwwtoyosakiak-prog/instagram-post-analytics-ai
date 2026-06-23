@@ -9,6 +9,7 @@ import { sampleAccounts } from "@/lib/sample-data";
 const initialForm: InstagramAccountInput = {
   name: "",
   username: "",
+  instagramApiUsername: "",
   profileUrl: "",
   industry: "",
   targetAudience: "",
@@ -66,6 +67,7 @@ export default function AccountsPage() {
     setForm({
       name: account.name,
       username: account.username,
+      instagramApiUsername: account.instagramApiUsername ?? "",
       profileUrl: account.profileUrl,
       industry: account.industry,
       targetAudience: account.targetAudience,
@@ -144,9 +146,13 @@ export default function AccountsPage() {
             <div className="md:col-span-2 rounded-md border border-stone-200 bg-fog/80 p-4">
               <h3 className="font-semibold">AI/API設定</h3>
               <p className="mt-1 text-sm leading-6 text-stone-600">
-                APIキー本体は保存しません。`.env.local` やVercelに設定した環境変数名だけを登録します。未設定の場合は共通の `OPENAI_API_KEY` を使います。
+                Instagram API連携の紐づけ名と、AI分析に使う環境変数名をここで管理します。APIキー本体は保存しません。`.env.local` やVercelに設定した環境変数名だけを登録します。未設定の場合は共通の `OPENAI_API_KEY` を使います。
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label>Instagram APIユーザー名</label>
+                  <input value={form.instagramApiUsername} onChange={(e) => setValue("instagramApiUsername", e.target.value)} placeholder="例: tamaenergycircle" />
+                </div>
                 <div>
                   <label>APIキー環境変数名</label>
                   <input value={form.openaiApiKeyEnvName} onChange={(e) => setValue("openaiApiKeyEnvName", e.target.value)} placeholder="例: OPENAI_API_KEY_OZOPS" />
@@ -191,6 +197,7 @@ export default function AccountsPage() {
                 <p className="mt-1 text-sm leading-6 text-stone-600">{account.targetAudience || "ターゲット未設定"}</p>
                 <div className="mt-3 rounded-md bg-fog px-3 py-2 text-xs leading-5 text-stone-600">
                   <p className="font-semibold text-ink">AI/API設定</p>
+                  <p>Instagram APIユーザー名: {account.instagramApiUsername || "未設定"}</p>
                   <p>APIキー: {account.openaiApiKeyEnvName || "共通設定を使用"}</p>
                   <p>モデル: {account.openaiModel || "共通設定を使用"}</p>
                   <p>分析方針: {account.analysisInstructions || "未設定"}</p>

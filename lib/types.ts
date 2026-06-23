@@ -14,6 +14,7 @@ export type PostCategoryDefinition = {
 export type InstagramAccountInput = {
   name: string;
   username: string;
+  instagramApiUsername: string;
   profileUrl: string;
   industry: string;
   targetAudience: string;

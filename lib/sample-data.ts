@@ -7,6 +7,7 @@ export const sampleAccounts: InstagramAccount[] = [
     updatedAt: "2026-05-01T08:00:00.000Z",
     name: "OZOPS Outdoor",
     username: "ozops_outdoor",
+    instagramApiUsername: "ozops_outdoor",
     profileUrl: "https://www.instagram.com/ozops_outdoor/",
     industry: "アウトドア用品",
     targetAudience: "週末キャンプを楽しむ30代から40代の会社員、キャンプ初心者",

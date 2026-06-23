@@ -120,6 +120,12 @@ async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount |
   const username = posts.find((post) => post.username)?.username?.replace(/^@/, "").trim();
   if (!username) return null;
 
+  const linkedByApiUsername = await supabaseRequest<SyncedAccount[]>(
+    `instagram_accounts?instagram_api_username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
+    { method: "GET" }
+  );
+  if (linkedByApiUsername[0]) return linkedByApiUsername[0];
+
   const existing = await supabaseRequest<SyncedAccount[]>(
     `instagram_accounts?username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
     { method: "GET" }
@@ -131,6 +137,7 @@ async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount |
     body: JSON.stringify({
       name: username,
       username,
+      instagram_api_username: username,
       profile_url: `https://www.instagram.com/${encodeURIComponent(username)}/`,
       industry: "",
       target_audience: "",
