@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -131,6 +131,31 @@ type GoalRow = {
   memo: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type SyncRunRow = {
+  id: string;
+  trigger_type: "manual" | "scheduled";
+  status: "success" | "partial" | "failed";
+  started_at: string;
+  finished_at: string;
+  fetched_posts: number;
+  saved_posts: number;
+  saved_snapshots: number;
+  failed_posts: number;
+  api_mode: string;
+  account_id: string | null;
+  account_name: string | null;
+  account_username: string | null;
+  error_summary: string | null;
+  errors: Array<{
+    postId?: string;
+    stage: string;
+    message: string;
+    code?: number;
+    subcode?: number;
+    traceId?: string;
+  }> | null;
 };
 
 function assertConfigured() {
@@ -284,6 +309,26 @@ function mapInsightSnapshot(row: InsightSnapshotRow): InstagramInsightSnapshot {
     totalInteractions: Number(row.total_interactions),
     likeCount: Number(row.like_count),
     commentsCount: Number(row.comments_count)
+  };
+}
+
+function mapSyncRun(row: SyncRunRow): InstagramSyncRun {
+  return {
+    id: row.id,
+    triggerType: row.trigger_type,
+    status: row.status,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    fetchedPosts: row.fetched_posts,
+    savedPosts: row.saved_posts,
+    savedSnapshots: row.saved_snapshots,
+    failedPosts: row.failed_posts,
+    apiMode: row.api_mode,
+    accountId: row.account_id ?? undefined,
+    accountName: row.account_name ?? undefined,
+    accountUsername: row.account_username ?? undefined,
+    errorSummary: row.error_summary ?? undefined,
+    errors: row.errors ?? []
   };
 }
 
@@ -587,6 +632,13 @@ export async function listLatestInsightSnapshotsFromSupabase() {
     if (!latestByPostId.has(row.post_id)) latestByPostId.set(row.post_id, mapInsightSnapshot(row));
   }
   return [...latestByPostId.values()];
+}
+
+export async function listSyncRunsFromSupabase() {
+  const rows = await supabaseRequest<SyncRunRow[]>(
+    "instagram_sync_runs?select=*&order=finished_at.desc&limit=20"
+  );
+  return rows.map(mapSyncRun);
 }
 
 export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {

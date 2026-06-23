@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createInstagramGraphUrl, getInstagramGraphConfig, InstagramGraphConfig } from "@/lib/instagram-graph";
+import { InstagramSyncRun } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -54,6 +55,21 @@ type SyncedAccount = {
   id: string;
   name: string;
   username: string;
+};
+
+type SyncTriggerType = "manual" | "scheduled";
+
+type SyncResponseBody = {
+  success: boolean;
+  fetchedPosts: number;
+  savedPosts: number;
+  savedSnapshots: number;
+  failedPosts: number;
+  apiMode: string;
+  account: SyncedAccount | null;
+  capturedAt: string;
+  errors: SyncError[];
+  error?: string;
 };
 
 const MEDIA_FIELDS = [
@@ -114,6 +130,36 @@ async function supabaseRequest<T>(path: string, init: RequestInit): Promise<T> {
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+async function saveSyncRun(run: Omit<InstagramSyncRun, "id">) {
+  await supabaseRequest<unknown[]>("instagram_sync_runs", {
+    method: "POST",
+    body: JSON.stringify({
+      trigger_type: run.triggerType,
+      status: run.status,
+      started_at: run.startedAt,
+      finished_at: run.finishedAt,
+      fetched_posts: run.fetchedPosts,
+      saved_posts: run.savedPosts,
+      saved_snapshots: run.savedSnapshots,
+      failed_posts: run.failedPosts,
+      api_mode: run.apiMode,
+      account_id: run.accountId ?? null,
+      account_name: run.accountName ?? null,
+      account_username: run.accountUsername ?? null,
+      error_summary: run.errorSummary ?? null,
+      errors: run.errors
+    })
+  });
+}
+
+async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">) {
+  try {
+    await saveSyncRun(run);
+  } catch (error) {
+    console.error("[instagram-sync-run-save]", error);
+  }
 }
 
 async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount | null> {
@@ -269,21 +315,62 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
   }
 }
 
-async function handler() {
+async function handler(triggerType: SyncTriggerType) {
+  const startedAt = new Date().toISOString();
   const missing = [
     !process.env.SUPABASE_URL && "SUPABASE_URL",
     !process.env.SUPABASE_SERVICE_ROLE_KEY && "SUPABASE_SERVICE_ROLE_KEY",
     !process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN && "INSTAGRAM_GRAPH_ACCESS_TOKEN"
   ].filter(Boolean);
   if (missing.length) {
-    return NextResponse.json({ error: `環境変数が不足しています: ${missing.join(", ")}` }, { status: 500 });
+    const capturedAt = new Date().toISOString();
+    const payload: SyncResponseBody = {
+      success: false,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "unknown",
+      account: null,
+      capturedAt,
+      errors: [],
+      error: `環境変数が不足しています: ${missing.join(", ")}`
+    };
+    return NextResponse.json(payload, { status: 500 });
   }
 
   let config: InstagramGraphConfig;
   try {
     config = getInstagramGraphConfig();
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Instagram API設定が不正です。" }, { status: 500 });
+    const capturedAt = new Date().toISOString();
+    const message = error instanceof Error ? error.message : "Instagram API設定が不正です。";
+    const payload: SyncResponseBody = {
+      success: false,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "unknown",
+      account: null,
+      capturedAt,
+      errors: [],
+      error: message
+    };
+    await safeSaveSyncRun({
+      triggerType,
+      status: "failed",
+      startedAt,
+      finishedAt: capturedAt,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "unknown",
+      errorSummary: message,
+      errors: []
+    });
+    return NextResponse.json(payload, { status: 500 });
   }
 
   let posts: GraphMedia[];
@@ -292,7 +379,33 @@ async function handler() {
   } catch (error) {
     const detail = toSyncError(error, "media");
     logSyncError(detail);
-    return NextResponse.json({ error: "Instagram投稿の取得に失敗しました。", details: [detail] }, { status: 502 });
+    const capturedAt = new Date().toISOString();
+    const payload: SyncResponseBody = {
+      success: false,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: config.mode,
+      account: null,
+      capturedAt,
+      errors: [detail],
+      error: "Instagram投稿の取得に失敗しました。"
+    };
+    await safeSaveSyncRun({
+      triggerType,
+      status: "failed",
+      startedAt,
+      finishedAt: capturedAt,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: config.mode,
+      errorSummary: payload.error,
+      errors: [detail]
+    });
+    return NextResponse.json(payload, { status: 502 });
   }
 
   const capturedAt = new Date().toISOString();
@@ -302,7 +415,32 @@ async function handler() {
   } catch (error) {
     const detail = toSyncError(error, "account_save");
     logSyncError(detail);
-    return NextResponse.json({ error: "Instagramアカウントの保存に失敗しました。", details: [detail] }, { status: 500 });
+    const payload: SyncResponseBody = {
+      success: false,
+      fetchedPosts: posts.length,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: config.mode,
+      account: null,
+      capturedAt,
+      errors: [detail],
+      error: "Instagramアカウントの保存に失敗しました。"
+    };
+    await safeSaveSyncRun({
+      triggerType,
+      status: "failed",
+      startedAt,
+      finishedAt: capturedAt,
+      fetchedPosts: posts.length,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: config.mode,
+      errorSummary: payload.error,
+      errors: [detail]
+    });
+    return NextResponse.json(payload, { status: 500 });
   }
 
   const results = [];
@@ -314,7 +452,7 @@ async function handler() {
   }
 
   const errors = results.flatMap((result) => result.errors);
-  return NextResponse.json({
+  const payload: SyncResponseBody = {
     success: errors.length === 0,
     fetchedPosts: posts.length,
     savedPosts: results.filter((result) => result.postSaved).length,
@@ -324,7 +462,24 @@ async function handler() {
     account: syncedAccount,
     capturedAt,
     errors
-  }, { status: errors.length ? 207 : 200 });
+  };
+  await safeSaveSyncRun({
+    triggerType,
+    status: errors.length === 0 ? "success" : payload.savedPosts > 0 || payload.savedSnapshots > 0 ? "partial" : "failed",
+    startedAt,
+    finishedAt: capturedAt,
+    fetchedPosts: payload.fetchedPosts,
+    savedPosts: payload.savedPosts,
+    savedSnapshots: payload.savedSnapshots,
+    failedPosts: payload.failedPosts,
+    apiMode: payload.apiMode,
+    accountId: syncedAccount?.id,
+    accountName: syncedAccount?.name,
+    accountUsername: syncedAccount?.username,
+    errorSummary: errors[0]?.message,
+    errors
+  });
+  return NextResponse.json(payload, { status: errors.length ? 207 : 200 });
 }
 
 export async function GET(request: Request) {
@@ -335,9 +490,9 @@ export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return handler();
+  return handler("scheduled");
 }
 
 export async function POST() {
-  return handler();
+  return handler("manual");
 }

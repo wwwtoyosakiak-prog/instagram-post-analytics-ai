@@ -74,6 +74,34 @@ export type InstagramInsightSnapshot = {
   commentsCount: number;
 };
 
+export type InstagramSyncTriggerType = "manual" | "scheduled";
+export type InstagramSyncRunStatus = "success" | "partial" | "failed";
+
+export type InstagramSyncRun = {
+  id: string;
+  triggerType: InstagramSyncTriggerType;
+  status: InstagramSyncRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  fetchedPosts: number;
+  savedPosts: number;
+  savedSnapshots: number;
+  failedPosts: number;
+  apiMode: string;
+  accountId?: string;
+  accountName?: string;
+  accountUsername?: string;
+  errorSummary?: string;
+  errors: Array<{
+    postId?: string;
+    stage: string;
+    message: string;
+    code?: number;
+    subcode?: number;
+    traceId?: string;
+  }>;
+};
+
 export type PostMetrics = {
   engagement: number;
   engagementRate: number;

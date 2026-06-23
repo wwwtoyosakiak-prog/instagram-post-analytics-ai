@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, PostCategoryDefinition, PostType } from "@/lib/types";
+import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadPostsData, loadSyncRunsData, loadTasksData } from "@/lib/cloud-storage";
+import { ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, InstagramSyncRun, MonthlyGoal, PostCategoryDefinition, PostType } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
 
@@ -29,16 +29,19 @@ export default function DashboardPage() {
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [accountId, setAccountId] = useState("all");
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
+  const [graphPeriod, setGraphPeriod] = useState<"7" | "30" | "90" | "all">("30");
+  const [syncRuns, setSyncRuns] = useState<InstagramSyncRun[]>([]);
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights, loadedCategories]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData(), loadCategoriesData(), loadSyncRunsData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights, loadedCategories, loadedSyncRuns]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
       setGoals(loadedGoals);
       setInsightHistory(loadedInsights);
+      setSyncRuns(loadedSyncRuns);
       const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
       if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
       setCategories(loadedCategories);
@@ -138,8 +141,16 @@ export default function DashboardPage() {
 
   const data = useMemo(() => {
     const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
+    const todayKey = toTokyoDateKey(new Date());
+    const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, todayKey);
     const currentMonthKey = currentMonth();
     const monthlyPosts = targetPosts.filter((post) => post.date.startsWith(currentMonthKey));
+    const todayPosts = targetPosts.filter((post) => post.date === todayKey);
+    const latestTodayPost = [...todayPosts].sort((a, b) => {
+      const byUpdated = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      if (byUpdated !== 0) return byUpdated;
+      return a.date < b.date ? 1 : -1;
+    })[0];
     const monthlyActual = {
       posts: monthlyPosts.length,
       views: monthlyPosts.reduce((sum, post) => sum + post.views, 0),
@@ -157,7 +168,7 @@ export default function DashboardPage() {
     const completedTasks = targetTasks.filter((task) => task.status === "done");
     const completionRate = targetTasks.length ? (completedTasks.length / targetTasks.length) * 100 : 0;
     const dailyViews = Array.from(
-      targetPosts.reduce((daily, post) => {
+      graphPosts.reduce((daily, post) => {
         daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
         return daily;
       }, new Map<string, number>())
@@ -165,7 +176,7 @@ export default function DashboardPage() {
       .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
       .map(([date, views]) => ({ name: date.slice(5), date, views }));
     const typeData = (["image", "video", "reel", "carousel"] as PostType[]).map((type) => {
-      const items = targetPosts.filter((post) => post.type === type);
+      const items = graphPosts.filter((post) => post.type === type);
       return {
         name: postTypeLabels[type],
         averageViews: Math.round(average(items.map((post) => post.views))),
@@ -173,11 +184,11 @@ export default function DashboardPage() {
       };
     });
     const weekdayData = ["日", "月", "火", "水", "木", "金", "土"].map((day) => {
-      const items = targetPosts.filter((post) => weekdayJa(post.date) === day);
+      const items = graphPosts.filter((post) => weekdayJa(post.date) === day);
       return { name: day, averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2)) };
     });
     const categoryData = categories.map((category) => {
-      const items = targetPosts.filter((post) => (post.category ?? "other") === category.value);
+      const items = graphPosts.filter((post) => (post.category ?? "other") === category.value);
       const scores = items.map((post) => latestScoreByPostId[post.id]).filter((score): score is number => typeof score === "number");
       const categoryPostIds = new Set(items.map((post) => post.id));
       const categoryTasks = targetTasks.filter((task) => task.postId && categoryPostIds.has(task.postId));
@@ -204,8 +215,8 @@ export default function DashboardPage() {
       categoryData,
       taskStatusData,
       taskCategoryData,
-      saveRank: [...targetPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
-      likeRank: [...targetPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
+      saveRank: [...graphPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
+      likeRank: [...graphPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
       totalViews: targetPosts.reduce((sum, post) => sum + post.views, 0),
       averageEngagementRate: average(targetPosts.map((post) => getMetrics(post).engagementRate)),
       averageSaves: average(targetPosts.map((post) => post.saves)),
@@ -223,9 +234,19 @@ export default function DashboardPage() {
       completionRate,
       nextTask,
       nextTaskPost: nextTask?.postId ? postById[nextTask.postId] : undefined,
-      count: targetPosts.length
+      count: targetPosts.length,
+      graphCount: graphPosts.length,
+      graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "全期間",
+      todayPosts,
+      todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
+      latestTodayPost,
+      todayKey
     };
-  }, [posts, tasks, goals, accountId, latestScoreByPostId, categories]);
+  }, [posts, tasks, goals, accountId, latestScoreByPostId, categories, graphPeriod]);
+
+  const latestSyncRun = syncRuns[0] ?? null;
+  const latestSyncError = syncRuns.find((run) => run.status !== "success") ?? null;
+  const nextSyncAt = useMemo(() => getNextScheduledSyncTime(new Date()), []);
 
   return (
     <div>
@@ -258,6 +279,58 @@ export default function DashboardPage() {
             <HeroStat label="合計表示数" value={data.totalViews.toLocaleString()} note="最新の投稿データを合算" tone="clay" />
             <HeroStat label="平均ER" value={`${data.averageEngagementRate.toFixed(2)}%`} note="投稿ごとの平均値" tone="sky" />
             <HeroStat label="平均保存数" value={Math.round(data.averageSaves).toLocaleString()} note="1投稿あたりの平均" tone="plum" />
+          </div>
+          <div className="mb-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+            <Panel className="border-stone-200/80 bg-white/88">
+              <SectionLead
+                eyebrow="Sync"
+                title="同期状況"
+                description="自動反映のタイミングと、最後の同期結果をすぐ確認できます。"
+              />
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <Insight label="最終同期時刻" value={latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"} />
+                <Insight label="次回同期予定" value={formatDateTimeJst(nextSyncAt.toISOString())} />
+                <Insight label="同期状態" value={latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "履歴なし"} />
+              </div>
+              {latestSyncRun ? (
+                <div className="mt-4 grid gap-3 rounded-xl border border-stone-200/80 bg-fog/70 p-4 md:grid-cols-4">
+                  <MiniMetric label="取得投稿" value={`${latestSyncRun.fetchedPosts}件`} />
+                  <MiniMetric label="投稿保存" value={`${latestSyncRun.savedPosts}件`} />
+                  <MiniMetric label="履歴保存" value={`${latestSyncRun.savedSnapshots}件`} />
+                  <MiniMetric label="失敗" value={`${latestSyncRun.failedPosts}件`} />
+                </div>
+              ) : null}
+              {latestSyncError ? (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
+                  <p className="font-semibold">直近の同期エラー</p>
+                  <p className="mt-1">{latestSyncError.errorSummary || "同期でエラーが発生しました。"}</p>
+                  <p className="mt-2 text-xs text-red-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
+                </div>
+              ) : null}
+            </Panel>
+            <Panel className="border-stone-200/80 bg-gradient-to-br from-white/92 to-oat/70">
+              <SectionLead
+                eyebrow="Today"
+                title="今日の投稿"
+                description="日次確認に必要な投稿数、表示数、直近投稿をまとめています。"
+              />
+              <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-1">
+                <Insight label="今日の投稿件数" value={`${data.todayPosts.length}件`} />
+                <Insight label="今日の表示数合計" value={data.todayViews.toLocaleString()} />
+              </div>
+              <div className="mt-4 rounded-xl border border-stone-200/80 bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">直近投稿</p>
+                {data.latestTodayPost ? (
+                  <>
+                    <p className="mt-2 line-clamp-2 font-semibold text-ink">{videoTitle(data.latestTodayPost)}</p>
+                    <p className="mt-2 text-sm text-stone-600">表示数 {data.latestTodayPost.views.toLocaleString()} / 保存 {data.latestTodayPost.saves.toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-stone-500">投稿日 {data.latestTodayPost.date}</p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-stone-600">{data.todayKey} の投稿はまだありません。</p>
+                )}
+              </div>
+            </Panel>
           </div>
           <section className="mb-6 border-y border-stone-200 py-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -384,6 +457,21 @@ export default function DashboardPage() {
           title="推移と比較"
           description="時系列の流れ、投稿タイプ差、カテゴリ差を横断して確認できるグラフ群です。"
         />
+        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-stone-600">{data.graphPeriodLabel}の投稿 {data.graphCount}件をもとに集計しています。</p>
+          <div className="grid grid-cols-4 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
+            {(["7", "30", "90", "all"] as const).map((period) => (
+              <button
+                key={period}
+                type="button"
+                onClick={() => setGraphPeriod(period)}
+                className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
+              >
+                {period === "all" ? "全期間" : `${period}日`}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
         <ChartPanel title="日別表示数の推移" description="投稿日ごとの表示数の流れです。大きく伸びた日を先に把握できます。" accent="clay">
@@ -607,11 +695,67 @@ function currentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
 
+function toTokyoDateKey(date: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date).map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function filterPostsByPeriod(posts: InstagramPost[], period: "7" | "30" | "90" | "all", todayKey: string) {
+  if (period === "all") return posts;
+  const end = new Date(`${todayKey}T00:00:00+09:00`);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (Number(period) - 1));
+  const startKey = toTokyoDateKey(start);
+  return posts.filter((post) => post.date >= startKey && post.date <= todayKey);
+}
+
+function getNextScheduledSyncTime(now: Date) {
+  const next = new Date(now);
+  next.setSeconds(0, 0);
+  if (next.getMinutes() >= 17) {
+    next.setHours(next.getHours() + 1);
+  }
+  next.setMinutes(17, 0, 0);
+  return next;
+}
+
+function formatDateTimeJst(value: string) {
+  return new Date(value).toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function syncStatusLabel(status: InstagramSyncRun["status"]) {
+  if (status === "success") return "成功";
+  if (status === "partial") return "一部失敗";
+  return "失敗";
+}
+
 function Insight({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
       <p className="mt-2 text-base font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</p>
+      <p className="mt-2 text-lg font-bold text-ink">{value}</p>
     </div>
   );
 }

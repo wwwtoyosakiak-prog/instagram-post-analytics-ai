@@ -26,7 +26,7 @@ import {
   upsertManyPosts,
   upsertManyTasks
 } from "@/lib/storage";
-import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, MonthlyGoal, MonthlyGoalInput, PostCategoryDefinition } from "@/lib/types";
+import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, PostCategoryDefinition } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { postCategoryOptions } from "@/lib/metrics";
 
@@ -271,6 +271,16 @@ export async function loadAllInsightData(): Promise<InstagramInsightSnapshot[]> 
   try {
     const data = await requestJson<{ insights: InstagramInsightSnapshot[] }>("/api/data/insights?all=true");
     return data.insights;
+  } catch (error) {
+    if (!isServerStorageDisabled(error)) console.warn(error);
+    return [];
+  }
+}
+
+export async function loadSyncRunsData(): Promise<InstagramSyncRun[]> {
+  try {
+    const data = await requestJson<{ syncRuns: InstagramSyncRun[] }>("/api/data/sync-runs");
+    return data.syncRuns;
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
     return [];
