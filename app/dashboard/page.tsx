@@ -230,23 +230,34 @@ export default function DashboardPage() {
   return (
     <div>
       <PageHeader title="ダッシュボード" description="投稿データをグラフで確認し、成果が出やすい型を探します。" />
-      <Panel className="mb-6">
-        <label>アカウント</label>
-        <select className="mt-1 max-w-sm" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-          <option value="all">すべて</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>{account.name}</option>
-          ))}
-        </select>
+      <Panel className="mb-6 overflow-hidden border-stone-200/80 bg-gradient-to-br from-white/92 via-white/80 to-skyglass/50">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-clay">Overview</p>
+            <h2 className="mt-2 text-2xl font-bold text-ink">いま見るべき数値を先に確認</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+              アカウントを切り替えると、投稿数、表示数、保存傾向、改善タスクの進み具合を同じ基準で見比べられます。
+            </p>
+          </div>
+          <div>
+            <label>アカウント</label>
+            <select className="mt-2" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              <option value="all">すべて</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </Panel>
       {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。登録ページからサンプルデータを追加できます。</p></Panel> : null}
       {data.count ? (
         <>
-          <div className="mb-6 grid gap-4 md:grid-cols-4">
-            <Stat label="対象投稿" value={`${data.count}件`} />
-            <Stat label="合計表示数" value={data.totalViews.toLocaleString()} />
-            <Stat label="平均ER" value={`${data.averageEngagementRate.toFixed(2)}%`} />
-            <Stat label="平均保存数" value={Math.round(data.averageSaves).toLocaleString()} />
+          <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <HeroStat label="対象投稿" value={`${data.count}件`} note={accountId === "all" ? "全アカウント合計" : "選択アカウントのみ"} tone="moss" />
+            <HeroStat label="合計表示数" value={data.totalViews.toLocaleString()} note="最新の投稿データを合算" tone="clay" />
+            <HeroStat label="平均ER" value={`${data.averageEngagementRate.toFixed(2)}%`} note="投稿ごとの平均値" tone="sky" />
+            <HeroStat label="平均保存数" value={Math.round(data.averageSaves).toLocaleString()} note="1投稿あたりの平均" tone="plum" />
           </div>
           <section className="mb-6 border-y border-stone-200 py-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -321,7 +332,11 @@ export default function DashboardPage() {
             ) : null}
           </section>
           <Panel className="mb-6">
-            <h2 className="font-semibold">読み取りポイント</h2>
+            <SectionLead
+              eyebrow="Highlights"
+              title="読み取りポイント"
+              description="相対的に強い曜日、投稿タイプ、カテゴリをひと目で拾えるように整理しています。"
+            />
             <div className="mt-4 grid gap-3 md:grid-cols-5">
               <Insight label="反応が良い投稿タイプ" value={data.bestType?.averageEngagementRate ? `${data.bestType.name} / ${data.bestType.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
               <Insight label="反応が良い曜日" value={data.bestWeekday?.averageEngagementRate ? `${data.bestWeekday.name}曜日 / ${data.bestWeekday.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
@@ -331,7 +346,11 @@ export default function DashboardPage() {
             </div>
           </Panel>
           <Panel className="mb-6">
-            <h2 className="font-semibold">改善タスク進捗</h2>
+            <SectionLead
+              eyebrow="Tasks"
+              title="改善タスク進捗"
+              description="進み具合だけでなく、次に手を付ける期限付きタスクもすぐ確認できます。"
+            />
             <div className="mt-4 grid gap-3 md:grid-cols-4">
               <Insight label="未完了タスク" value={`${data.openTaskCount}件`} />
               <Insight label="完了率" value={`${data.completionRate.toFixed(1)}%`} />
@@ -340,7 +359,11 @@ export default function DashboardPage() {
             </div>
           </Panel>
           <Panel className="mb-6">
-            <h2 className="font-semibold">今月の目標達成率</h2>
+            <SectionLead
+              eyebrow="Goals"
+              title="今月の目標達成率"
+              description="今月の実績と目標値の差を指標ごとに比較します。"
+            />
             {data.selectedGoal ? (
               <div className="mt-4 grid gap-3 md:grid-cols-5">
                 <Progress label="投稿数" actual={data.monthlyActual.posts} target={data.selectedGoal.targetPosts} suffix="件" />
@@ -355,8 +378,15 @@ export default function DashboardPage() {
           </Panel>
         </>
       ) : null}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ChartPanel title="日別表示数の推移">
+      <section className="mt-8">
+        <SectionLead
+          eyebrow="Charts"
+          title="推移と比較"
+          description="時系列の流れ、投稿タイプ差、カテゴリ差を横断して確認できるグラフ群です。"
+        />
+      </section>
+      <div className="mt-4 grid gap-6 lg:grid-cols-2">
+        <ChartPanel title="日別表示数の推移" description="投稿日ごとの表示数の流れです。大きく伸びた日を先に把握できます。" accent="clay">
           <LineChart data={data.dailyViews}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -365,7 +395,7 @@ export default function DashboardPage() {
             <Line type="monotone" dataKey="views" name="表示数" stroke="#b55d3e" strokeWidth={2} />
           </LineChart>
         </ChartPanel>
-        <ChartPanel title="投稿タイプ別の平均表示数">
+        <ChartPanel title="投稿タイプ別の平均表示数" description="動画・画像など、形式ごとの平均表示数を比較します。" accent="moss">
           <BarChart data={data.typeData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -374,7 +404,7 @@ export default function DashboardPage() {
             <Bar dataKey="averageViews" name="平均表示数" fill="#53624a" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="カテゴリ別の平均表示数">
+        <ChartPanel title="カテゴリ別の平均表示数" description="どのテーマが見られやすいかをカテゴリ単位で見ます。" accent="moss">
           <BarChart data={data.categoryData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -383,7 +413,7 @@ export default function DashboardPage() {
             <Bar dataKey="averageViews" name="平均表示数" fill="#4f6b57" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="カテゴリ別の平均保存率">
+        <ChartPanel title="カテゴリ別の平均保存率" description="保存されやすいテーマを特定するための比較です。" accent="sky">
           <BarChart data={data.categoryData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -392,7 +422,7 @@ export default function DashboardPage() {
             <Bar dataKey="averageSaveRate" name="平均保存率" fill="#2f766d" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="カテゴリ別の平均AIスコア">
+        <ChartPanel title="カテゴリ別の平均AIスコア" description="AI評価の高いカテゴリをまとめて確認します。" accent="plum">
           <BarChart data={data.categoryData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -401,7 +431,7 @@ export default function DashboardPage() {
             <Bar dataKey="averageAiScore" name="平均AIスコア" fill="#5a4356" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="改善タスクの状態別件数">
+        <ChartPanel title="改善タスクの状態別件数" description="未着手、進行中、完了の件数バランスです。" accent="clay">
           <BarChart data={data.taskStatusData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -410,7 +440,7 @@ export default function DashboardPage() {
             <Bar dataKey="count" name="タスク数" fill="#b55d3e" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="カテゴリ別の改善タスク数">
+        <ChartPanel title="カテゴリ別の改善タスク数" description="改善の集中先をカテゴリ別に見ます。" accent="moss">
           <BarChart data={data.taskCategoryData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -421,7 +451,7 @@ export default function DashboardPage() {
             <Bar dataKey="openTaskCount" name="未完了" fill="#b55d3e" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="投稿タイプ別の平均エンゲージメント率">
+        <ChartPanel title="投稿タイプ別の平均エンゲージメント率" description="反応率が高い投稿形式を比較します。" accent="clay">
           <BarChart data={data.typeData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -430,7 +460,7 @@ export default function DashboardPage() {
             <Bar dataKey="averageEngagementRate" name="平均エンゲージメント率" fill="#b55d3e" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="曜日別の平均エンゲージメント率">
+        <ChartPanel title="曜日別の平均エンゲージメント率" description="反応が出やすい曜日の偏りを確認します。" accent="sky">
           <BarChart data={data.weekdayData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -439,7 +469,7 @@ export default function DashboardPage() {
             <Bar dataKey="averageEngagementRate" name="平均エンゲージメント率" fill="#2f766d" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="保存数ランキング">
+        <ChartPanel title="保存数ランキング" description="保存されやすかった投稿を上位順に見ます。" accent="moss">
           <BarChart data={data.saveRank}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -448,7 +478,7 @@ export default function DashboardPage() {
             <Bar dataKey="saves" name="保存数" fill="#53624a" />
           </BarChart>
         </ChartPanel>
-        <ChartPanel title="いいね数ランキング">
+        <ChartPanel title="いいね数ランキング" description="いいね数の上位投稿を一覧で確認します。" accent="clay">
           <BarChart data={data.likeRank}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -489,10 +519,11 @@ export default function DashboardPage() {
         )}
       </Panel>
       <section className="mt-6 border-y border-stone-200 py-6">
-        <div>
-          <h2 className="font-semibold">週・月の伸び</h2>
-          <p className="mt-1 text-sm text-stone-600">Instagram APIの同期履歴から、期間内の増加数を比較します。</p>
-        </div>
+        <SectionLead
+          eyebrow="Growth"
+          title="週・月の伸び"
+          description="Instagram API の同期履歴から、期間内にどれだけ増えたかを比較します。"
+        />
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <GrowthSummaryPanel title="直近7日" summary={periodGrowth.week} />
           <GrowthSummaryPanel title="直近30日" summary={periodGrowth.month} />
@@ -585,6 +616,42 @@ function Insight({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SectionLead({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">{eyebrow}</p>
+      <h2 className="mt-2 text-lg font-bold text-ink">{title}</h2>
+      <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
+    </div>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  note,
+  tone
+}: {
+  label: string;
+  value: string;
+  note: string;
+  tone: "moss" | "clay" | "sky" | "plum";
+}) {
+  const toneClasses = {
+    moss: "from-moss/18 border-moss/20 text-moss",
+    clay: "from-clay/18 border-clay/20 text-clay",
+    sky: "from-skyglass border-skyglass/90 text-teal-800",
+    plum: "from-plum/16 border-plum/20 text-plum"
+  };
+  return (
+    <div className={`rounded-2xl border bg-gradient-to-br to-white/90 p-5 shadow-panel ${toneClasses[tone]}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">{label}</p>
+      <p className="mt-3 text-3xl font-bold text-ink">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-stone-600">{note}</p>
+    </div>
+  );
+}
+
 function Progress({ label, actual, target, suffix, decimal = false }: { label: string; actual: number; target: number; suffix: string; decimal?: boolean }) {
   const rate = target > 0 ? Math.min((actual / target) * 100, 999) : 0;
   const actualText = decimal ? actual.toFixed(2) : Math.round(actual).toLocaleString();
@@ -601,10 +668,30 @@ function Progress({ label, actual, target, suffix, decimal = false }: { label: s
   );
 }
 
-function ChartPanel({ title, children }: { title: string; children: React.ReactElement }) {
+function ChartPanel({
+  title,
+  description,
+  accent,
+  children
+}: {
+  title: string;
+  description: string;
+  accent: "moss" | "clay" | "sky" | "plum";
+  children: React.ReactElement;
+}) {
+  const accentClasses = {
+    moss: "bg-moss",
+    clay: "bg-clay",
+    sky: "bg-teal-700",
+    plum: "bg-plum"
+  };
   return (
-    <Panel>
-      <h2 className="mb-4 font-semibold">{title}</h2>
+    <Panel className="relative overflow-hidden">
+      <div className={`absolute left-0 top-0 h-full w-1 ${accentClasses[accent]}`} />
+      <div className="pl-3">
+        <h2 className="font-semibold">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
+      </div>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           {children}
