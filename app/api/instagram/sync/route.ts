@@ -61,6 +61,7 @@ type SyncTriggerType = "manual" | "scheduled";
 
 type SyncResponseBody = {
   success: boolean;
+  skipped?: boolean;
   fetchedPosts: number;
   savedPosts: number;
   savedSnapshots: number;
@@ -160,6 +161,29 @@ async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">) {
   } catch (error) {
     console.error("[instagram-sync-run-save]", error);
   }
+}
+
+async function getLatestScheduledSyncRun() {
+  const rows = await supabaseRequest<Array<{ finished_at: string }>>(
+    "instagram_sync_runs?trigger_type=eq.scheduled&select=finished_at&order=finished_at.desc&limit=1",
+    { method: "GET" }
+  );
+  return rows[0]?.finished_at ?? null;
+}
+
+function getCurrentScheduledSlotStart(now: Date) {
+  const slot = new Date(now);
+  slot.setSeconds(0, 0);
+  slot.setMinutes(17, 0, 0);
+  if (now.getMinutes() < 17) {
+    slot.setHours(slot.getHours() - 1);
+  }
+  return slot;
+}
+
+function hasRunForScheduledSlot(latestScheduledFinishedAt: string | null, slotStart: Date) {
+  if (!latestScheduledFinishedAt) return false;
+  return new Date(latestScheduledFinishedAt).getTime() >= slotStart.getTime();
 }
 
 async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount | null> {
@@ -336,7 +360,44 @@ async function handler(triggerType: SyncTriggerType) {
       errors: [],
       error: `環境変数が不足しています: ${missing.join(", ")}`
     };
+    await safeSaveSyncRun({
+      triggerType,
+      status: "failed",
+      startedAt,
+      finishedAt: capturedAt,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "unknown",
+      errorSummary: payload.error,
+      errors: []
+    });
     return NextResponse.json(payload, { status: 500 });
+  }
+
+  if (triggerType === "scheduled") {
+    try {
+      const now = new Date();
+      const slotStart = getCurrentScheduledSlotStart(now);
+      const latestScheduledFinishedAt = await getLatestScheduledSyncRun();
+      if (hasRunForScheduledSlot(latestScheduledFinishedAt, slotStart)) {
+        return NextResponse.json({
+          success: true,
+          skipped: true,
+          fetchedPosts: 0,
+          savedPosts: 0,
+          savedSnapshots: 0,
+          failedPosts: 0,
+          apiMode: "scheduled",
+          account: null,
+          capturedAt: now.toISOString(),
+          errors: []
+        } satisfies SyncResponseBody);
+      }
+    } catch (error) {
+      console.error("[instagram-sync-slot-check]", error);
+    }
   }
 
   let config: InstagramGraphConfig;

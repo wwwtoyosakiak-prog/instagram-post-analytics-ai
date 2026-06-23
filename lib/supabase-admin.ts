@@ -641,6 +641,13 @@ export async function listSyncRunsFromSupabase() {
   return rows.map(mapSyncRun);
 }
 
+export async function getLatestScheduledSyncRunFromSupabase() {
+  const rows = await supabaseRequest<SyncRunRow[]>(
+    "instagram_sync_runs?trigger_type=eq.scheduled&select=*&order=finished_at.desc&limit=1"
+  );
+  return rows[0] ? mapSyncRun(rows[0]) : null;
+}
+
 export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {
   const filters = ["select=*", "order=created_at.desc"];
   if (month) filters.push(`month=eq.${encodeURIComponent(month)}`);

@@ -2,8 +2,8 @@ name: Instagram hourly sync
 
 on:
   schedule:
-    # Avoid the top-of-hour queue where GitHub Actions scheduled jobs are often delayed.
-    - cron: "17 * * * *"
+    # Run every 5 minutes and let the API decide whether the current hourly slot still needs syncing.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 concurrency:

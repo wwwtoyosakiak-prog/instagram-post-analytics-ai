@@ -245,10 +245,11 @@ export default function DashboardPage() {
   }, [posts, tasks, goals, accountId, latestScoreByPostId, categories, graphPeriod]);
 
   const latestSyncRun = syncRuns[0] ?? null;
+  const latestScheduledSyncRun = syncRuns.find((run) => run.triggerType === "scheduled") ?? null;
   const latestSyncError = syncRuns.find((run) => run.status !== "success") ?? null;
   const showPastSyncError = Boolean(latestSyncError && latestSyncRun && latestSyncRun.id !== latestSyncError.id);
   const pastSyncError = showPastSyncError ? latestSyncError : null;
-  const nextSyncAt = useMemo(() => getNextScheduledSyncTime(new Date()), []);
+  const syncMonitor = useMemo(() => getSyncMonitor(new Date(), latestScheduledSyncRun?.finishedAt), [latestScheduledSyncRun?.finishedAt]);
 
   return (
     <div>
@@ -291,9 +292,15 @@ export default function DashboardPage() {
               />
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <Insight label="最終同期時刻" value={latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"} />
-                <Insight label="次回同期予定" value={formatDateTimeJst(nextSyncAt.toISOString())} />
-                <Insight label="同期状態" value={latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "履歴なし"} />
+                <Insight label="次回同期予定" value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())} />
+                <Insight label="同期状態" value={syncMonitor.isDelayed ? "同期遅延" : latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "履歴なし"} />
               </div>
+              {syncMonitor.isDelayed ? (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  <p className="font-semibold">定時同期が遅れています</p>
+                  <p className="mt-1">予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の自動同期がまだ記録されていません。</p>
+                </div>
+              ) : null}
               {latestSyncRun ? (
                 <div className="mt-4 grid gap-3 rounded-xl border border-stone-200/80 bg-fog/70 p-4 md:grid-cols-4">
                   <MiniMetric label="取得投稿" value={`${latestSyncRun.fetchedPosts}件`} />
@@ -740,6 +747,30 @@ function getNextScheduledSyncTime(now: Date) {
   }
   next.setMinutes(17, 0, 0);
   return next;
+}
+
+function getLatestExpectedScheduledTime(now: Date) {
+  const expected = new Date(now);
+  expected.setSeconds(0, 0);
+  expected.setMinutes(17, 0, 0);
+  if (now.getMinutes() < 17) {
+    expected.setHours(expected.getHours() - 1);
+  }
+  return expected;
+}
+
+function getSyncMonitor(now: Date, latestScheduledFinishedAt?: string) {
+  const expectedScheduledAt = getLatestExpectedScheduledTime(now);
+  const nextScheduledAt = getNextScheduledSyncTime(now);
+  const latestScheduledAtMs = latestScheduledFinishedAt ? new Date(latestScheduledFinishedAt).getTime() : 0;
+  const expectedAtMs = expectedScheduledAt.getTime();
+  const graceMs = 8 * 60 * 1000;
+  const isDelayed = now.getTime() >= expectedAtMs + graceMs && latestScheduledAtMs < expectedAtMs;
+  return {
+    expectedScheduledAt,
+    nextScheduledAt,
+    isDelayed
+  };
 }
 
 function formatDateTimeJst(value: string) {
