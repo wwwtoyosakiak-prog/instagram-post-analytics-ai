@@ -302,8 +302,17 @@ export default function DashboardPage() {
   const showPastSyncError = Boolean(latestSyncError && latestSyncRun && latestSyncRun.id !== latestSyncError.id);
   const pastSyncError = showPastSyncError ? latestSyncError : null;
   const syncMonitor = useMemo(() => getSyncMonitor(new Date(), latestScheduledSyncRun?.finishedAt), [latestScheduledSyncRun?.finishedAt]);
-  const showTodayMissingAlert = Boolean(
+  const latestSyncFinishedAt = latestSyncRun ? new Date(latestSyncRun.finishedAt) : null;
+  const latestSyncAgeMs = latestSyncFinishedAt ? Date.now() - latestSyncFinishedAt.getTime() : Number.POSITIVE_INFINITY;
+  const hasFreshTodaySync = Boolean(
     latestSyncRun?.status === "success" &&
+    latestSyncFinishedAt &&
+    toTokyoDateKey(latestSyncFinishedAt) === data.todayKey &&
+    latestSyncAgeMs <= 2 * 60 * 60 * 1000
+  );
+  const showTodayMissingAlert = Boolean(
+    hasFreshTodaySync &&
+    !syncMonitor.isDelayed &&
     data.todayPosts.length === 0 &&
     new Date().getHours() >= 12
   );
@@ -361,6 +370,12 @@ export default function DashboardPage() {
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <p className="font-semibold">定時同期が遅れています</p>
                   <p className="mt-1">予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の自動同期がまだ記録されていません。</p>
+                  <p className="mt-2 text-xs text-amber-700">
+                    最後の自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    GitHub Actions の実行履歴、`CRON_SECRET`、Vercel の環境変数を確認してください。
+                  </p>
                 </div>
               ) : null}
               {latestSyncRun ? (
@@ -406,7 +421,7 @@ export default function DashboardPage() {
               {showTodayMissingAlert ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <p className="font-semibold">今日の投稿が未取得の可能性があります</p>
-                  <p className="mt-1">同期は成功していますが、{data.todayKey} の投稿が0件です。今日投稿している場合は、再同期かアカウント紐づけを確認してください。</p>
+                  <p className="mt-1">直近2時間以内の同期は成功していますが、{data.todayKey} の投稿が0件です。今日投稿している場合は、再同期かアカウント紐づけを確認してください。</p>
                 </div>
               ) : null}
               <div className="mt-4 rounded-xl border border-stone-200/80 bg-white/80 p-4">
