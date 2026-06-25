@@ -38,6 +38,9 @@ export interface IgMedia {
   like_count?: number;
   comments_count?: number;
   children?: { data: { id: string }[] };
+  insights?: {
+    data: { name: string; values: { value: number }[] }[];
+  };
 }
 
 export interface IgMediaInsights {
@@ -120,12 +123,22 @@ export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo
   return data;
 }
 
+// ── インサイトヘルパー ────────────────────────────────────
+
+export function getMetric(
+  insights: { data: { name: string; values: { value: number }[] }[] } | null | undefined,
+  name: string
+): number | null {
+  return insights?.data?.find(m => m.name === name)?.values?.[0]?.value ?? null;
+}
+
 // ── 投稿一覧取得 ─────────────────────────────────────────
 
 export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgMedia[]> {
   const token = getToken();
   const uid = getUid(igUserId);
-  const fields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children';
+  const insightMetrics = 'reach,views,saved,total_interactions,likes,shares,ig_reels_avg_watch_time';
+  const fields = `id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
   const results: IgMedia[] = [];
   let url: string | null = `${BASE}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
 
@@ -139,14 +152,14 @@ export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgM
 
 // ── 投稿インサイト取得 ────────────────────────────────────
 
-// Business API で利用可能なメディアインサイト指標
+// Business API で利用可能なメディアインサイト指標（impressions は廃止、views に置換）
 const COMMON_METRICS = [
-  'impressions', 'reach', 'likes', 'comments', 'saved',
+  'reach', 'views', 'likes', 'comments', 'saved',
   'shares', 'total_interactions', 'follows', 'profile_visits',
 ];
 const VIDEO_METRICS = [
   ...COMMON_METRICS,
-  'views', 'ig_reels_avg_watch_time',
+  'ig_reels_avg_watch_time',
 ];
 
 function metricsForType(mediaType: string): string[] {

@@ -6,9 +6,9 @@ import { NextResponse } from 'next/server';
 import {
   fetchAccountInfo,
   fetchMediaList,
-  fetchMediaInsights,
   fetchAccountInsights,
   fetchFollowerSnapshot,
+  getMetric,
   isReel,
   type ApiError,
 } from '@/lib/instagram-graph-api';
@@ -59,7 +59,6 @@ async function handler() {
         follows_count: account.follows_count,
         media_count: account.media_count,
         website: account.website,
-        account_type: account.account_type,
         last_synced_at: new Date().toISOString(),
       }, { onConflict: 'ig_user_id' })
       .select('id')
@@ -104,33 +103,24 @@ async function handler() {
         results.errors.push(`投稿保存エラー ${media.id}: ${mediaErr.message}`);
       }
 
-      // インサイト取得（失敗しても続行）
+      // インサイト保存（fetchMediaList でフィールド展開済み）
       try {
-        const insights = await fetchMediaInsights(media.id, media.media_type);
+        const ins = media.insights ?? null;
         const { error: insErr } = await db
           .from('instagram_media_insights')
           .insert({
             media_id: media.id,
             account_id: accountId,
             captured_at: new Date().toISOString(),
-            impressions: insights.impressions ?? null,
-            reach: insights.reach ?? null,
-            likes: insights.likes ?? null,
-            comments: insights.comments ?? null,
-            saved: insights.saved ?? null,
-            shares: insights.shares ?? null,
-            total_interactions: insights.total_interactions ?? null,
-            follows: insights.follows ?? null,
-            profile_visits: insights.profile_visits ?? null,
-            views: insights.views ?? null,
-            plays: insights.plays ?? null,
-            ig_reels_avg_watch_time: insights.ig_reels_avg_watch_time ?? null,
-            ig_reels_video_view_total_time: insights.ig_reels_video_view_total_time ?? null,
-            video_view_total_time: insights.video_view_total_time ?? null,
-            avg_watch_time: insights.avg_watch_time ?? null,
-            navigation: insights.navigation ?? null,
-            replies: insights.replies ?? null,
-            raw_response: insights.raw_response ?? null,
+            reach: getMetric(ins, 'reach'),
+            views: getMetric(ins, 'views'),
+            likes: getMetric(ins, 'likes'),
+            comments: getMetric(ins, 'comments'),
+            saved: getMetric(ins, 'saved'),
+            shares: getMetric(ins, 'shares'),
+            total_interactions: getMetric(ins, 'total_interactions'),
+            ig_reels_avg_watch_time: getMetric(ins, 'ig_reels_avg_watch_time'),
+            raw_response: ins,
           });
 
         if (insErr) {
@@ -139,9 +129,6 @@ async function handler() {
         } else {
           results.insights_fetched++;
         }
-
-        // 小さなウェイト（レート制限対策）
-        await new Promise(r => setTimeout(r, 100));
       } catch (e) {
         results.insights_failed++;
         console.warn(`[full-sync] insights exception ${media.id}:`, e);
