@@ -19,7 +19,6 @@ const nav = [
   { href: "/tasks", label: "タスク", icon: CheckSquare },
   { href: "/goals", label: "目標", icon: Target },
   { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 },
-  { href: "/ig-dashboard", label: "IGダッシュボード", icon: BarChart3 },
   { href: "/ig-media", label: "IG投稿一覧", icon: Instagram },
   { href: "/reel-insights", label: "リール分析", icon: PlayCircle },
   { href: "/reports", label: "レポート", icon: FileText },
