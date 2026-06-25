@@ -41,7 +41,7 @@ function PostDetailContent() {
     Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id), loadInsightData(id), loadCategoriesData()]).then(([posts, accounts, analyses, loadedTasks, insightData, loadedCategories]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
-      setAccount(accounts.find((item) => item.id === foundPost?.accountId) ?? null);
+      setAccount(accounts[0] ?? null);
       setAnalysisHistory(analyses);
       setAnalysis(analyses[0] ?? null);
       setTasks(loadedTasks);
@@ -140,7 +140,6 @@ function PostDetailContent() {
           <dl className="space-y-3 text-sm">
             <div><dt className="font-semibold">投稿日</dt><dd>{toJSTDate(post.date)}</dd></div>
             <div><dt className="font-semibold">データ登録日</dt><dd>{toJSTDate(post.recordedDate ?? post.date)}</dd></div>
-            <div><dt className="font-semibold">アカウント</dt><dd>{account ? `${account.name}（@${account.username}）` : "未選択"}</dd></div>
             <div><dt className="font-semibold">投稿タイプ</dt><dd>{postTypeLabels[post.type]}</dd></div>
             <div><dt className="font-semibold">投稿カテゴリ</dt><dd>{getPostCategoryLabel(post.category, categories)}</dd></div>
             <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>

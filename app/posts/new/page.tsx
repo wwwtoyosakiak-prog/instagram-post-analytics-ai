@@ -107,16 +107,6 @@ export default function NewPostPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Panel>
           <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label>対象アカウント</label>
-              <select value={form.accountId ?? ""} onChange={(e) => setValue("accountId", e.target.value)}>
-                <option value="">未選択</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>{account.name}（@{account.username}）</option>
-                ))}
-              </select>
-              {!accounts.length ? <p className="mt-2 text-xs text-stone-500">先にアカウント登録ページでアカウントを追加すると、投稿と紐づけできます。</p> : null}
-            </div>
             <div>
               <label>投稿日</label>
               <input type="date" value={form.date} onChange={(e) => setValue("date", e.target.value)} required />

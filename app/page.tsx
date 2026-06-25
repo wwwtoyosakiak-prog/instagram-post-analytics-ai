@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadCategoriesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, PostCategoryDefinition } from "@/lib/types";
+import { getServerStorageStatus, loadAnalysesData, loadCategoriesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, ImprovementTask, InstagramPost, PostCategoryDefinition } from "@/lib/types";
 import { average, formatPercent, getMetrics, getPostCategoryLabel, taskStatusLabels } from "@/lib/metrics";
 
 export default function Home() {
-  const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
@@ -17,8 +16,7 @@ export default function Home() {
   const [serverStorageEnabled, setServerStorageEnabled] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadAccountsData(), loadPostsData(), loadTasksData(), getServerStorageStatus(), loadCategoriesData()]).then(([loadedAccounts, loadedPosts, loadedTasks, status, loadedCategories]) => {
-      setAccounts(loadedAccounts);
+    Promise.all([loadPostsData(), loadTasksData(), getServerStorageStatus(), loadCategoriesData()]).then(([loadedPosts, loadedTasks, status, loadedCategories]) => {
       setPosts(loadedPosts);
       setTasks(loadedTasks);
       setServerStorageEnabled(status.serverStorageEnabled);
@@ -108,7 +106,6 @@ export default function Home() {
         <Panel>
           <h2 className="flex items-center gap-2 font-semibold"><CheckCircle2 size={18} className="text-moss" />運用ステータス</h2>
           <div className="mt-4 grid gap-3 text-sm">
-            <StatusRow label="アカウント登録" value={accounts.length ? `${accounts.length}件登録済み` : "未登録"} active={accounts.length > 0} />
             <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件登録済み` : "未登録"} active={posts.length > 0} />
             <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
             <StatusRow label="改善タスク" value={`${summary.openTasks.length}件が未完了`} active={summary.openTasks.length > 0} />
@@ -159,12 +156,7 @@ export default function Home() {
           </div>
         </Panel>
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        <Panel>
-          <Users className="mb-4 text-moss" />
-          <h2 className="font-semibold">アカウント管理</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">ブランドや店舗ごとにアカウントを登録し、投稿データを紐づけて集計できます。</p>
-        </Panel>
+      <div className="grid gap-4 md:grid-cols-3">
         <Panel>
           <FileUp className="mb-4 text-clay" />
           <h2 className="font-semibold">手入力・CSV登録</h2>
@@ -172,8 +164,8 @@ export default function Home() {
         </Panel>
         <Panel>
           <Database className="mb-4 text-moss" />
-          <h2 className="font-semibold">localStorage保存</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">初期版はブラウザ保存です。データアクセスを分けているため、SupabaseやPostgreSQLへ移行しやすい構成です。</p>
+          <h2 className="font-semibold">Supabase保存</h2>
+          <p className="mt-2 text-sm leading-6 text-stone-600">Supabaseに接続するとデータがサーバーに保存されます。未設定の場合はブラウザ保存で動作します。</p>
         </Panel>
         <Panel>
           <Sparkles className="mb-4 text-amber-700" />

@@ -8,12 +8,12 @@ import {
 } from "recharts";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
-  loadAccountsData, loadAllInsightData, loadAnalysesData,
+  loadAllInsightData, loadAnalysesData,
   loadCategoriesData, loadGoalsData, loadPostsData,
   loadSyncRunsData, loadTasksData,
 } from "@/lib/cloud-storage";
 import {
-  ImprovementTask, InstagramAccount, InstagramInsightSnapshot,
+  ImprovementTask, InstagramInsightSnapshot,
   InstagramPost, InstagramSyncRun, MonthlyGoal,
   PostCategoryDefinition, PostType,
 } from "@/lib/types";
@@ -599,14 +599,12 @@ function ChartPanel({ title, description, accent, children }: {
 
 function ManualDashboardTab() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [insightDate, setInsightDate] = useState("");
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
-  const [accountId, setAccountId] = useState("all");
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
   const [graphPeriod, setGraphPeriod] = useState<"7" | "30" | "90" | "all">("30");
   const [syncRuns, setSyncRuns] = useState<InstagramSyncRun[]>([]);
@@ -618,9 +616,8 @@ function ManualDashboardTab() {
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
   const refreshDashboard = async () => {
-    const [loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights, loadedCategories, loadedSyncRuns] = await Promise.all([
+    const [loadedPosts, loadedTasks, loadedGoals, loadedInsights, loadedCategories, loadedSyncRuns] = await Promise.all([
       loadPostsData(),
-      loadAccountsData(),
       loadTasksData(),
       loadGoalsData(),
       loadAllInsightData(),
@@ -628,7 +625,6 @@ function ManualDashboardTab() {
       loadSyncRunsData()
     ]);
     setPosts(loadedPosts);
-    setAccounts(loadedAccounts);
     setTasks(loadedTasks);
     setGoals(loadedGoals);
     setInsightHistory(loadedInsights);
@@ -645,11 +641,7 @@ function ManualDashboardTab() {
 
   const hourlyInsightData = useMemo(() => {
     if (!insightDate) return [];
-    const targetPostIds = new Set(
-      posts
-        .filter((post) => accountId === "all" || post.accountId === accountId)
-        .map((post) => post.id)
-    );
+    const targetPostIds = new Set(posts.map((post) => post.id));
     const snapshotsByHour = new Map<string, Map<string, InstagramInsightSnapshot>>();
     for (const snapshot of insightHistory) {
       if (!targetPostIds.has(snapshot.postId)) continue;
@@ -671,23 +663,19 @@ function ManualDashboardTab() {
         previousViews = views;
         return { hour: `${hour}:00`, views, growth, postCount: snapshots.size };
       });
-  }, [posts, insightHistory, accountId, insightDate]);
+  }, [posts, insightHistory, insightDate]);
 
   const periodGrowth = useMemo(() => {
-    const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
     return {
-      week: calculateInsightGrowth(targetPosts, insightHistory, 7),
-      month: calculateInsightGrowth(targetPosts, insightHistory, 30)
+      week: calculateInsightGrowth(posts, insightHistory, 7),
+      month: calculateInsightGrowth(posts, insightHistory, 30)
     };
-  }, [posts, insightHistory, accountId]);
+  }, [posts, insightHistory]);
 
   const growingVideos = useMemo(() => {
     const periodDays = videoPeriod === "day" ? 1 : videoPeriod === "week" ? 7 : 30;
     const cutoff = Date.now() - periodDays * 24 * 60 * 60 * 1000;
-    const targetPosts = posts.filter((post) =>
-      (post.type === "video" || post.type === "reel") &&
-      (accountId === "all" || post.accountId === accountId)
-    );
+    const targetPosts = posts.filter((post) => post.type === "video" || post.type === "reel");
     const snapshotsByPostId = new Map<string, InstagramInsightSnapshot[]>();
     for (const snapshot of insightHistory) {
       const current = snapshotsByPostId.get(snapshot.postId) ?? [];
@@ -704,7 +692,7 @@ function ManualDashboardTab() {
       const growth = snapshots.length >= 2 ? Math.max(latest.views - first.views, 0) : latest.views;
       return [{ post, growth, views: latest.views, reach: latest.reach, snapshotCount: snapshots.length }];
     }).sort((a, b) => b.growth - a.growth || b.views - a.views).slice(0, 5);
-  }, [posts, insightHistory, accountId, videoPeriod]);
+  }, [posts, insightHistory, videoPeriod]);
 
   const analyzeGrowingVideos = async () => {
     if (!growingVideos.length) return;
@@ -712,11 +700,10 @@ function ManualDashboardTab() {
     setGrowthAnalysisLoading(true);
     setGrowthAnalysisError("");
     try {
-      const account = accounts.find((item) => item.id === accountId) ?? null;
       const response = await fetch("/api/instagram/growth-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ posts: growingVideos, period: videoPeriod, account })
+        body: JSON.stringify({ posts: growingVideos, period: videoPeriod, account: null })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "共通点分析に失敗しました。");
@@ -748,7 +735,7 @@ function ManualDashboardTab() {
   };
 
   const data = useMemo(() => {
-    const targetPosts = posts.filter((post) => accountId === "all" || post.accountId === accountId);
+    const targetPosts = posts;
     const todayKey = toTokyoDateKey(new Date());
     const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, todayKey);
     const currentMonthKey = currentMonth();
@@ -771,10 +758,9 @@ function ManualDashboardTab() {
       saveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
       engagementRate: average(monthlyPosts.map((post) => getMetrics(post).engagementRate))
     };
-    const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && (goal.accountId ?? null) === (accountId === "all" ? null : accountId)) ?? null;
-    const targetPostIds = new Set(targetPosts.map((post) => post.id));
+    const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && goal.accountId == null) ?? goals.find((goal) => goal.month === currentMonthKey) ?? null;
     const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
-    const targetTasks = tasks.filter((task) => !task.postId || accountId === "all" || targetPostIds.has(task.postId));
+    const targetTasks = tasks;
     const today = toDateKey(new Date());
     const openTasks = targetTasks.filter((task) => task.status !== "done");
     const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < today);
@@ -851,7 +837,7 @@ function ManualDashboardTab() {
       previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
       previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [posts, tasks, goals, accountId, latestScoreByPostId, categories, graphPeriod]);
+  }, [posts, tasks, goals, latestScoreByPostId, categories, graphPeriod]);
 
   const latestSyncRun = syncRuns[0] ?? null;
   const latestScheduledSyncRun = syncRuns.find((run) => run.triggerType === "scheduled") ?? null;
@@ -920,23 +906,12 @@ function ManualDashboardTab() {
     <div>
       <PageHeader title="ダッシュボード" description="投稿データをグラフで確認し、成果が出やすい型を探します。" />
       <Panel className="mb-6 overflow-hidden border-stone-200/80 bg-gradient-to-br from-white/92 via-white/80 to-skyglass/50">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-clay">Overview</p>
-            <h2 className="mt-2 text-2xl font-bold text-ink">いま見るべき数値を先に確認</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-              アカウントを切り替えると、投稿数、表示数、保存傾向、改善タスクの進み具合を同じ基準で見比べられます。
-            </p>
-          </div>
-          <div>
-            <label>アカウント</label>
-            <select className="mt-2" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              <option value="all">すべて</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-clay">Overview</p>
+          <h2 className="mt-2 text-2xl font-bold text-ink">いま見るべき数値を先に確認</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+            投稿数、表示数、保存傾向、改善タスクの進み具合をまとめて確認できます。
+          </p>
         </div>
       </Panel>
       {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。登録ページからサンプルデータを追加できます。</p></Panel> : null}
@@ -1280,7 +1255,7 @@ function SummaryStatsSection() {
 
   return (
     <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <HeroStat label="対象投稿" value={`${posts.length}件`} note="全アカウント合計" tone="moss" />
+      <HeroStat label="対象投稿" value={`${posts.length}件`} note="全投稿合計" tone="moss" />
       <HeroStat label="合計表示数" value={totalViews.toLocaleString()} note="最新の投稿データを合算" tone="clay" />
       <HeroStat label="平均ER" value={`${avgER.toFixed(2)}%`} note="投稿ごとの平均値" tone="sky" />
       <HeroStat label="平均保存数" value={Math.round(avgSaves).toLocaleString()} note="1投稿あたりの平均" tone="plum" />

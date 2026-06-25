@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { loadAccountsData, loadAnalysesData, loadCategoriesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, PostCategoryDefinition, PostType } from "@/lib/types";
+import { loadAnalysesData, loadCategoriesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
+import { InstagramPost, PostCategoryDefinition, PostType } from "@/lib/types";
 import { formatPercent, getMetrics, getPostCategoryLabel, postTypeLabels } from "@/lib/metrics";
 
 type SortKey = "date" | "recordedDate" | "likes" | "saves" | "views" | "engagementRate";
@@ -12,21 +12,18 @@ type ViewMode = "table" | "cards";
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [sort, setSort] = useState<SortKey>("date");
   const [type, setType] = useState<PostType | "all">("all");
   const [category, setCategory] = useState<string>("all");
-  const [accountId, setAccountId] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedCategories]) => {
+    Promise.all([loadPostsData(), loadCategoriesData()]).then(([loadedPosts, loadedCategories]) => {
       setPosts(loadedPosts);
-      setAccounts(loadedAccounts);
       setCategories(loadedCategories);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
         setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
@@ -36,7 +33,6 @@ export default function PostsPage() {
 
   const filtered = useMemo(() => {
     return posts
-      .filter((post) => accountId === "all" || post.accountId === accountId)
       .filter((post) => type === "all" || post.type === type)
       .filter((post) => category === "all" || (post.category ?? "other") === category)
       .sort((a, b) => {
@@ -45,9 +41,7 @@ export default function PostsPage() {
         if (sort === "engagementRate") return getMetrics(b).engagementRate - getMetrics(a).engagementRate;
         return b[sort] - a[sort];
       });
-  }, [posts, sort, type, category, accountId]);
-
-  const accountNameById = useMemo(() => Object.fromEntries(accounts.map((account) => [account.id, account.name])), [accounts]);
+  }, [posts, sort, type, category]);
 
   const analyzeFilteredPosts = async (onlyMissing: boolean) => {
     const targets = filtered.filter((post) => !onlyMissing || typeof latestScoreByPostId[post.id] !== "number");
@@ -108,16 +102,7 @@ export default function PostsPage() {
           {aiMessage ? <p className="mt-3 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{aiMessage}</p> : null}
           <p className="mt-2 text-xs text-stone-500">料金を抑えるため、一度に評価する投稿は最大10件までです。対象は下の絞り込み条件に連動します。</p>
         </div>
-        <div className="mb-4 grid gap-3 md:grid-cols-5">
-          <div>
-            <label>アカウント</label>
-            <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              <option value="all">すべて</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
-            </select>
-          </div>
+        <div className="mb-4 grid gap-3 md:grid-cols-4">
           <div>
             <label>並び替え</label>
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
@@ -164,7 +149,6 @@ export default function PostsPage() {
                   <th>投稿</th>
                   <th>投稿日</th>
                   <th>データ登録日</th>
-                  <th>アカウント</th>
                   <th>タイプ</th>
                   <th>カテゴリ</th>
                   <th>枚数</th>
@@ -187,7 +171,6 @@ export default function PostsPage() {
                       <td><PostThumbnail post={post} className="h-14 w-14" /></td>
                       <td>{toJSTDate(post.date)}</td>
                       <td>{toJSTDate(post.recordedDate ?? post.date)}</td>
-                      <td>{post.accountId ? accountNameById[post.accountId] ?? "未登録" : "未選択"}</td>
                       <td>{postTypeLabels[post.type]}</td>
                       <td>{getPostCategoryLabel(post.category, categories)}</td>
                       <td>{post.mediaCount ?? 1}</td>
@@ -213,7 +196,6 @@ export default function PostsPage() {
               <PostCard
                 key={post.id}
                 post={post}
-                accountName={post.accountId ? accountNameById[post.accountId] : undefined}
                 aiScore={latestScoreByPostId[post.id]}
                 categoryLabel={getPostCategoryLabel(post.category, categories)}
               />
@@ -226,7 +208,7 @@ export default function PostsPage() {
   );
 }
 
-function PostCard({ post, accountName, aiScore, categoryLabel }: { post: InstagramPost; accountName?: string; aiScore?: number; categoryLabel: string }) {
+function PostCard({ post, aiScore, categoryLabel }: { post: InstagramPost; aiScore?: number; categoryLabel: string }) {
   const metrics = getMetrics(post);
   return (
     <Link href={`/posts/detail?id=${post.id}`} className="group overflow-hidden rounded-lg border border-stone-200 bg-white/82 shadow-panel transition hover:border-moss hover:bg-white">
@@ -243,7 +225,7 @@ function PostCard({ post, accountName, aiScore, categoryLabel }: { post: Instagr
           <span className="rounded-full bg-fog px-2 py-1 text-stone-700">{postTypeLabels[post.type]}</span>
           <span className="rounded-full bg-skyglass px-2 py-1 text-ink">AI {typeof aiScore === "number" ? `${aiScore}点` : "未分析"}</span>
         </div>
-        <p className="text-xs font-semibold text-stone-500">{toJSTDate(post.date)} / {accountName ?? "未選択"}</p>
+        <p className="text-xs font-semibold text-stone-500">{toJSTDate(post.date)}</p>
         <h2 className="mt-2 line-clamp-3 min-h-[4.5rem] text-sm font-semibold leading-6 text-ink">{post.caption || "投稿コメントなし"}</h2>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
           <CardMetric label="表示" value={post.views.toLocaleString()} />

@@ -1,16 +1,31 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAccountsData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, pushLocalBackupToServer } from "@/lib/cloud-storage";
+import { addAccountData, getServerStorageStatus, loadAccountsData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, pushLocalBackupToServer, updateAccountData } from "@/lib/cloud-storage";
 import { exportAccountsCsv, exportAnalysesCsv, exportGoalsCsv, exportMonthlyReportsCsv, exportPostsCsv, exportTasksCsv } from "@/lib/csv";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
+import { InstagramAccount, InstagramAccountInput } from "@/lib/types";
 
 type TestResult = {
   ok: boolean;
   message: string;
   model?: string;
   output?: string;
+};
+
+const initialAccountForm: InstagramAccountInput = {
+  name: "",
+  username: "",
+  instagramApiUsername: "",
+  profileUrl: "",
+  industry: "",
+  targetAudience: "",
+  goal: "",
+  openaiApiKeyEnvName: "",
+  openaiModel: "",
+  analysisInstructions: "",
+  memo: ""
 };
 
 export default function SettingsPage() {
@@ -20,6 +35,59 @@ export default function SettingsPage() {
   const [dataMessage, setDataMessage] = useState("");
   const [serverMessage, setServerMessage] = useState("");
   const [csvLoading, setCsvLoading] = useState(false);
+  const [account, setAccount] = useState<InstagramAccount | null>(null);
+  const [accountForm, setAccountForm] = useState<InstagramAccountInput>(initialAccountForm);
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [accountMessage, setAccountMessage] = useState("");
+  const [accountError, setAccountError] = useState("");
+
+  useEffect(() => {
+    loadAccountsData().then((accounts) => {
+      if (accounts[0]) {
+        setAccount(accounts[0]);
+        setAccountForm({
+          name: accounts[0].name,
+          username: accounts[0].username,
+          instagramApiUsername: accounts[0].instagramApiUsername ?? "",
+          profileUrl: accounts[0].profileUrl,
+          industry: accounts[0].industry,
+          targetAudience: accounts[0].targetAudience,
+          goal: accounts[0].goal,
+          openaiApiKeyEnvName: accounts[0].openaiApiKeyEnvName ?? "",
+          openaiModel: accounts[0].openaiModel ?? "",
+          analysisInstructions: accounts[0].analysisInstructions ?? "",
+          memo: accounts[0].memo
+        });
+      }
+    });
+  }, []);
+
+  const setAccountValue = (key: keyof InstagramAccountInput, value: string) => {
+    setAccountForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const saveAccount = async (event: FormEvent) => {
+    event.preventDefault();
+    setAccountSaving(true);
+    setAccountError("");
+    const input = { ...accountForm, username: accountForm.username.replace(/^@/, "") };
+    try {
+      if (account) {
+        await updateAccountData(account.id, input);
+        setAccountMessage("アカウント情報を更新しました。");
+      } else {
+        await addAccountData(input);
+        setAccountMessage("アカウント情報を登録しました。");
+      }
+      const accounts = await loadAccountsData();
+      if (accounts[0]) setAccount(accounts[0]);
+    } catch (caught) {
+      setAccountMessage("");
+      setAccountError(caught instanceof Error ? `保存に失敗しました: ${caught.message}` : "アカウントの保存に失敗しました。");
+    } finally {
+      setAccountSaving(false);
+    }
+  };
 
   const testOpenAi = async () => {
     setLoading(true);
@@ -134,7 +202,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="設定" description="OpenAI APIキーの設定状態と接続を確認できます。" />
+      <PageHeader title="設定" description="アカウント情報・API接続・データ管理を確認・変更できます。" />
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <Panel>
           <h2 className="font-semibold">API連携テスト</h2>
@@ -165,6 +233,67 @@ OPENAI_MODEL=gpt-4.1-mini`}</pre>
           <p className="mt-3 text-sm leading-6 text-stone-600">設定後はサーバーを再起動すると反映されます。</p>
         </Panel>
       </div>
+      <Panel className="mt-6">
+        <h2 className="font-semibold">アカウント設定</h2>
+        <p className="mt-2 text-sm leading-6 text-stone-600">このツールで管理するInstagramアカウントの情報を入力してください。AI分析の精度向上に使われます。</p>
+        <form onSubmit={saveAccount} className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label>アカウント名</label>
+            <input value={accountForm.name} onChange={(e) => setAccountValue("name", e.target.value)} required />
+          </div>
+          <div>
+            <label>ユーザー名</label>
+            <input value={accountForm.username} onChange={(e) => setAccountValue("username", e.target.value)} required />
+          </div>
+          <div className="md:col-span-2">
+            <label>プロフィールURL</label>
+            <input value={accountForm.profileUrl} onChange={(e) => setAccountValue("profileUrl", e.target.value)} placeholder="https://www.instagram.com/..." />
+          </div>
+          <div>
+            <label>業種</label>
+            <input value={accountForm.industry} onChange={(e) => setAccountValue("industry", e.target.value)} placeholder="アウトドア用品、飲食店、美容室など" />
+          </div>
+          <div>
+            <label>運用目的</label>
+            <input value={accountForm.goal} onChange={(e) => setAccountValue("goal", e.target.value)} placeholder="認知拡大、来店、EC流入など" />
+          </div>
+          <div className="md:col-span-2">
+            <label>ターゲット</label>
+            <textarea rows={3} value={accountForm.targetAudience} onChange={(e) => setAccountValue("targetAudience", e.target.value)} />
+          </div>
+          <div className="md:col-span-2 rounded-md border border-stone-200 bg-fog/80 p-4">
+            <h3 className="font-semibold">AI/API設定</h3>
+            <p className="mt-1 text-sm leading-6 text-stone-600">Instagram API連携の紐づけ名と、AI分析に使う環境変数名を管理します。APIキー本体は保存しません。</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <label>Instagram APIユーザー名</label>
+                <input value={accountForm.instagramApiUsername} onChange={(e) => setAccountValue("instagramApiUsername", e.target.value)} placeholder="例: tamaenergycircle" />
+              </div>
+              <div>
+                <label>APIキー環境変数名</label>
+                <input value={accountForm.openaiApiKeyEnvName} onChange={(e) => setAccountValue("openaiApiKeyEnvName", e.target.value)} placeholder="例: OPENAI_API_KEY" />
+              </div>
+              <div>
+                <label>使用モデル</label>
+                <input value={accountForm.openaiModel} onChange={(e) => setAccountValue("openaiModel", e.target.value)} placeholder="未設定なら OPENAI_MODEL または gpt-4.1-mini" />
+              </div>
+              <div className="md:col-span-2">
+                <label>AI分析方針</label>
+                <textarea rows={4} value={accountForm.analysisInstructions} onChange={(e) => setAccountValue("analysisInstructions", e.target.value)} placeholder="例: 来店予約につながる改善案を優先。ブランドの上品さを崩さない表現で提案する。" />
+              </div>
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label>メモ</label>
+            <textarea rows={3} value={accountForm.memo} onChange={(e) => setAccountValue("memo", e.target.value)} />
+          </div>
+          <div className="md:col-span-2">
+            <Button type="submit" disabled={accountSaving}>{accountSaving ? "保存中..." : account ? "変更を保存" : "登録する"}</Button>
+          </div>
+        </form>
+        {accountMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{accountMessage}</p> : null}
+        {accountError ? <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm leading-6 text-red-800">{accountError}</p> : null}
+      </Panel>
       <Panel className="mt-6">
         <h2 className="font-semibold">データ管理</h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
