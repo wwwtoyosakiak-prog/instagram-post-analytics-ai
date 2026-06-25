@@ -75,10 +75,18 @@ export default function AccountPage() {
         setEditing(true);
       }
       if (dashData?.account) {
-        const snaps: { followers_count?: number }[] = dashData.follower_snapshots ?? [];
+        type Snap = { followers_count?: number | null; follows_count?: number | null; media_count?: number | null };
+        const snaps: Snap[] = dashData.follower_snapshots ?? [];
         const lastSnap = snaps[snaps.length - 1];
-        const followers = dashData.account.followers_count || lastSnap?.followers_count || null;
-        setGraphAccount({ ...dashData.account, followers_count: followers } as GraphApiAccount);
+        const followers  = dashData.account.followers_count  || lastSnap?.followers_count  || null;
+        const follows    = dashData.account.follows_count    || lastSnap?.follows_count    || null;
+        const mediaCount = dashData.account.media_count      || lastSnap?.media_count      || (dashData.totals?.posts ?? null);
+        setGraphAccount({
+          ...dashData.account,
+          followers_count: followers,
+          follows_count:   follows,
+          media_count:     mediaCount,
+        } as GraphApiAccount);
       }
       setLoading(false);
     });
@@ -154,16 +162,9 @@ export default function AccountPage() {
               </a>
             )}
 
-            {/* 統計 */}
-            <div className="mt-5 flex gap-8">
-              <Stat label="投稿" value={fmt(graphAccount?.media_count)} />
-              <Stat label="フォロワー" value={fmt(graphAccount?.followers_count)} />
-              <Stat label="フォロー中" value={fmt(graphAccount?.follows_count)} />
-            </div>
-
             {/* bio */}
             {graphAccount?.biography && (
-              <p className="mt-4 text-sm leading-6 text-stone-700 whitespace-pre-wrap max-w-lg">
+              <p className="mt-3 text-sm leading-6 text-stone-700 whitespace-pre-wrap max-w-lg">
                 {graphAccount.biography}
               </p>
             )}
@@ -174,11 +175,18 @@ export default function AccountPage() {
                 href={graphAccount.website}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 inline-block text-sm text-sky-600 hover:underline break-all"
+                className="mt-1 inline-block text-sm text-sky-600 hover:underline break-all"
               >
                 {graphAccount.website}
               </a>
             )}
+
+            {/* 統計 */}
+            <div className="mt-5 flex gap-8">
+              <Stat label="投稿" value={fmt(graphAccount?.media_count)} />
+              <Stat label="フォロワー" value={fmt(graphAccount?.followers_count)} />
+              <Stat label="フォロー中" value={fmt(graphAccount?.follows_count)} />
+            </div>
           </div>
         </div>
 
@@ -189,7 +197,7 @@ export default function AccountPage() {
               最終同期: {new Date(graphAccount.last_synced_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
             </p>
           ) : (
-            <p className="text-xs text-stone-400">未同期</p>
+            <p className="text-xs text-stone-400">ダッシュボードから同期するとデータが更新されます</p>
           )}
           {!editing && (
             <Button variant="secondary" onClick={() => { setEditing(true); setMessage(""); }}>
