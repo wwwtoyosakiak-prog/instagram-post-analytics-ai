@@ -114,7 +114,7 @@ async function igFetch(url: string): Promise<unknown> {
 export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo> {
   const token = getToken();
   const uid = getUid(igUserId);
-  const fields = 'id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website,account_type';
+  const fields = 'id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website';
   const url = `${BASE}/${uid}?fields=${fields}&access_token=${token}`;
   const data = await igFetch(url) as IgAccountInfo;
   return data;
