@@ -60,11 +60,10 @@ export default function PostsPage() {
     let success = 0;
     try {
       for (const post of limitedTargets) {
-        const account = accounts.find((item) => item.id === post.accountId) ?? null;
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ post, account })
+          body: JSON.stringify({ post, account: null })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "AI評価に失敗しました。");
