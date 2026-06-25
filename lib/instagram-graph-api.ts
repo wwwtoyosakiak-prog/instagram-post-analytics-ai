@@ -4,8 +4,13 @@
  */
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
-const BASE = `https://graph.instagram.com/${API_VERSION}`;
-const FB_BASE = `https://graph.facebook.com/${API_VERSION}`;
+
+// Facebook Login トークン（instagram_business_manage_insights スコープ）は
+// graph.facebook.com を使う。Instagram Login トークンは graph.instagram.com。
+const API_MODE = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'facebook_business';
+const BASE = API_MODE === 'instagram_login'
+  ? `https://graph.instagram.com/${API_VERSION}`
+  : `https://graph.facebook.com/${API_VERSION}`;
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -85,6 +90,12 @@ function getToken(): string {
   return token;
 }
 
+function getUid(igUserId?: string): string {
+  if (igUserId) return igUserId;
+  if (API_MODE === 'instagram_login') return 'me';
+  return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me';
+}
+
 async function igFetch(url: string): Promise<unknown> {
   const res = await fetch(url);
   const json = await res.json();
@@ -102,8 +113,7 @@ async function igFetch(url: string): Promise<unknown> {
 
 export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo> {
   const token = getToken();
-  const mode = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
-  const uid = igUserId ?? (mode === 'instagram_login' ? 'me' : (process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me'));
+  const uid = getUid(igUserId);
   const fields = 'id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website,account_type';
   const url = `${BASE}/${uid}?fields=${fields}&access_token=${token}`;
   const data = await igFetch(url) as IgAccountInfo;
@@ -114,8 +124,7 @@ export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo
 
 export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgMedia[]> {
   const token = getToken();
-  const mode = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
-  const uid = igUserId ?? (mode === 'instagram_login' ? 'me' : (process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me'));
+  const uid = getUid(igUserId);
   const fields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children';
   const results: IgMedia[] = [];
   let url: string | null = `${BASE}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
@@ -130,22 +139,27 @@ export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgM
 
 // ── 投稿インサイト取得 ────────────────────────────────────
 
-const IMAGE_METRICS = [
+// Business API で利用可能なメディアインサイト指標
+const COMMON_METRICS = [
   'impressions', 'reach', 'likes', 'comments', 'saved',
   'shares', 'total_interactions', 'follows', 'profile_visits',
 ];
 const VIDEO_METRICS = [
-  ...IMAGE_METRICS,
-  'views', 'plays',
-  'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
+  ...COMMON_METRICS,
+  'views', 'ig_reels_avg_watch_time',
 ];
-const REEL_METRICS = VIDEO_METRICS;
 
 function metricsForType(mediaType: string): string[] {
   if (mediaType === 'VIDEO') return VIDEO_METRICS;
-  if (mediaType === 'CAROUSEL_ALBUM') return IMAGE_METRICS;
-  return IMAGE_METRICS;
+  if (mediaType === 'CAROUSEL_ALBUM') return COMMON_METRICS;
+  return COMMON_METRICS;
 }
+
+type InsightItem = {
+  name: string;
+  value?: number;
+  values?: { value: number }[];
+};
 
 export async function fetchMediaInsights(mediaId: string, mediaType: string): Promise<IgMediaInsights> {
   const token = getToken();
@@ -154,15 +168,15 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string): Pr
   let raw: unknown;
   try {
     raw = await igFetch(url);
-    const data = (raw as { data: { name: string; values: { value: number }[] }[] }).data ?? [];
+    const data = (raw as { data: InsightItem[] }).data ?? [];
     const result: IgMediaInsights = { raw_response: raw };
     for (const item of data) {
-      const val = item.values?.[0]?.value ?? null;
+      // Business API は values[0].value、一部は value 直値で返すケースもある
+      const val = item.values?.[0]?.value ?? item.value ?? null;
       (result as Record<string, unknown>)[item.name] = val;
     }
     return result;
   } catch (e) {
-    // 投稿タイプ不一致などで失敗してもnullで返す（アプリを止めない）
     console.warn(`[fetchMediaInsights] ${mediaId} failed:`, e);
     return { raw_response: raw ?? e };
   }
@@ -172,8 +186,7 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string): Pr
 
 export async function fetchAccountInsights(igUserId?: string): Promise<IgAccountInsights> {
   const token = getToken();
-  const mode = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
-  const uid = igUserId ?? (mode === 'instagram_login' ? 'me' : (process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me'));
+  const uid = getUid(igUserId);
 
   const metrics = [
     'reach', 'impressions', 'profile_views', 'website_clicks',
@@ -181,7 +194,6 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
     'get_directions_clicks', 'phone_call_clicks', 'text_message_clicks',
   ];
 
-  // 期間は昨日1日分（Instagram APIはday単位が基本）
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const since = Math.floor(yesterday.setHours(0, 0, 0, 0) / 1000);
@@ -189,26 +201,24 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
 
   const result: IgAccountInsights = {};
 
-  // スカラー指標
   try {
     const url = `${BASE}/${uid}/insights?metric=${metrics.join(',')}&period=day&since=${since}&until=${until}&access_token=${token}`;
-    const raw = await igFetch(url) as { data: { name: string; values: { value: number }[] }[] };
+    const raw = await igFetch(url) as { data: InsightItem[] };
     for (const item of raw.data ?? []) {
-      const val = item.values?.[0]?.value ?? null;
+      const val = item.values?.[0]?.value ?? item.value ?? null;
       (result as Record<string, unknown>)[item.name] = val;
     }
   } catch (e) {
     console.warn('[fetchAccountInsights] スカラー指標取得失敗:', e);
   }
 
-  // オーディエンス（lifetime）
   const lifetimeMetrics = ['audience_city', 'audience_country', 'audience_gender_age', 'online_followers'];
   for (const metric of lifetimeMetrics) {
     try {
       const url = `${BASE}/${uid}/insights?metric=${metric}&period=lifetime&access_token=${token}`;
-      const raw = await igFetch(url) as { data: { name: string; values: { value: unknown }[] }[] };
+      const raw = await igFetch(url) as { data: InsightItem[] };
       const item = raw.data?.[0];
-      if (item) (result as Record<string, unknown>)[item.name] = item.values?.[0]?.value ?? null;
+      if (item) (result as Record<string, unknown>)[item.name] = item.values?.[0]?.value ?? item.value ?? null;
     } catch (e) {
       console.warn(`[fetchAccountInsights] ${metric} 取得失敗:`, e);
       (result as Record<string, unknown>)[metric] = null;
