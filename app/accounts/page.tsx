@@ -110,8 +110,7 @@ export default function AccountPage() {
         title="アカウント情報"
         description="Instagramアカウントの設定・AI分析方針を確認・編集できます。"
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
+      <div className="space-y-6">
           {/* Graph API 取得情報 */}
           {graphAccount && (
             <Panel>
@@ -250,31 +249,6 @@ export default function AccountPage() {
           )}
 
           {message && !editing ? <p className="rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}
-        </div>
-
-        {/* 右カラム：補足情報 */}
-        <aside className="space-y-4">
-          <Panel>
-            <h2 className="font-semibold">このページについて</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              Instagramアカウントの基本情報とAI分析の設定を管理します。
-              左側の「登録情報」にある「編集」ボタンから変更できます。
-            </p>
-            <p className="mt-3 text-sm leading-6 text-stone-600">
-              上部の「Instagram アカウント（API取得）」欄はGraph APIで同期した最新情報です。
-              ダッシュボードから同期を実行すると更新されます。
-            </p>
-          </Panel>
-          {!graphAccount && (
-            <Panel>
-              <h2 className="font-semibold">Graph API 未連携</h2>
-              <p className="mt-2 text-sm leading-6 text-stone-600">
-                フォロワー数・プロフィール画像・bioはInstagram Graph APIを連携すると自動表示されます。
-                ダッシュボードから同期を実行してください。
-              </p>
-            </Panel>
-          )}
-        </aside>
       </div>
     </div>
   );
