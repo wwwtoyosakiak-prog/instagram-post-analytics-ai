@@ -1,0 +1,240 @@
+/**
+ * Instagram Graph API ユーティリティ
+ * 自分が管理権限を持つビジネス/クリエイターアカウントのみ対象
+ */
+
+const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
+const BASE = `https://graph.instagram.com/${API_VERSION}`;
+const FB_BASE = `https://graph.facebook.com/${API_VERSION}`;
+
+// ── 型定義 ────────────────────────────────────────────────
+
+export interface IgAccountInfo {
+  id: string;
+  username: string;
+  name: string;
+  biography: string;
+  profile_picture_url: string;
+  followers_count: number;
+  follows_count: number;
+  media_count: number;
+  website: string;
+  account_type: string;
+}
+
+export interface IgMedia {
+  id: string;
+  caption?: string;
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink: string;
+  timestamp: string;
+  like_count?: number;
+  comments_count?: number;
+  children?: { data: { id: string }[] };
+}
+
+export interface IgMediaInsights {
+  impressions?: number | null;
+  reach?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  saved?: number | null;
+  shares?: number | null;
+  total_interactions?: number | null;
+  follows?: number | null;
+  profile_visits?: number | null;
+  views?: number | null;
+  plays?: number | null;
+  ig_reels_avg_watch_time?: number | null;
+  ig_reels_video_view_total_time?: number | null;
+  video_view_total_time?: number | null;
+  avg_watch_time?: number | null;
+  navigation?: number | null;
+  replies?: number | null;
+  raw_response?: unknown;
+}
+
+export interface IgAccountInsights {
+  reach?: number | null;
+  impressions?: number | null;
+  profile_views?: number | null;
+  website_clicks?: number | null;
+  follower_count?: number | null;
+  online_followers?: unknown;
+  audience_city?: unknown;
+  audience_country?: unknown;
+  audience_gender_age?: unknown;
+  email_contacts?: number | null;
+  get_directions_clicks?: number | null;
+  phone_call_clicks?: number | null;
+  text_message_clicks?: number | null;
+}
+
+export type ApiError =
+  | { type: 'token_expired'; message: string }
+  | { type: 'permission_denied'; message: string }
+  | { type: 'unknown'; message: string; raw?: unknown };
+
+// ── ヘルパー ─────────────────────────────────────────────
+
+function getToken(): string {
+  const token = process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN;
+  if (!token) throw new Error('INSTAGRAM_GRAPH_ACCESS_TOKEN が未設定です');
+  return token;
+}
+
+async function igFetch(url: string): Promise<unknown> {
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!res.ok || (json as { error?: { message: string; code: number } }).error) {
+    const err = (json as { error?: { message: string; code: number } }).error;
+    console.error('[Instagram API Error]', JSON.stringify(err));
+    if (err?.code === 190) throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。' } as ApiError;
+    if (err?.code === 10 || err?.code === 200) throw { type: 'permission_denied', message: '必要なAPI権限がありません。' } as ApiError;
+    throw { type: 'unknown', message: err?.message ?? 'API エラー', raw: json } as ApiError;
+  }
+  return json;
+}
+
+// ── アカウント情報取得 ────────────────────────────────────
+
+export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo> {
+  const token = getToken();
+  const mode = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
+  const uid = igUserId ?? (mode === 'instagram_login' ? 'me' : (process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me'));
+  const fields = 'id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website,account_type';
+  const url = `${BASE}/${uid}?fields=${fields}&access_token=${token}`;
+  const data = await igFetch(url) as IgAccountInfo;
+  return data;
+}
+
+// ── 投稿一覧取得 ─────────────────────────────────────────
+
+export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgMedia[]> {
+  const token = getToken();
+  const mode = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
+  const uid = igUserId ?? (mode === 'instagram_login' ? 'me' : (process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me'));
+  const fields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children';
+  const results: IgMedia[] = [];
+  let url: string | null = `${BASE}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
+
+  while (url && results.length < 200) {
+    const data = await igFetch(url) as { data: IgMedia[]; paging?: { next?: string } };
+    results.push(...(data.data ?? []));
+    url = data.paging?.next ?? null;
+  }
+  return results;
+}
+
+// ── 投稿インサイト取得 ────────────────────────────────────
+
+const IMAGE_METRICS = [
+  'impressions', 'reach', 'likes', 'comments', 'saved',
+  'shares', 'total_interactions', 'follows', 'profile_visits',
+];
+const VIDEO_METRICS = [
+  ...IMAGE_METRICS,
+  'views', 'plays',
+  'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
+];
+const REEL_METRICS = VIDEO_METRICS;
+
+function metricsForType(mediaType: string): string[] {
+  if (mediaType === 'VIDEO') return VIDEO_METRICS;
+  if (mediaType === 'CAROUSEL_ALBUM') return IMAGE_METRICS;
+  return IMAGE_METRICS;
+}
+
+export async function fetchMediaInsights(mediaId: string, mediaType: string): Promise<IgMediaInsights> {
+  const token = getToken();
+  const metrics = metricsForType(mediaType).join(',');
+  const url = `${BASE}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
+  let raw: unknown;
+  try {
+    raw = await igFetch(url);
+    const data = (raw as { data: { name: string; values: { value: number }[] }[] }).data ?? [];
+    const result: IgMediaInsights = { raw_response: raw };
+    for (const item of data) {
+      const val = item.values?.[0]?.value ?? null;
+      (result as Record<string, unknown>)[item.name] = val;
+    }
+    return result;
+  } catch (e) {
+    // 投稿タイプ不一致などで失敗してもnullで返す（アプリを止めない）
+    console.warn(`[fetchMediaInsights] ${mediaId} failed:`, e);
+    return { raw_response: raw ?? e };
+  }
+}
+
+// ── アカウント全体インサイト取得 ──────────────────────────
+
+export async function fetchAccountInsights(igUserId?: string): Promise<IgAccountInsights> {
+  const token = getToken();
+  const mode = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
+  const uid = igUserId ?? (mode === 'instagram_login' ? 'me' : (process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me'));
+
+  const metrics = [
+    'reach', 'impressions', 'profile_views', 'website_clicks',
+    'follower_count', 'email_contacts',
+    'get_directions_clicks', 'phone_call_clicks', 'text_message_clicks',
+  ];
+
+  // 期間は昨日1日分（Instagram APIはday単位が基本）
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const since = Math.floor(yesterday.setHours(0, 0, 0, 0) / 1000);
+  const until = Math.floor(yesterday.setHours(23, 59, 59, 999) / 1000) + 1;
+
+  const result: IgAccountInsights = {};
+
+  // スカラー指標
+  try {
+    const url = `${BASE}/${uid}/insights?metric=${metrics.join(',')}&period=day&since=${since}&until=${until}&access_token=${token}`;
+    const raw = await igFetch(url) as { data: { name: string; values: { value: number }[] }[] };
+    for (const item of raw.data ?? []) {
+      const val = item.values?.[0]?.value ?? null;
+      (result as Record<string, unknown>)[item.name] = val;
+    }
+  } catch (e) {
+    console.warn('[fetchAccountInsights] スカラー指標取得失敗:', e);
+  }
+
+  // オーディエンス（lifetime）
+  const lifetimeMetrics = ['audience_city', 'audience_country', 'audience_gender_age', 'online_followers'];
+  for (const metric of lifetimeMetrics) {
+    try {
+      const url = `${BASE}/${uid}/insights?metric=${metric}&period=lifetime&access_token=${token}`;
+      const raw = await igFetch(url) as { data: { name: string; values: { value: unknown }[] }[] };
+      const item = raw.data?.[0];
+      if (item) (result as Record<string, unknown>)[item.name] = item.values?.[0]?.value ?? null;
+    } catch (e) {
+      console.warn(`[fetchAccountInsights] ${metric} 取得失敗:`, e);
+      (result as Record<string, unknown>)[metric] = null;
+    }
+  }
+
+  return result;
+}
+
+// ── フォロワー数スナップショット ─────────────────────────
+
+export async function fetchFollowerSnapshot(igUserId?: string): Promise<{
+  followers_count: number;
+  follows_count: number;
+  media_count: number;
+}> {
+  const info = await fetchAccountInfo(igUserId);
+  return {
+    followers_count: info.followers_count,
+    follows_count: info.follows_count,
+    media_count: info.media_count,
+  };
+}
+
+// ── リール動画かどうかの判定 ─────────────────────────────
+
+export function isReel(mediaType: string, permalink: string): boolean {
+  return mediaType === 'VIDEO' || permalink.includes('/reel/');
+}

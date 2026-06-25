@@ -1,37 +1,32 @@
-name: Instagram hourly sync
+name: Instagram full sync (hourly)
 
 on:
   schedule:
-    # Run every 5 minutes and let the API decide whether the current hourly slot still needs syncing.
-    - cron: "*/5 * * * *"
+    # 毎時5分に実行（UTC）= 日本時間 毎時14分
+    - cron: '5 * * * *'
   workflow_dispatch:
-
-concurrency:
-  group: instagram-hourly-sync
-  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
-      - name: Sync Instagram posts and insights
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SYNC_URL: https://instagram-post-analytics-ai.vercel.app/api/instagram/sync
+      - name: Call full-sync API
         run: |
-          if [ -z "$CRON_SECRET" ]; then
-            echo "GitHub Actions secret CRON_SECRET is not configured."
+          RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST "${{ secrets.VERCEL_URL }}/api/instagram/full-sync" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+          echo "HTTP Status: $RESPONSE"
+          cat /tmp/response.json
+          if [ "$RESPONSE" -eq 401 ]; then
+            echo "::error::Instagramトークンが期限切れです。再連携してください。"
             exit 1
           fi
-
-          response=$(curl \
-            --silent \
-            --show-error \
-            --fail-with-body \
-            --max-time 180 \
-            --header "Authorization: Bearer $CRON_SECRET" \
-            "$SYNC_URL")
-
-          echo "$response" | jq .
-          echo "$response" | jq -e '.success == true'
+          if [ "$RESPONSE" -eq 403 ]; then
+            echo "::error::API権限が不足しています。"
+            exit 1
+          fi
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "::error::同期APIエラー: HTTP $RESPONSE"
+            exit 1
+          fi
+          echo "同期完了"
