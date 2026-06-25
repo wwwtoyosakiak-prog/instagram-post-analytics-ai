@@ -81,9 +81,9 @@ export interface IgAccountInsights {
 }
 
 export type ApiError =
-  | { type: 'token_expired'; message: string }
-  | { type: 'permission_denied'; message: string }
-  | { type: 'unknown'; message: string; raw?: unknown };
+  | { type: 'token_expired'; message: string; debug_url?: string; raw?: unknown }
+  | { type: 'permission_denied'; message: string; debug_url?: string; raw?: unknown }
+  | { type: 'unknown'; message: string; raw?: unknown; debug_url?: string };
 
 // ── ヘルパー ─────────────────────────────────────────────
 
@@ -100,14 +100,15 @@ function getUid(igUserId?: string): string {
 }
 
 async function igFetch(url: string): Promise<unknown> {
+  const debugUrl = url.replace(/access_token=[^&]+/, 'access_token=REDACTED');
   const res = await fetch(url);
   const json = await res.json();
   if (!res.ok || (json as { error?: { message: string; code: number } }).error) {
     const err = (json as { error?: { message: string; code: number } }).error;
-    console.error('[Instagram API Error]', JSON.stringify(err));
-    if (err?.code === 190) throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。' } as ApiError;
-    if (err?.code === 10 || err?.code === 200) throw { type: 'permission_denied', message: '必要なAPI権限がありません。' } as ApiError;
-    throw { type: 'unknown', message: err?.message ?? 'API エラー', raw: json } as ApiError;
+    console.error('[Instagram API Error]', debugUrl, JSON.stringify(err));
+    if (err?.code === 190) throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。', debug_url: debugUrl, raw: err } as ApiError;
+    if (err?.code === 10 || err?.code === 200) throw { type: 'permission_denied', message: '必要なAPI権限がありません。', debug_url: debugUrl, raw: err } as ApiError;
+    throw { type: 'unknown', message: err?.message ?? 'API エラー', raw: json, debug_url: debugUrl } as ApiError;
   }
   return json;
 }

@@ -195,7 +195,14 @@ async function handler() {
     const err = e as ApiError;
     const status = err.type === 'token_expired' ? 401 : err.type === 'permission_denied' ? 403 : 500;
     return NextResponse.json(
-      { ok: false, error: err.message ?? String(e), type: err.type ?? 'unknown' },
+      {
+        ok: false,
+        error: err.message ?? String(e),
+        type: err.type ?? 'unknown',
+        // DEBUG: 原因調査用（確認後に削除）
+        debug_url: err.debug_url ?? null,
+        raw_api_error: err.raw ?? null,
+      },
       { status }
     );
   }
