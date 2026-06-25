@@ -121,7 +121,14 @@ export default function AccountPage() {
                 )}
                 <div>
                   <p className="text-xl font-bold text-ink">{graphAccount.name}</p>
-                  <p className="text-sm text-stone-500">@{graphAccount.username}</p>
+                  <a
+                    href={`https://www.instagram.com/${graphAccount.username}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-stone-500 hover:text-moss hover:underline"
+                  >
+                    @{graphAccount.username}
+                  </a>
                   <p className="mt-1 text-sm font-semibold text-moss">
                     フォロワー {(graphAccount.followers_count ?? 0).toLocaleString("ja-JP")} 人
                   </p>
@@ -149,7 +156,7 @@ export default function AccountPage() {
               </div>
               <dl className="mt-4 grid gap-3 text-sm">
                 <InfoRow label="アカウント名" value={account.name} />
-                <InfoRow label="ユーザー名" value={`@${account.username}`} />
+                <InfoRow label="ユーザー名" value={`@${account.username}`} href={`https://www.instagram.com/${account.username}/`} />
                 {account.profileUrl && <InfoRow label="プロフィールURL" value={account.profileUrl} />}
                 {account.industry && <InfoRow label="業種" value={account.industry} />}
                 {account.goal && <InfoRow label="運用目的" value={account.goal} />}
@@ -277,11 +284,17 @@ export default function AccountPage() {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="flex gap-3">
       <dt className="w-40 shrink-0 font-semibold text-stone-600">{label}</dt>
-      <dd className="leading-6 text-ink break-all">{value}</dd>
+      <dd className="leading-6 text-ink break-all">
+        {href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-moss hover:underline">
+            {value}
+          </a>
+        ) : value}
+      </dd>
     </div>
   );
 }
