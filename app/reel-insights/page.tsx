@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -208,7 +208,7 @@ function buildAiPrompt(ins: Insight | null, avg: ReelAverage | null): string {
 
 // ── メインページ ──────────────────────────────────────────
 
-export default function ReelInsightsPage() {
+function ReelInsightsContent() {
   const searchParams = useSearchParams();
   const mediaId = searchParams.get('id');
 
@@ -467,5 +467,13 @@ export default function ReelInsightsPage() {
       {/* AI分析 */}
       <AiAnalysis latest={latest} avg={avg} />
     </div>
+  );
+}
+
+export default function ReelInsightsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">読み込み中...</div>}>
+      <ReelInsightsContent />
+    </Suspense>
   );
 }
