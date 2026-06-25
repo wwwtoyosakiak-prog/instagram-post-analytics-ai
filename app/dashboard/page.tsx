@@ -942,12 +942,6 @@ function ManualDashboardTab() {
       {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。登録ページからサンプルデータを追加できます。</p></Panel> : null}
       {data.count ? (
         <>
-          <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <HeroStat label="対象投稿" value={`${data.count}件`} note={accountId === "all" ? "全アカウント合計" : "選択アカウントのみ"} tone="moss" />
-            <HeroStat label="合計表示数" value={data.totalViews.toLocaleString()} note="最新の投稿データを合算" tone="clay" />
-            <HeroStat label="平均ER" value={`${data.averageEngagementRate.toFixed(2)}%`} note="投稿ごとの平均値" tone="sky" />
-            <HeroStat label="平均保存数" value={Math.round(data.averageSaves).toLocaleString()} note="1投稿あたりの平均" tone="plum" />
-          </div>
           <div className="mb-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
             <Panel className="border-stone-200/80 bg-white/88">
               <SectionLead eyebrow="Sync" title="同期状況" description="自動反映のタイミングと、最後の同期結果をすぐ確認できます。" />
@@ -1268,25 +1262,52 @@ function ManualDashboardTab() {
   );
 }
 
+// ── 共通サマリーカード ────────────────────────────────────
+
+function SummaryStatsSection() {
+  const [posts, setPosts] = useState<InstagramPost[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    loadPostsData().then(p => { setPosts(p); setLoaded(true); });
+  }, []);
+
+  if (!loaded) return null;
+
+  const totalViews = posts.reduce((sum, p) => sum + p.views, 0);
+  const avgER = average(posts.map(p => getMetrics(p).engagementRate));
+  const avgSaves = average(posts.map(p => p.saves));
+
+  return (
+    <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <HeroStat label="対象投稿" value={`${posts.length}件`} note="全アカウント合計" tone="moss" />
+      <HeroStat label="合計表示数" value={totalViews.toLocaleString()} note="最新の投稿データを合算" tone="clay" />
+      <HeroStat label="平均ER" value={`${avgER.toFixed(2)}%`} note="投稿ごとの平均値" tone="sky" />
+      <HeroStat label="平均保存数" value={Math.round(avgSaves).toLocaleString()} note="1投稿あたりの平均" tone="plum" />
+    </div>
+  );
+}
+
 // ── メインページ（タブ切り替え） ───────────────────────────
 
 export default function DashboardPage() {
-  const [tab, setTab] = useState<'manual' | 'graphapi'>('manual');
+  const [tab, setTab] = useState<'manual' | 'graphapi'>('graphapi');
 
   return (
     <div>
+      <SummaryStatsSection />
       <div className="flex gap-0 border-b border-stone-200 mb-6">
-        <button
-          onClick={() => setTab('manual')}
-          className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition ${tab === 'manual' ? 'border-ink text-ink' : 'border-transparent text-stone-500 hover:text-ink'}`}
-        >
-          手入力データ
-        </button>
         <button
           onClick={() => setTab('graphapi')}
           className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition ${tab === 'graphapi' ? 'border-pink-500 text-pink-600' : 'border-transparent text-stone-500 hover:text-ink'}`}
         >
-          Graph API データ
+          Instagram APIデータ
+        </button>
+        <button
+          onClick={() => setTab('manual')}
+          className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition ${tab === 'manual' ? 'border-ink text-ink' : 'border-transparent text-stone-500 hover:text-ink'}`}
+        >
+          投稿管理データ
         </button>
       </div>
       {tab === 'manual' ? <ManualDashboardTab /> : <GraphApiDashboardTab />}
