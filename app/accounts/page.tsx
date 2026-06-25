@@ -41,9 +41,10 @@ export default function AccountPage() {
   useEffect(() => {
     Promise.all([
       loadAccountsData(),
-      fetch("/api/instagram/dashboard").then((r) => r.json()).catch(() => null)
+      fetch("/api/instagram/dashboard").then((r) => r.ok ? r.json() : null).catch(() => null)
     ]).then(([accounts, dashData]) => {
-      const acc = accounts[0] ?? null;
+      const list = Array.isArray(accounts) ? accounts : [];
+      const acc = list[0] ?? null;
       setAccount(acc);
       if (acc) {
         setForm({
@@ -122,7 +123,7 @@ export default function AccountPage() {
                   <p className="text-xl font-bold text-ink">{graphAccount.name}</p>
                   <p className="text-sm text-stone-500">@{graphAccount.username}</p>
                   <p className="mt-1 text-sm font-semibold text-moss">
-                    フォロワー {graphAccount.followers_count.toLocaleString("ja-JP")} 人
+                    フォロワー {(graphAccount.followers_count ?? 0).toLocaleString("ja-JP")} 人
                   </p>
                 </div>
               </div>
@@ -131,9 +132,11 @@ export default function AccountPage() {
                   {graphAccount.biography}
                 </p>
               )}
-              <p className="mt-3 text-xs text-stone-400">
-                最終同期: {new Date(graphAccount.last_synced_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
-              </p>
+              {graphAccount.last_synced_at && (
+                <p className="mt-3 text-xs text-stone-400">
+                  最終同期: {new Date(graphAccount.last_synced_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
+                </p>
+              )}
             </Panel>
           )}
 
