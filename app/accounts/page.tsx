@@ -170,17 +170,6 @@ export default function AccountPage() {
                 {account.targetAudience && <InfoRow label="ターゲット" value={account.targetAudience} />}
                 {account.memo && <InfoRow label="メモ" value={account.memo} />}
               </dl>
-              <div className="mt-5 rounded-md border border-stone-200 bg-fog/80 p-4">
-                <p className="text-sm font-semibold">AI/API設定</p>
-                <dl className="mt-3 grid gap-2 text-sm">
-                  <InfoRow label="Instagram APIユーザー名" value={account.instagramApiUsername || "未設定"} />
-                  <InfoRow label="APIキー環境変数名" value={account.openaiApiKeyEnvName || "共通設定を使用"} />
-                  <InfoRow label="使用モデル" value={account.openaiModel || "共通設定を使用"} />
-                  {account.analysisInstructions && (
-                    <InfoRow label="AI分析方針" value={account.analysisInstructions} />
-                  )}
-                </dl>
-              </div>
               <p className="mt-4 text-xs text-stone-400">
                 登録: {new Date(account.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 {account.updatedAt && account.updatedAt !== account.createdAt && (
