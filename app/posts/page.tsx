@@ -185,8 +185,8 @@ export default function PostsPage() {
                   return (
                     <tr key={post.id}>
                       <td><PostThumbnail post={post} className="h-14 w-14" /></td>
-                      <td>{post.date}</td>
-                      <td>{post.recordedDate ?? post.date}</td>
+                      <td>{toJSTDate(post.date)}</td>
+                      <td>{toJSTDate(post.recordedDate ?? post.date)}</td>
                       <td>{post.accountId ? accountNameById[post.accountId] ?? "未登録" : "未選択"}</td>
                       <td>{postTypeLabels[post.type]}</td>
                       <td>{getPostCategoryLabel(post.category, categories)}</td>
@@ -243,7 +243,7 @@ function PostCard({ post, accountName, aiScore, categoryLabel }: { post: Instagr
           <span className="rounded-full bg-fog px-2 py-1 text-stone-700">{postTypeLabels[post.type]}</span>
           <span className="rounded-full bg-skyglass px-2 py-1 text-ink">AI {typeof aiScore === "number" ? `${aiScore}点` : "未分析"}</span>
         </div>
-        <p className="text-xs font-semibold text-stone-500">{post.date} / {accountName ?? "未選択"}</p>
+        <p className="text-xs font-semibold text-stone-500">{toJSTDate(post.date)} / {accountName ?? "未選択"}</p>
         <h2 className="mt-2 line-clamp-3 min-h-[4.5rem] text-sm font-semibold leading-6 text-ink">{post.caption || "投稿コメントなし"}</h2>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
           <CardMetric label="表示" value={post.views.toLocaleString()} />
@@ -280,5 +280,10 @@ function CardMetric({ label, value }: { label: string; value: string }) {
 
 function formatDateTime(value?: string) {
   if (!value) return "未記録";
-  return new Date(value).toLocaleString("ja-JP");
+  return new Date(value).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+}
+
+function toJSTDate(value?: string) {
+  if (!value) return "未記録";
+  return new Date(value).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }

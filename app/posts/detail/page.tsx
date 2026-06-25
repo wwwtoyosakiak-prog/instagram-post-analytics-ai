@@ -138,8 +138,8 @@ function PostDetailContent() {
         <Panel>
           {getPostPreview(post) ? <img src={getPostPreview(post)} alt="投稿画像・動画サムネイル" className="mb-4 max-h-[520px] w-full rounded-md object-contain" /> : <div className="mb-4 rounded-md bg-stone-100 p-8 text-center text-sm text-stone-500">投稿画像未取得</div>}
           <dl className="space-y-3 text-sm">
-            <div><dt className="font-semibold">投稿日</dt><dd>{post.date}</dd></div>
-            <div><dt className="font-semibold">データ登録日</dt><dd>{post.recordedDate ?? post.date}</dd></div>
+            <div><dt className="font-semibold">投稿日</dt><dd>{toJSTDate(post.date)}</dd></div>
+            <div><dt className="font-semibold">データ登録日</dt><dd>{toJSTDate(post.recordedDate ?? post.date)}</dd></div>
             <div><dt className="font-semibold">アカウント</dt><dd>{account ? `${account.name}（@${account.username}）` : "未選択"}</dd></div>
             <div><dt className="font-semibold">投稿タイプ</dt><dd>{postTypeLabels[post.type]}</dd></div>
             <div><dt className="font-semibold">投稿カテゴリ</dt><dd>{getPostCategoryLabel(post.category, categories)}</dd></div>
@@ -181,7 +181,7 @@ function PostDetailContent() {
 function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) {
   if (!snapshots.length) return null;
   const rows = [...snapshots].reverse().map((snapshot) => ({
-    date: new Date(snapshot.capturedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    date: new Date(snapshot.capturedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }),
     閲覧数: snapshot.views,
     リーチ: snapshot.reach,
     保存数: snapshot.saved,
@@ -244,7 +244,12 @@ function LatestInsightSection({ insight, loading }: { insight: InstagramInsightS
 
 function formatDateTime(value?: string) {
   if (!value) return "未記録";
-  return new Date(value).toLocaleString("ja-JP");
+  return new Date(value).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+}
+
+function toJSTDate(value?: string) {
+  if (!value) return "未記録";
+  return new Date(value).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
 function getPostPreview(post: InstagramPost) {
