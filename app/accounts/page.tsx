@@ -8,10 +8,10 @@ import { InstagramAccount, InstagramAccountInput } from "@/lib/types";
 interface GraphApiAccount {
   name: string;
   username: string;
-  followers_count: number;
-  biography: string;
-  profile_picture_url: string;
-  last_synced_at: string;
+  followers_count: number | null;
+  biography: string | null;
+  profile_picture_url: string | null;
+  last_synced_at: string | null;
 }
 
 const emptyForm: InstagramAccountInput = {
@@ -63,7 +63,12 @@ export default function AccountPage() {
       } else {
         setEditing(true);
       }
-      if (dashData?.account) setGraphAccount(dashData.account as GraphApiAccount);
+      if (dashData?.account) {
+        const snaps: { followers_count?: number }[] = dashData.follower_snapshots ?? [];
+        const lastSnap = snaps[snaps.length - 1];
+        const followers = dashData.account.followers_count || lastSnap?.followers_count || null;
+        setGraphAccount({ ...dashData.account, followers_count: followers } as GraphApiAccount);
+      }
       setLoading(false);
     });
   }, []);
@@ -124,13 +129,15 @@ export default function AccountPage() {
                   <a
                     href={`https://www.instagram.com/${graphAccount.username}/`}
                     target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-stone-500 hover:text-moss hover:underline"
+                    rel="noreferrer"
+                    className="text-sm text-pink-500 hover:underline"
                   >
                     @{graphAccount.username}
                   </a>
                   <p className="mt-1 text-sm font-semibold text-moss">
-                    フォロワー {(graphAccount.followers_count ?? 0).toLocaleString("ja-JP")} 人
+                    {graphAccount.followers_count != null
+                      ? `フォロワー ${graphAccount.followers_count.toLocaleString("ja-JP")} 人`
+                      : "フォロワー数 未取得"}
                   </p>
                 </div>
               </div>
@@ -290,7 +297,7 @@ function InfoRow({ label, value, href }: { label: string; value: string; href?: 
       <dt className="w-40 shrink-0 font-semibold text-stone-600">{label}</dt>
       <dd className="leading-6 text-ink break-all">
         {href ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-moss hover:underline">
+          <a href={href} target="_blank" rel="noreferrer" className="text-pink-500 hover:underline">
             {value}
           </a>
         ) : value}
