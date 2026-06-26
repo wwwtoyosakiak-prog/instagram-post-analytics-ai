@@ -27,7 +27,7 @@ function getEnvToken() {
 function maskToken(token: string | null | undefined) {
   if (!token) return "未設定";
   const suffix = token.slice(-4);
-  return `${"*".repeat(Math.max(24, token.length - 4))}${suffix}`;
+  return `${"*".repeat(24)}${suffix}`;
 }
 
 function sanitizeMessage(message: string, token?: string | null) {
@@ -52,6 +52,7 @@ function computeStatus(storage: InstagramAccessTokenStorage | null, source: "dat
   const expiresAt = storage?.expiresAt ? new Date(storage.expiresAt).getTime() : null;
   if (expiresAt != null && expiresAt <= Date.now()) return "expired";
   if (storage?.status === "refresh_failed") return "refresh_failed";
+  if (storage?.status === "environment_only" && expiresAt == null) return "environment_only";
   const remainingDays = getRemainingDays(storage?.expiresAt);
   if (remainingDays != null && remainingDays < REFRESH_THRESHOLD_DAYS) return "expiring_soon";
   if (source === "environment") return "environment_only";

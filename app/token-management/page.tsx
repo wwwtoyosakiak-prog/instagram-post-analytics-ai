@@ -118,7 +118,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="rounded-md border border-stone-200 bg-white/70 px-4 py-3">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-sm text-ink">{children}</p>
+      <p className="mt-2 break-all text-sm text-ink">{children}</p>
     </div>
   );
 }
