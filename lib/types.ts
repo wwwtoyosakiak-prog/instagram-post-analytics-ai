@@ -77,6 +77,44 @@ export type InstagramInsightSnapshot = {
 export type InstagramSyncTriggerType = "manual" | "scheduled";
 export type InstagramSyncRunStatus = "success" | "partial" | "failed";
 
+export type InstagramAccessTokenStatus =
+  | "missing"
+  | "environment_only"
+  | "active"
+  | "expiring_soon"
+  | "expired"
+  | "refresh_failed";
+
+export type InstagramAccessTokenStorage = {
+  provider: string;
+  accessToken: string;
+  issuedAt?: string | null;
+  expiresAt?: string | null;
+  lastRefreshedAt?: string | null;
+  nextRefreshAt?: string | null;
+  status: InstagramAccessTokenStatus;
+  lastError?: string | null;
+  lastCheckedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type InstagramAccessTokenRecord = {
+  provider: string;
+  maskedToken: string;
+  source: "database" | "environment" | "missing";
+  status: InstagramAccessTokenStatus;
+  remainingDays: number | null;
+  issuedAt?: string | null;
+  expiresAt?: string | null;
+  lastRefreshedAt?: string | null;
+  nextRefreshAt?: string | null;
+  lastError?: string | null;
+  lastCheckedAt?: string | null;
+  canRefresh: boolean;
+  refreshBlockedReason?: string | null;
+};
+
 export type InstagramSyncRun = {
   id: string;
   triggerType: InstagramSyncTriggerType;

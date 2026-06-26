@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostCategoryDefinition, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -156,6 +156,20 @@ type SyncRunRow = {
     subcode?: number;
     traceId?: string;
   }> | null;
+};
+
+type InstagramAccessTokenRow = {
+  provider: string;
+  access_token: string;
+  issued_at: string | null;
+  expires_at: string | null;
+  last_refreshed_at: string | null;
+  next_refresh_at: string | null;
+  status: "missing" | "environment_only" | "active" | "expiring_soon" | "expired" | "refresh_failed";
+  last_error: string | null;
+  last_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 function assertConfigured() {
@@ -329,6 +343,36 @@ function mapSyncRun(row: SyncRunRow): InstagramSyncRun {
     accountUsername: row.account_username ?? undefined,
     errorSummary: row.error_summary ?? undefined,
     errors: row.errors ?? []
+  };
+}
+
+function mapInstagramAccessToken(row: InstagramAccessTokenRow): InstagramAccessTokenStorage {
+  return {
+    provider: row.provider,
+    accessToken: row.access_token,
+    issuedAt: row.issued_at,
+    expiresAt: row.expires_at,
+    lastRefreshedAt: row.last_refreshed_at,
+    nextRefreshAt: row.next_refresh_at,
+    status: row.status,
+    lastError: row.last_error,
+    lastCheckedAt: row.last_checked_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function instagramAccessTokenToRow(record: InstagramAccessTokenStorage) {
+  return {
+    provider: record.provider,
+    access_token: record.accessToken,
+    issued_at: record.issuedAt ?? null,
+    expires_at: record.expiresAt ?? null,
+    last_refreshed_at: record.lastRefreshedAt ?? null,
+    next_refresh_at: record.nextRefreshAt ?? null,
+    status: record.status,
+    last_error: record.lastError ?? null,
+    last_checked_at: record.lastCheckedAt ?? null
   };
 }
 
@@ -646,6 +690,24 @@ export async function getLatestScheduledSyncRunFromSupabase() {
     "instagram_sync_runs?trigger_type=eq.scheduled&select=*&order=finished_at.desc&limit=1"
   );
   return rows[0] ? mapSyncRun(rows[0]) : null;
+}
+
+export async function getInstagramAccessTokenFromSupabase(provider = "instagram_graph_api") {
+  const rows = await supabaseRequest<InstagramAccessTokenRow[]>(
+    `instagram_access_tokens?provider=eq.${encodeURIComponent(provider)}&select=*&limit=1`
+  );
+  return rows[0] ? mapInstagramAccessToken(rows[0]) : null;
+}
+
+export async function upsertInstagramAccessTokenInSupabase(record: InstagramAccessTokenStorage) {
+  const rows = await supabaseRequest<InstagramAccessTokenRow[]>("instagram_access_tokens?on_conflict=provider", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify(instagramAccessTokenToRow(record))
+  });
+  return rows[0] ? mapInstagramAccessToken(rows[0]) : null;
 }
 
 export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {

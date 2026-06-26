@@ -1,12 +1,13 @@
 // DEBUG ONLY: 確認後に削除
 import { NextResponse } from 'next/server';
+import { getInstagramAccessTokenState } from '@/lib/instagram-token-manager';
 
 export async function GET() {
-  const token = process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN ?? '';
+  const { state } = await getInstagramAccessTokenState();
   return NextResponse.json({
-    has_token: token.length > 0,
-    length: token.length,
-    first6: token.slice(0, 6),
-    last4: token.slice(-4),
+    has_token: state.source !== 'missing',
+    masked_token: state.maskedToken,
+    source: state.source,
+    status: state.status
   });
 }

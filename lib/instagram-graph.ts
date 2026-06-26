@@ -8,17 +8,16 @@ export type InstagramGraphConfig = {
   accountResource: string;
 };
 
-export function getInstagramGraphConfig(): InstagramGraphConfig {
-  const accessToken = process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN;
+import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
+
+export async function getInstagramGraphConfig(): Promise<InstagramGraphConfig> {
+  const accessToken = await getInstagramAccessTokenForServer();
   const version = process.env.INSTAGRAM_GRAPH_API_VERSION || "v23.0";
   const mode = process.env.INSTAGRAM_GRAPH_API_MODE === "instagram_login"
     ? "instagram_login"
     : "facebook_login";
   const accountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
-  if (!accessToken) {
-    throw new Error("INSTAGRAM_GRAPH_ACCESS_TOKEN が設定されていません。");
-  }
   if (mode === "facebook_login" && !accountId) {
     throw new Error("従来方式では INSTAGRAM_BUSINESS_ACCOUNT_ID が必要です。");
   }

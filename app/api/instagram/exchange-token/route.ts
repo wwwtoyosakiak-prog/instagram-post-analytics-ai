@@ -1,5 +1,6 @@
-// 交換専用。結果をVercel環境変数 INSTAGRAM_GRAPH_ACCESS_TOKEN に手動で貼る
+// 短期トークンを長期トークンへ交換し、サーバー側へ保存する
 import { NextRequest, NextResponse } from 'next/server';
+import { getInstagramAccessTokenState, storeInstagramAccessToken } from '@/lib/instagram-token-manager';
 
 export async function POST(req: NextRequest) {
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
@@ -48,9 +49,20 @@ export async function POST(req: NextRequest) {
   }
 
   const expiresIn = data.expires_in ?? 0;
+  try {
+    await storeInstagramAccessToken(data.access_token!, expiresIn);
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : '長期トークンの保存に失敗しました' },
+      { status: 500 }
+    );
+  }
+
+  const { state } = await getInstagramAccessTokenState();
   return NextResponse.json({
     ok: true,
-    long_lived_token: data.access_token,
+    message: '長期アクセストークンを保存しました。',
+    token: state,
     expires_in: expiresIn,
     expires_in_days: Math.floor(expiresIn / 86400),
   });

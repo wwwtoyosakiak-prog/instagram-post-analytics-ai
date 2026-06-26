@@ -343,8 +343,7 @@ async function handler(triggerType: SyncTriggerType) {
   const startedAt = new Date().toISOString();
   const missing = [
     !process.env.SUPABASE_URL && "SUPABASE_URL",
-    !process.env.SUPABASE_SERVICE_ROLE_KEY && "SUPABASE_SERVICE_ROLE_KEY",
-    !process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN && "INSTAGRAM_GRAPH_ACCESS_TOKEN"
+    !process.env.SUPABASE_SERVICE_ROLE_KEY && "SUPABASE_SERVICE_ROLE_KEY"
   ].filter(Boolean);
   if (missing.length) {
     const capturedAt = new Date().toISOString();
@@ -402,7 +401,7 @@ async function handler(triggerType: SyncTriggerType) {
 
   let config: InstagramGraphConfig;
   try {
-    config = getInstagramGraphConfig();
+    config = await getInstagramGraphConfig();
   } catch (error) {
     const capturedAt = new Date().toISOString();
     const message = error instanceof Error ? error.message : "Instagram API設定が不正です。";

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
-import { Button, PageHeader, Panel } from "@/components/ui";
+import { Button, ButtonLink, PageHeader, Panel } from "@/components/ui";
 import { addAccountData, getServerStorageStatus, loadAccountsData, loadAnalysesData, loadCategoriesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, pushLocalBackupToServer, updateAccountData } from "@/lib/cloud-storage";
 import { exportAccountsCsv, exportAnalysesCsv, exportGoalsCsv, exportMonthlyReportsCsv, exportPostsCsv, exportTasksCsv } from "@/lib/csv";
 import { clearLocalData, exportLocalBackup, importLocalBackup, LocalBackup } from "@/lib/storage";
@@ -227,10 +227,12 @@ export default function SettingsPage() {
         </Panel>
         <Panel>
           <h2 className="font-semibold">設定ファイル</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">`.env.local` に以下を設定してください。</p>
+          <p className="mt-2 text-sm leading-6 text-stone-600">Vercel Environment Variables に設定し、サーバー側では `process.env` から参照します。</p>
           <pre className="mt-3 overflow-auto rounded-md bg-stone-100 p-3 text-xs">{`OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4.1-mini`}</pre>
-          <p className="mt-3 text-sm leading-6 text-stone-600">設定後はサーバーを再起動すると反映されます。</p>
+OPENAI_MODEL=gpt-4.1-mini
+INSTAGRAM_ACCESS_TOKEN=ig-long-lived-token
+CRON_SECRET=your-random-secret`}</pre>
+          <p className="mt-3 text-sm leading-6 text-stone-600">変更後はVercelの再デプロイ、または新しい実行から反映されます。</p>
         </Panel>
       </div>
       <Panel className="mt-6">
@@ -322,6 +324,15 @@ OPENAI_MODEL=gpt-4.1-mini`}</pre>
           <Button variant="secondary" onClick={migrateLocalData} disabled={serverLoading}>ブラウザ内データをサーバーへ移行</Button>
         </div>
         {serverMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{serverMessage}</p> : null}
+      </Panel>
+      <Panel className="mt-6">
+        <h2 className="font-semibold">Instagramトークン管理</h2>
+        <p className="mt-2 text-sm leading-6 text-stone-600">
+          Instagram Graph API の長期アクセストークン状態を確認し、期限切れ前の手動更新を実行できます。トークン本体は表示しません。
+        </p>
+        <div className="mt-4">
+          <ButtonLink href="/token-management">トークン管理を開く</ButtonLink>
+        </div>
       </Panel>
     </div>
   );

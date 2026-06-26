@@ -26,7 +26,7 @@ type InstagramMediaResponse = {
 export async function GET() {
   let config;
   try {
-    config = getInstagramGraphConfig();
+    config = await getInstagramGraphConfig();
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Instagram API設定が不正です。" },

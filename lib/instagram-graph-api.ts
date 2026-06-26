@@ -3,6 +3,8 @@
  * 自分が管理権限を持つビジネス/クリエイターアカウントのみ対象
  */
 
+import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
+
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
 // INSTAGRAM_GRAPH_API_MODE=facebook_business と明示した場合のみ graph.facebook.com を使う。
@@ -93,10 +95,8 @@ export type ApiError =
 
 // ── ヘルパー ─────────────────────────────────────────────
 
-function getToken(): string {
-  const token = process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN;
-  if (!token) throw new Error('INSTAGRAM_GRAPH_ACCESS_TOKEN が未設定です');
-  return token;
+async function getToken(): Promise<string> {
+  return getInstagramAccessTokenForServer();
 }
 
 function getUid(igUserId?: string): string {
@@ -129,7 +129,7 @@ async function igFetch(url: string): Promise<unknown> {
 // ── アカウント情報取得 ────────────────────────────────────
 
 export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo> {
-  const token = getToken();
+  const token = await getToken();
   const uid = getUid(igUserId);
   const fields = 'id,name,biography,profile_picture_url,followers_count,follows_count,media_count,website';
   const url = `${getApiBase()}/${uid}?fields=${fields}&access_token=${token}`;
@@ -149,7 +149,7 @@ export function getMetric(
 // ── 投稿一覧取得 ─────────────────────────────────────────
 
 export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgMedia[]> {
-  const token = getToken();
+  const token = await getToken();
   const uid = getUid(igUserId);
   const insightMetrics = 'reach,views,saved,total_interactions,likes,shares,ig_reels_avg_watch_time';
   const fields = `id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
@@ -189,7 +189,7 @@ type InsightItem = {
 };
 
 export async function fetchMediaInsights(mediaId: string, mediaType: string): Promise<IgMediaInsights> {
-  const token = getToken();
+  const token = await getToken();
   const metrics = metricsForType(mediaType).join(',');
   const url = `${getApiBase()}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
   let raw: unknown;
@@ -212,7 +212,7 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string): Pr
 // ── アカウント全体インサイト取得 ──────────────────────────
 
 export async function fetchAccountInsights(igUserId?: string): Promise<IgAccountInsights> {
-  const token = getToken();
+  const token = await getToken();
   const uid = getUid(igUserId);
 
   const metrics = [
