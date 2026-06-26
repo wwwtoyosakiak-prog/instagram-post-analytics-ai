@@ -29,7 +29,7 @@ export interface ApiMedia {
  * preferApi=false で手入力優先に切り替え可能。
  */
 export function mergePostMetrics(
-  post: Pick<InstagramPost, 'views' | 'likes' | 'saves' | 'comments'>,
+  post: Pick<InstagramPost, 'views' | 'likes' | 'saves' | 'comments' | 'shares'>,
   ins: ApiMediaInsights | null | undefined,
   preferApi = true,
 ): {
@@ -37,6 +37,7 @@ export function mergePostMetrics(
   likes: number; likesSrc: MetricSource;
   saves: number; savesSrc: MetricSource;
   comments: number; commentsSrc: MetricSource;
+  shares: number; sharesSrc: MetricSource;
 } {
   const pick = (apiVal: number | null | undefined, fallback: number): [number, MetricSource] => {
     if (preferApi && apiVal != null && apiVal > 0) return [apiVal, 'api'];
@@ -51,7 +52,8 @@ export function mergePostMetrics(
   const [likes, likesSrc] = pick(ins?.likes, post.likes);
   const [saves, savesSrc] = pick(ins?.saved, post.saves);
   const [comments, commentsSrc] = pick(ins?.comments, post.comments);
-  return { views, viewsSrc, likes, likesSrc, saves, savesSrc, comments, commentsSrc };
+  const [shares, sharesSrc] = pick(ins?.shares, post.shares);
+  return { views, viewsSrc, likes, likesSrc, saves, savesSrc, comments, commentsSrc, shares, sharesSrc };
 }
 
 /**

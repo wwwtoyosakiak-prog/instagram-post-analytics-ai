@@ -129,7 +129,7 @@ export default function PostsPage() {
         saves: m.saves, savesSrc: m.savesSrc,
         comments: m.comments, commentsSrc: m.commentsSrc,
         reach: ins?.reach ?? null,
-        er: getMetrics({ views: m.views, likes: m.likes, saves: m.saves, comments: m.comments, shares: post.shares }).engagementRate,
+        er: getMetrics({ views: m.views, likes: m.likes, saves: m.saves, comments: m.comments, shares: m.shares }).engagementRate,
         post,
         media: matched ?? null,
         hasApi: !!(ins && ((ins.views != null && ins.views > 0) || (ins.reach != null && ins.reach > 0))),

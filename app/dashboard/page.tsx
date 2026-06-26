@@ -426,7 +426,7 @@ export default function DashboardPage() {
     return posts.map(post => {
       const matched = matchPostToMedia(post, apiMedia);
       const m = mergePostMetrics(post, matched?.latest_insights);
-      return { ...post, views: m.views, likes: m.likes, saves: m.saves, comments: m.comments };
+      return { ...post, views: m.views, likes: m.likes, saves: m.saves, comments: m.comments, shares: m.shares };
     });
   }, [posts, apiMedia]);
 
@@ -748,19 +748,19 @@ export default function DashboardPage() {
         <HeroStat
           label="合計表示数"
           value={effectivePosts.reduce((s, p) => s + p.views, 0).toLocaleString()}
-          note="統合後の実効値"
+          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件 + 手入力 ${mergeStats.manualCount}件` : "手入力のみ"}
           tone="clay"
         />
         <HeroStat
           label="平均ER"
           value={`${average(effectivePosts.map(p => getMetrics(p).engagementRate)).toFixed(2)}%`}
-          note="投稿ごとの平均値"
+          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "手入力のみ"}
           tone="sky"
         />
         <HeroStat
           label="平均保存数"
           value={Math.round(average(effectivePosts.map(p => p.saves))).toLocaleString()}
-          note="1投稿あたりの平均"
+          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "手入力のみ"}
           tone="plum"
         />
       </div>
