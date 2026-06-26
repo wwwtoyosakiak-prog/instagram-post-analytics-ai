@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import {
   fetchAccountInfo,
+  fetchMediaInsights,
   fetchMediaList,
   fetchAccountInsights,
   fetchFollowerSnapshot,
@@ -161,21 +162,25 @@ async function handler() {
       // インサイト保存（fetchMediaList でフィールド展開済み）
       try {
         const ins = media.insights ?? null;
+        const detailedInsights = await fetchMediaInsights(media.id, media.media_type);
         const { error: insErr } = await db
           .from('instagram_media_insights')
           .insert({
             media_id: media.id,
             account_id: accountId,
             captured_at: new Date().toISOString(),
-            reach: getMetric(ins, 'reach'),
-            views: getMetric(ins, 'views'),
-            likes: getMetric(ins, 'likes'),
-            comments: getMetric(ins, 'comments'),
-            saved: getMetric(ins, 'saved'),
-            shares: getMetric(ins, 'shares'),
-            total_interactions: getMetric(ins, 'total_interactions'),
-            ig_reels_avg_watch_time: getMetric(ins, 'ig_reels_avg_watch_time'),
-            raw_response: ins,
+            reach: detailedInsights.reach ?? getMetric(ins, 'reach'),
+            views: detailedInsights.views ?? getMetric(ins, 'views'),
+            likes: detailedInsights.likes ?? getMetric(ins, 'likes'),
+            comments: detailedInsights.comments ?? media.comments_count ?? getMetric(ins, 'comments'),
+            saved: detailedInsights.saved ?? getMetric(ins, 'saved'),
+            shares: detailedInsights.shares ?? getMetric(ins, 'shares'),
+            total_interactions: detailedInsights.total_interactions ?? getMetric(ins, 'total_interactions'),
+            follows: detailedInsights.follows ?? null,
+            profile_visits: detailedInsights.profile_visits ?? null,
+            ig_reels_avg_watch_time: detailedInsights.ig_reels_avg_watch_time ?? getMetric(ins, 'ig_reels_avg_watch_time'),
+            ig_reels_video_view_total_time: detailedInsights.ig_reels_video_view_total_time ?? null,
+            raw_response: detailedInsights.raw_response ?? ins,
           });
 
         if (insErr) {

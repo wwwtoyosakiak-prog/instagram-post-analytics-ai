@@ -17,6 +17,7 @@ interface Media {
   permalink: string;
   thumbnail_url?: string;
   timestamp: string;
+  comments_count?: number | null;
 }
 
 interface Insight {
@@ -119,14 +120,15 @@ function CompareBar({
 
 function AiAnalysis({
   latest, avg,
-}: { latest: Insight | null; avg: ReelAverage | null }) {
+  mediaComments,
+}: { latest: Insight | null; avg: ReelAverage | null; mediaComments?: number | null }) {
   const [aiText, setAiText] = useState('');
   const [loading, setLoading] = useState(false);
 
   const analyze = async () => {
     setLoading(true);
     try {
-      const prompt = buildAiPrompt(latest, avg);
+      const prompt = buildAiPrompt(latest, avg, mediaComments);
       const res = await fetch('/api/analysis/reel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,13 +164,13 @@ function AiAnalysis({
   );
 }
 
-function buildAiPrompt(ins: Insight | null, avg: ReelAverage | null): string {
+function buildAiPrompt(ins: Insight | null, avg: ReelAverage | null, mediaComments?: number | null): string {
   const views = ins?.views;
   const reach = ins?.reach;
   const likes = ins?.likes;
   const saved = ins?.saved;
   const shares = ins?.shares;
-  const comments = ins?.comments;
+  const comments = ins?.comments ?? mediaComments;
   const follows = ins?.follows;
   const profileVisits = ins?.profile_visits;
   const avgWatch = ins?.ig_reels_avg_watch_time;
@@ -242,10 +244,11 @@ function ReelInsightsContent() {
   if (!media) return <div className="p-8 text-center text-gray-500">データが見つかりません</div>;
 
   const latest = insights[insights.length - 1] ?? null;
+  const displayedComments = latest?.comments ?? media.comments_count ?? null;
 
   // 率を計算
   const likeRate = pct(latest?.likes, latest?.views);
-  const commentRate = pct(latest?.comments, latest?.views);
+  const commentRate = pct(displayedComments, latest?.views);
   const saveRate = pct(latest?.saved, latest?.views);
   const shareRate = pct(latest?.shares, latest?.views);
   const engRate = pct(latest?.total_interactions, latest?.reach);
@@ -302,7 +305,7 @@ function ReelInsightsContent() {
           <MetricCard label="閲覧数" value={fmt(latest?.views)} />
           <MetricCard label="リーチ" value={fmt(latest?.reach)} />
           <MetricCard label="いいね" value={fmt(latest?.likes)} />
-          <MetricCard label="コメント" value={fmt(latest?.comments)} />
+          <MetricCard label="コメント" value={fmt(displayedComments)} />
           <MetricCard label="保存数" value={fmt(latest?.saved)} highlight />
           <MetricCard label="シェア数" value={fmt(latest?.shares)} highlight />
           <MetricCard label="合計インタラクション" value={fmt(latest?.total_interactions)} />
@@ -465,7 +468,7 @@ function ReelInsightsContent() {
       )}
 
       {/* AI分析 */}
-      <AiAnalysis latest={latest} avg={avg} />
+      <AiAnalysis latest={latest} avg={avg} mediaComments={media.comments_count} />
     </div>
   );
 }
