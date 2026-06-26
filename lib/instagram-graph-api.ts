@@ -5,12 +5,19 @@
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
-// Instagram Login トークン（IGAA...）は graph.instagram.com のみ有効。
-// Facebook Business トークンを使う場合は INSTAGRAM_GRAPH_API_MODE=facebook_business を設定。
-const API_MODE = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
-const BASE = API_MODE === 'instagram_login'
-  ? `https://graph.instagram.com/${API_VERSION}`
-  : `https://graph.facebook.com/${API_VERSION}`;
+// INSTAGRAM_GRAPH_API_MODE=facebook_business と明示した場合のみ graph.facebook.com を使う。
+// それ以外（未設定・instagram_login など）はすべて graph.instagram.com。
+// 関数化することで、モジュール初期化時ではなくリクエストごとに env を読む。
+function getApiBase(): string {
+  return process.env.INSTAGRAM_GRAPH_API_MODE === 'facebook_business'
+    ? `https://graph.facebook.com/${API_VERSION}`
+    : `https://graph.instagram.com/${API_VERSION}`;
+}
+function getApiMode(): string {
+  return process.env.INSTAGRAM_GRAPH_API_MODE === 'facebook_business'
+    ? 'facebook_business'
+    : 'instagram_login';
+}
 
 // ── 型定義 ────────────────────────────────────────────────
 
@@ -94,7 +101,7 @@ function getToken(): string {
 
 function getUid(igUserId?: string): string {
   if (igUserId) return igUserId;
-  if (API_MODE === 'instagram_login') return 'me';
+  if (getApiMode() === 'instagram_login') return 'me';
   return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me';
 }
 
@@ -125,7 +132,7 @@ export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo
   const token = getToken();
   const uid = getUid(igUserId);
   const fields = 'id,name,biography,profile_picture_url,followers_count,follows_count,media_count,website';
-  const url = `${BASE}/${uid}?fields=${fields}&access_token=${token}`;
+  const url = `${getApiBase()}/${uid}?fields=${fields}&access_token=${token}`;
   const data = await igFetch(url) as IgAccountInfo;
   return data;
 }
@@ -147,7 +154,7 @@ export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgM
   const insightMetrics = 'reach,views,saved,total_interactions,likes,shares,ig_reels_avg_watch_time';
   const fields = `id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
   const results: IgMedia[] = [];
-  let url: string | null = `${BASE}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
+  let url: string | null = `${getApiBase()}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
 
   while (url && results.length < 200) {
     const data = await igFetch(url) as { data: IgMedia[]; paging?: { next?: string } };
@@ -184,7 +191,7 @@ type InsightItem = {
 export async function fetchMediaInsights(mediaId: string, mediaType: string): Promise<IgMediaInsights> {
   const token = getToken();
   const metrics = metricsForType(mediaType).join(',');
-  const url = `${BASE}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
+  const url = `${getApiBase()}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
   let raw: unknown;
   try {
     raw = await igFetch(url);
@@ -222,7 +229,7 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
   const result: IgAccountInsights = {};
 
   try {
-    const url = `${BASE}/${uid}/insights?metric=${metrics.join(',')}&period=day&since=${since}&until=${until}&access_token=${token}`;
+    const url = `${getApiBase()}/${uid}/insights?metric=${metrics.join(',')}&period=day&since=${since}&until=${until}&access_token=${token}`;
     const raw = await igFetch(url) as { data: InsightItem[] };
     for (const item of raw.data ?? []) {
       const val = item.values?.[0]?.value ?? item.value ?? null;
@@ -235,7 +242,7 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
   const lifetimeMetrics = ['audience_city', 'audience_country', 'audience_gender_age', 'online_followers'];
   for (const metric of lifetimeMetrics) {
     try {
-      const url = `${BASE}/${uid}/insights?metric=${metric}&period=lifetime&access_token=${token}`;
+      const url = `${getApiBase()}/${uid}/insights?metric=${metric}&period=lifetime&access_token=${token}`;
       const raw = await igFetch(url) as { data: InsightItem[] };
       const item = raw.data?.[0];
       if (item) (result as Record<string, unknown>)[item.name] = item.values?.[0]?.value ?? item.value ?? null;
