@@ -358,15 +358,17 @@ export default function DashboardPage() {
     });
   };
 
-  const refreshApiData = () => {
-    fetch('/api/instagram/media?limit=200')
-      .then(r => r.ok ? r.json() : { data: [] })
-      .then(d => setApiMedia((d as { data: ApiMedia[] }).data ?? []))
-      .catch(() => {});
-    fetch('/api/instagram/dashboard')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setDashAccount((d as { account?: DashboardAccount })?.account ?? null))
-      .catch(() => {});
+  const refreshApiData = async () => {
+    try {
+      const [mediaRes, dashRes] = await Promise.all([
+        fetch('/api/instagram/media?limit=200').then(r => r.ok ? r.json() : { data: [] }),
+        fetch('/api/instagram/dashboard').then(r => r.ok ? r.json() : null),
+      ]);
+      setApiMedia((mediaRes as { data: ApiMedia[] }).data ?? []);
+      setDashAccount((dashRes as { account?: DashboardAccount })?.account ?? null);
+    } catch {
+      // 無視
+    }
   };
 
   useEffect(() => {
@@ -386,8 +388,8 @@ export default function DashboardPage() {
         else if (d.type === 'permission_denied') setSyncMsg('⚠️ 必要なAPI権限がありません。');
         else setSyncMsg(`❌ 同期エラー: ${d.error ?? '不明なエラー'}`);
       } else {
+        await refreshApiData();
         setSyncMsg(`✅ 完了: 投稿${d.media_fetched}件 / インサイト${d.insights_fetched}件`);
-        refreshApiData();
       }
     } catch {
       setSyncMsg('❌ 通信エラーが発生しました');
@@ -429,12 +431,14 @@ export default function DashboardPage() {
   }, [posts, apiMedia]);
 
   // APIマッチ件数のカウント（サマリー表示用）
+  // views > 0（動画）または reach > 0（画像含む全タイプ）があればAPIマッチとみなす
   const mergeStats = useMemo(() => {
     let apiCount = 0;
     for (const post of posts) {
       const matched = matchPostToMedia(post, apiMedia);
       const ins = matched?.latest_insights;
-      if (ins?.views != null && ins.views > 0) apiCount++;
+      const hasApiData = (ins?.views != null && ins.views > 0) || (ins?.reach != null && ins.reach > 0);
+      if (hasApiData) apiCount++;
     }
     return { apiCount, manualCount: posts.length - apiCount, total: posts.length };
   }, [posts, apiMedia]);

@@ -42,7 +42,12 @@ export function mergePostMetrics(
     if (preferApi && apiVal != null && apiVal > 0) return [apiVal, 'api'];
     return [fallback, 'manual'];
   };
-  const [views, viewsSrc] = pick(ins?.views, post.views);
+  // views: 動画は views、画像は views が null のため reach にフォールバック（全メディアタイプ対応）
+  const [views, viewsSrc] = (() => {
+    if (preferApi && ins?.views != null && ins.views > 0) return [ins.views, 'api' as MetricSource];
+    if (preferApi && ins?.reach != null && ins.reach > 0) return [ins.reach, 'api' as MetricSource];
+    return [post.views, 'manual' as MetricSource];
+  })();
   const [likes, likesSrc] = pick(ins?.likes, post.likes);
   const [saves, savesSrc] = pick(ins?.saved, post.saves);
   const [comments, commentsSrc] = pick(ins?.comments, post.comments);
