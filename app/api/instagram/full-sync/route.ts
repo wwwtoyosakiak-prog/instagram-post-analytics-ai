@@ -21,6 +21,10 @@ function supabase() {
   return createClient(url, key);
 }
 
+type ExistingAccountRow = {
+  id: string;
+};
+
 export async function POST() {
   return handler();
 }
@@ -46,23 +50,74 @@ async function handler() {
     console.log('[full-sync] account:', account.username ?? '(username unavailable)', account.id);
     results.account = { username: account.username ?? null, id: account.id };
 
-    // Supabase に upsert（ig_user_id で一致させる）
-    const { data: accountRow, error: accErr } = await db
+    const syncedAt = new Date().toISOString();
+    const normalizedUsername = account.username?.replace(/^@/, '').trim() ?? null;
+
+    // 既存の手動登録アカウントを優先的に再利用して、同期先が増殖しないようにする。
+    let existingAccount: ExistingAccountRow | null = null;
+    const { data: linkedAccount } = await db
       .from('instagram_accounts')
-      .upsert({
-        ig_user_id: account.id,
-        username: account.username ?? null,
-        name: account.name,
-        biography: account.biography,
-        profile_picture_url: account.profile_picture_url,
-        followers_count: account.followers_count,
-        follows_count: account.follows_count,
-        media_count: account.media_count,
-        website: account.website,
-        last_synced_at: new Date().toISOString(),
-      }, { onConflict: 'ig_user_id' })
       .select('id')
-      .single();
+      .eq('ig_user_id', account.id)
+      .limit(1)
+      .maybeSingle<ExistingAccountRow>();
+    existingAccount = linkedAccount ?? null;
+
+    if (!existingAccount && normalizedUsername) {
+      const { data: apiUsernameLinked } = await db
+        .from('instagram_accounts')
+        .select('id')
+        .eq('instagram_api_username', normalizedUsername)
+        .limit(1)
+        .maybeSingle<ExistingAccountRow>();
+      existingAccount = apiUsernameLinked ?? null;
+    }
+
+    if (!existingAccount && normalizedUsername) {
+      const { data: usernameLinked } = await db
+        .from('instagram_accounts')
+        .select('id')
+        .eq('username', normalizedUsername)
+        .limit(1)
+        .maybeSingle<ExistingAccountRow>();
+      existingAccount = usernameLinked ?? null;
+    }
+
+    const accountPayload = {
+      ig_user_id: account.id,
+      username: normalizedUsername,
+      instagram_api_username: normalizedUsername,
+      name: account.name,
+      biography: account.biography,
+      profile_picture_url: account.profile_picture_url,
+      followers_count: account.followers_count,
+      follows_count: account.follows_count,
+      media_count: account.media_count,
+      website: account.website,
+      last_synced_at: syncedAt,
+    };
+
+    let accountRow: ExistingAccountRow | null = null;
+    let accErr: { message: string } | null = null;
+
+    if (existingAccount) {
+      const { data, error } = await db
+        .from('instagram_accounts')
+        .update(accountPayload)
+        .eq('id', existingAccount.id)
+        .select('id')
+        .single<ExistingAccountRow>();
+      accountRow = data ?? null;
+      accErr = error;
+    } else {
+      const { data, error } = await db
+        .from('instagram_accounts')
+        .insert(accountPayload)
+        .select('id')
+        .single<ExistingAccountRow>();
+      accountRow = data ?? null;
+      accErr = error;
+    }
 
     if (accErr) {
       console.error('[full-sync] account upsert error:', accErr);

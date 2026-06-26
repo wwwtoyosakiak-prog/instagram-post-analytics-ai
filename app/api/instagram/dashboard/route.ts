@@ -15,10 +15,16 @@ export async function GET(req: NextRequest) {
   const db = supabase();
 
   // アカウント情報
-  let accountQuery = db.from('instagram_accounts').select('*').limit(1);
+  let accountQuery = db
+    .from('instagram_accounts')
+    .select('*')
+    .order('last_synced_at', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false })
+    .limit(1);
   if (accountId) accountQuery = accountQuery.eq('id', accountId);
   const { data: accounts } = await accountQuery;
   const account = accounts?.[0] ?? null;
+  const activeAccountId = accountId ?? account?.id ?? null;
 
   // 投稿 + 最新インサイト
   let mediaQuery = db
@@ -34,7 +40,7 @@ export async function GET(req: NextRequest) {
     .order('timestamp', { ascending: false })
     .limit(100);
 
-  if (accountId) mediaQuery = mediaQuery.eq('account_id', accountId);
+  if (activeAccountId) mediaQuery = mediaQuery.eq('account_id', activeAccountId);
   const { data: mediaRaw } = await mediaQuery;
 
   // 各投稿に最新インサイトだけ残す
@@ -118,7 +124,7 @@ export async function GET(req: NextRequest) {
     .select('date, followers_count')
     .order('date', { ascending: true })
     .limit(90);
-  if (accountId) snapQuery = snapQuery.eq('account_id', accountId);
+  if (activeAccountId) snapQuery = snapQuery.eq('account_id', activeAccountId);
   const { data: snapshots } = await snapQuery;
 
   // アカウントインサイト推移
@@ -127,7 +133,7 @@ export async function GET(req: NextRequest) {
     .select('date, reach, impressions, profile_views, website_clicks, follower_count')
     .order('date', { ascending: true })
     .limit(90);
-  if (accountId) aiQuery = aiQuery.eq('account_id', accountId);
+  if (activeAccountId) aiQuery = aiQuery.eq('account_id', activeAccountId);
   const { data: accountInsights } = await aiQuery;
 
   return NextResponse.json({
