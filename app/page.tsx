@@ -4,23 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAnalysesData, loadCategoriesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, ImprovementTask, InstagramPost, PostCategoryDefinition } from "@/lib/types";
-import { average, formatPercent, getMetrics, getPostCategoryLabel, taskStatusLabels } from "@/lib/metrics";
+import { getServerStorageStatus, loadAnalysesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, ImprovementTask, InstagramPost } from "@/lib/types";
+import { average, formatPercent, getMetrics, taskStatusLabels } from "@/lib/metrics";
 
 export default function Home() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
-  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [serverStorageEnabled, setServerStorageEnabled] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadTasksData(), getServerStorageStatus(), loadCategoriesData()]).then(([loadedPosts, loadedTasks, status, loadedCategories]) => {
+    Promise.all([loadPostsData(), loadTasksData(), getServerStorageStatus()]).then(([loadedPosts, loadedTasks, status]) => {
       setPosts(loadedPosts);
       setTasks(loadedTasks);
       setServerStorageEnabled(status.serverStorageEnabled);
-      setCategories(loadedCategories);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
       });
@@ -98,7 +96,7 @@ export default function Home() {
             <WorkItem
               icon={<ClipboardList size={17} />}
               title="次に確認すべき投稿"
-              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${getPostCategoryLabel(summary.nextPostToCheck.category, categories)} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
+              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
               href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/posts/new"}
             />
           </div>

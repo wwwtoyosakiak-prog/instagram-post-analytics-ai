@@ -26,9 +26,8 @@ import {
   upsertManyPosts,
   upsertManyTasks
 } from "@/lib/storage";
-import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, PostCategoryDefinition } from "@/lib/types";
+import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
-import { postCategoryOptions } from "@/lib/metrics";
 
 type ServerStatus = {
   mode: "supabase" | "local";
@@ -74,49 +73,6 @@ export async function loadAccountsData() {
     if (!isServerStorageDisabled(error)) console.warn(error);
     return loadAccounts();
   }
-}
-
-function builtInCategories(): PostCategoryDefinition[] {
-  const now = new Date().toISOString();
-  return postCategoryOptions.map((category) => ({
-    id: `built-in-${category.value}`,
-    value: category.value,
-    label: category.label,
-    sortOrder: category.sortOrder,
-    isSystem: true,
-    createdAt: now,
-    updatedAt: now
-  }));
-}
-
-export async function loadCategoriesData(): Promise<PostCategoryDefinition[]> {
-  try {
-    const data = await requestJson<{ categories: PostCategoryDefinition[] }>("/api/data/categories");
-    return data.categories;
-  } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
-    return builtInCategories();
-  }
-}
-
-export async function addCategoryData(label: string) {
-  const data = await requestJson<{ category: PostCategoryDefinition }>("/api/data/categories", {
-    method: "POST",
-    body: JSON.stringify({ label })
-  });
-  return data.category;
-}
-
-export async function updateCategoryData(id: string, label: string) {
-  const data = await requestJson<{ category: PostCategoryDefinition | null }>("/api/data/categories", {
-    method: "PUT",
-    body: JSON.stringify({ id, label })
-  });
-  return data.category;
-}
-
-export async function deleteCategoryData(id: string) {
-  await requestJson<{ ok: true }>(`/api/data/categories?id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function loadPostsData() {

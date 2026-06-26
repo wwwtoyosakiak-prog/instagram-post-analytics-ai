@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadCategoriesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { ImprovementTask, InstagramAccount, InstagramPost, PostCategoryDefinition } from "@/lib/types";
-import { getPostCategoryLabel, postTypeLabels, taskStatusLabels } from "@/lib/metrics";
+import { loadAccountsData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
+import { ImprovementTask, InstagramAccount, InstagramPost } from "@/lib/types";
+import { postTypeLabels, taskStatusLabels } from "@/lib/metrics";
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -14,16 +14,14 @@ export default function CalendarPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
-  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [accountId, setAccountId] = useState("all");
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadCategoriesData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedCategories]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData()]).then(([loadedPosts, loadedAccounts, loadedTasks]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setTasks(loadedTasks);
-      setCategories(loadedCategories);
       const latestPost = [...loadedPosts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
       if (latestPost) setMonth(latestPost.date.slice(0, 7));
     });
@@ -49,22 +47,11 @@ export default function CalendarPage() {
 
   const openTasksThisMonth = useMemo(() => monthlyTasks.filter((task) => task.status !== "done"), [monthlyTasks]);
 
-  const categorySummary = useMemo(() => {
-    return categories
-      .map((category) => {
-        const items = postedThisMonth.filter((post) => (post.category ?? "other") === category.value);
-        return { name: category.label, count: items.length };
-      })
-      .filter((item) => item.count > 0)
-      .sort((a, b) => b.count - a.count);
-  }, [postedThisMonth, categories]);
-
   const days = useMemo(() => buildCalendarDays(month), [month]);
 
   const postsByPostedDate = useMemo(() => groupPostsByDate(postedThisMonth, "date"), [postedThisMonth]);
   const postsByRecordedDate = useMemo(() => groupPostsByDate(recordedThisMonth, "recordedDate"), [recordedThisMonth]);
   const tasksByDueDate = useMemo(() => groupTasksByDueDate(monthlyTasks), [monthlyTasks]);
-  const strongestCategory = categorySummary[0];
 
   return (
     <div>
@@ -111,11 +98,6 @@ export default function CalendarPage() {
         <Stat label="未完了タスク" value={`${openTasksThisMonth.length}件`} />
       </div>
 
-      <div className="mb-6 grid gap-3 md:grid-cols-2">
-        <Stat label="使用カテゴリ数" value={`${categorySummary.length}種類`} />
-        <Stat label="最多カテゴリ" value={strongestCategory ? `${strongestCategory.name} ${strongestCategory.count}件` : "未登録"} />
-      </div>
-
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
         <Panel>
           <div className="mb-4 flex items-center gap-2">
@@ -146,14 +128,13 @@ export default function CalendarPage() {
                         accountName={post.accountId ? accountNameById[post.accountId] : undefined}
                         tone="posted"
                         sameDayRecorded={(post.recordedDate ?? post.date) === post.date}
-                        categoryLabel={getPostCategoryLabel(post.category, categories)}
                       />
                     ))}
                     {separatelyRecorded.map((post) => (
-                      <CalendarItem key={`recorded-${post.id}`} post={post} accountName={post.accountId ? accountNameById[post.accountId] : undefined} tone="recorded" categoryLabel={getPostCategoryLabel(post.category, categories)} />
+                      <CalendarItem key={`recorded-${post.id}`} post={post} accountName={post.accountId ? accountNameById[post.accountId] : undefined} tone="recorded" />
                     ))}
                     {dueTasks.map((task) => (
-                      <TaskCalendarItem key={`task-${task.id}`} task={task} post={task.postId ? postById[task.postId] : undefined} categoryLabel={task.postId ? getPostCategoryLabel(postById[task.postId]?.category, categories) : undefined} />
+                      <TaskCalendarItem key={`task-${task.id}`} task={task} post={task.postId ? postById[task.postId] : undefined} />
                     ))}
                   </div>
                 </div>
@@ -163,27 +144,7 @@ export default function CalendarPage() {
         </Panel>
 
         <Panel>
-          <h2 className="font-semibold">カテゴリ別投稿数</h2>
-          <p className="mt-2 text-sm text-stone-600">投稿日ベースで、今月どのテーマを何回投稿したかを集計しています。</p>
-          <div className="mt-4 space-y-3">
-            {categorySummary.map((item) => {
-              const width = postedThisMonth.length ? Math.max(8, (item.count / postedThisMonth.length) * 100) : 0;
-              return (
-                <div key={item.name}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-ink">{item.name}</span>
-                    <span className="text-stone-600">{item.count}件</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-stone-200">
-                    <div className="h-2 rounded-full bg-moss" style={{ width: `${width}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-            {!categorySummary.length ? <p className="rounded-md bg-fog p-4 text-sm text-stone-600">この月の投稿カテゴリはまだありません。</p> : null}
-          </div>
-
-          <div className="mt-6 border-t border-stone-200 pt-5">
+          <div className="mt-6">
             <h3 className="font-semibold">期限付きタスク</h3>
             <div className="mt-3 grid gap-2">
               {monthlyTasks.slice(0, 6).map((task) => (
@@ -196,16 +157,6 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="mt-6 border-t border-stone-200 pt-5">
-            <h3 className="font-semibold">カテゴリ一覧</h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <span key={category.value} className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-700">
-                  {category.label}
-                </span>
-              ))}
-            </div>
-          </div>
         </Panel>
       </div>
     </div>
@@ -243,23 +194,23 @@ function groupTasksByDueDate(tasks: ImprovementTask[]) {
   }, {});
 }
 
-function CalendarItem({ post, accountName, tone, categoryLabel, sameDayRecorded = false }: { post: InstagramPost; accountName?: string; tone: "posted" | "recorded"; categoryLabel: string; sameDayRecorded?: boolean }) {
+function CalendarItem({ post, accountName, tone, sameDayRecorded = false }: { post: InstagramPost; accountName?: string; tone: "posted" | "recorded"; sameDayRecorded?: boolean }) {
   const label = sameDayRecorded ? "投稿日・分析登録日" : tone === "posted" ? "投稿日" : "分析登録日";
   const toneClass = tone === "posted" ? "border-ink/20 bg-ink text-white" : "border-clay/20 bg-clay text-white";
   return (
     <Link href={`/posts/detail?id=${post.id}`} className={`block rounded-md border px-2 py-1 text-xs shadow-sm transition hover:opacity-90 ${toneClass}`}>
-      <span className="block font-semibold">{label}: {categoryLabel}</span>
+      <span className="block font-semibold">{label}</span>
       <span className="mt-0.5 block truncate opacity-90">{postTypeLabels[post.type]} / {accountName ?? "未選択"}</span>
     </Link>
   );
 }
 
-function TaskCalendarItem({ task, post, categoryLabel }: { task: ImprovementTask; post?: InstagramPost; categoryLabel?: string }) {
+function TaskCalendarItem({ task, post }: { task: ImprovementTask; post?: InstagramPost }) {
   const toneClass = task.status === "done" ? "border-emerald-200 bg-emerald-100 text-emerald-900" : "border-plum/20 bg-plum text-white";
   return (
     <Link href="/tasks" className={`block rounded-md border px-2 py-1 text-xs shadow-sm transition hover:opacity-90 ${toneClass}`}>
       <span className="block font-semibold">タスク期限: {taskStatusLabels[task.status]}</span>
-      <span className="mt-0.5 block truncate opacity-90">{post ? `${categoryLabel ?? "未分類"} / ` : ""}{task.title}</span>
+      <span className="mt-0.5 block truncate opacity-90">{post ? `${post.date} / ` : ""}{task.title}</span>
     </Link>
   );
 }

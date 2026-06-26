@@ -3,24 +3,22 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { addTaskData, deleteTaskData, loadCategoriesData, loadPostsData, loadTasksData, updateTaskData } from "@/lib/cloud-storage";
-import { ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramPost, PostCategoryDefinition } from "@/lib/types";
-import { getPostCategoryLabel, taskStatusLabels, taskStatusOptions } from "@/lib/metrics";
+import { addTaskData, deleteTaskData, loadPostsData, loadTasksData, updateTaskData } from "@/lib/cloud-storage";
+import { ImprovementTask, ImprovementTaskInput, ImprovementTaskStatus, InstagramPost } from "@/lib/types";
+import { taskStatusLabels, taskStatusOptions } from "@/lib/metrics";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [status, setStatus] = useState<ImprovementTaskStatus | "all">("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ImprovementTaskInput>(emptyTask());
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadTasksData(), loadPostsData(), loadCategoriesData()]).then(([loadedTasks, loadedPosts, loadedCategories]) => {
+    Promise.all([loadTasksData(), loadPostsData()]).then(([loadedTasks, loadedPosts]) => {
       setTasks(loadedTasks);
       setPosts(loadedPosts);
-      setCategories(loadedCategories);
     });
   }, []);
 
@@ -123,7 +121,7 @@ export default function TasksPage() {
               <select value={form.postId ?? ""} onChange={(event) => setForm({ ...form, postId: event.target.value || undefined })}>
                 <option value="">紐づけなし</option>
                 {posts.map((post) => (
-                  <option key={post.id} value={post.id}>{post.date} / {getPostCategoryLabel(post.category, categories)}</option>
+                  <option key={post.id} value={post.id}>{post.date}</option>
                 ))}
               </select>
             </div>
@@ -183,7 +181,7 @@ export default function TasksPage() {
                       <div className="mt-2 flex flex-wrap gap-2 text-xs text-stone-600">
                         <span>担当: {task.assignee || "未設定"}</span>
                         <span>期限: {task.dueDate || "未設定"}</span>
-                        {post ? <Link href={`/posts/detail?id=${post.id}`} className="font-semibold text-clay hover:underline">投稿: {post.date} / {getPostCategoryLabel(post.category, categories)}</Link> : <span>投稿: 紐づけなし</span>}
+                        {post ? <Link href={`/posts/detail?id=${post.id}`} className="font-semibold text-clay hover:underline">投稿: {post.date}</Link> : <span>投稿: 紐づけなし</span>}
                       </div>
                       {task.memo ? <p className="mt-3 rounded-md bg-fog px-3 py-2 text-sm leading-6 text-stone-700">{task.memo}</p> : null}
                     </div>

@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadCategoriesData, loadInsightData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
-import { AiAnalysis, AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, PostCategoryDefinition } from "@/lib/types";
-import { formatPercent, getMetrics, getPostCategoryLabel, postTypeLabels } from "@/lib/metrics";
+import { addTaskData, deletePostData, loadAccountsData, loadAnalysesData, loadInsightData, loadPostsData, loadTasksData, saveAnalysisData } from "@/lib/cloud-storage";
+import { AiAnalysis, AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
+import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
 export default function PostDetailPage() {
@@ -24,7 +24,6 @@ function PostDetailContent() {
   const id = params.get("id") ?? "";
   const [post, setPost] = useState<InstagramPost | null>(null);
   const [account, setAccount] = useState<InstagramAccount | null>(null);
-  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
@@ -38,7 +37,7 @@ function PostDetailContent() {
 
   useEffect(() => {
     setInsightLoading(true);
-    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id), loadInsightData(id), loadCategoriesData()]).then(([posts, accounts, analyses, loadedTasks, insightData, loadedCategories]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadTasksData(id), loadInsightData(id)]).then(([posts, accounts, analyses, loadedTasks, insightData]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
       setAccount(accounts[0] ?? null);
@@ -47,7 +46,6 @@ function PostDetailContent() {
       setTasks(loadedTasks);
       setLatestInsight(insightData.insight);
       setInsightHistory(insightData.insights);
-      setCategories(loadedCategories);
       setInsightLoading(false);
     });
   }, [id]);
@@ -141,7 +139,6 @@ function PostDetailContent() {
             <div><dt className="font-semibold">投稿日</dt><dd>{toJSTDate(post.date)}</dd></div>
             <div><dt className="font-semibold">データ登録日</dt><dd>{toJSTDate(post.recordedDate ?? post.date)}</dd></div>
             <div><dt className="font-semibold">投稿タイプ</dt><dd>{postTypeLabels[post.type]}</dd></div>
-            <div><dt className="font-semibold">投稿カテゴリ</dt><dd>{getPostCategoryLabel(post.category, categories)}</dd></div>
             <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>
             <div><dt className="font-semibold">投稿URL</dt><dd className="break-all">{post.url || "未登録"}</dd></div>
             <div><dt className="font-semibold">投稿コメント</dt><dd className="leading-6">{post.caption}</dd></div>

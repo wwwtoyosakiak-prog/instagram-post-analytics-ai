@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, CalendarDays, CheckSquare, FileText, Home, KeyRound, ListChecks, PlayCircle, Settings, Tags, Target, User } from "lucide-react";
+import { BarChart3, CalendarDays, CheckSquare, FileText, Home, KeyRound, ListChecks, PlayCircle, Settings, Target, User } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +12,6 @@ const nav = [
   { href: "/", label: "トップ", icon: Home },
   { href: "/accounts", label: "アカウント", icon: User },
   { href: "/posts", label: "一覧", icon: ListChecks },
-  { href: "/categories", label: "カテゴリ", icon: Tags },
   { href: "/calendar", label: "カレンダー", icon: CalendarDays },
   { href: "/tasks", label: "タスク", icon: CheckSquare },
   { href: "/goals", label: "目標", icon: Target },

@@ -9,13 +9,13 @@ import {
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
   loadAllInsightData, loadAnalysesData,
-  loadCategoriesData, loadGoalsData, loadPostsData,
+  loadGoalsData, loadPostsData,
   loadSyncRunsData, loadTasksData,
 } from "@/lib/cloud-storage";
 import {
   ImprovementTask, InstagramInsightSnapshot,
   InstagramPost, InstagramSyncRun, MonthlyGoal,
-  PostCategoryDefinition, PostType,
+  PostType,
 } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
@@ -316,7 +316,6 @@ function syncStatusLabel(status: InstagramSyncRun["status"]) {
 export default function DashboardPage() {
   // ── 手入力データ state ──
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
@@ -340,9 +339,9 @@ export default function DashboardPage() {
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
   const refreshDashboard = async () => {
-    const [loadedPosts, loadedTasks, loadedGoals, loadedInsights, loadedCategories, loadedSyncRuns] = await Promise.all([
+    const [loadedPosts, loadedTasks, loadedGoals, loadedInsights, loadedSyncRuns] = await Promise.all([
       loadPostsData(), loadTasksData(), loadGoalsData(),
-      loadAllInsightData(), loadCategoriesData(), loadSyncRunsData()
+      loadAllInsightData(), loadSyncRunsData()
     ]);
     setPosts(loadedPosts);
     setTasks(loadedTasks);
@@ -351,7 +350,6 @@ export default function DashboardPage() {
     setSyncRuns(loadedSyncRuns);
     const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
     if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
-    setCategories(loadedCategories);
     Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
       setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
     });
@@ -579,29 +577,13 @@ export default function DashboardPage() {
       const items = graphPosts.filter((post) => weekdayJa(post.date) === day);
       return { name: day, averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2)) };
     });
-    const categoryData = categories.map((category) => {
-      const items = graphPosts.filter((post) => (post.category ?? "other") === category.value);
-      const scores = items.map((post) => latestScoreByPostId[post.id]).filter((score): score is number => typeof score === "number");
-      const categoryPostIds = new Set(items.map((post) => post.id));
-      const categoryTasks = targetTasks.filter((task) => task.postId && categoryPostIds.has(task.postId));
-      return {
-        name: category.label,
-        averageViews: Math.round(average(items.map((post) => post.views))),
-        averageSaveRate: Number(average(items.map((post) => getMetrics(post).saveRate)).toFixed(2)),
-        averageAiScore: Number(average(scores).toFixed(1)),
-        taskCount: categoryTasks.length,
-        openTaskCount: categoryTasks.filter((task) => task.status !== "done").length,
-        count: items.length
-      };
-    });
     const taskStatusData = (["todo", "doing", "done"] as const).map((status) => ({
       name: taskStatusLabels[status],
       count: targetTasks.filter((task) => task.status === status).length
     }));
-    const taskCategoryData = categoryData.filter((item) => item.taskCount > 0);
     const nextTask = [...openTasks].filter((task) => task.dueDate).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
     return {
-      dailyViews, typeData, weekdayData, categoryData, taskStatusData, taskCategoryData,
+      dailyViews, typeData, weekdayData, taskStatusData,
       saveRank: [...graphPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
       likeRank: [...graphPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
       totalViews: targetPosts.reduce((sum, post) => sum + post.views, 0),
@@ -609,8 +591,6 @@ export default function DashboardPage() {
       averageSaves: average(targetPosts.map((post) => post.saves)),
       bestType: [...typeData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       bestWeekday: [...weekdayData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
-      bestCategory: [...categoryData].filter((item) => item.count > 0).sort((a, b) => b.averageSaveRate - a.averageSaveRate)[0],
-      bestAiScoreCategory: [...categoryData].filter((item) => item.averageAiScore > 0).sort((a, b) => b.averageAiScore - a.averageAiScore)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
       currentMonthKey, monthlyActual, selectedGoal,
       taskCount: targetTasks.length, openTaskCount: openTasks.length,
@@ -618,6 +598,7 @@ export default function DashboardPage() {
       nextTaskPost: nextTask?.postId ? postById[nextTask.postId] : undefined,
       count: targetPosts.length, graphCount: graphPosts.length,
       graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "全期間",
+
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
       todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
       todayEngagementRate: average(todayPosts.map((post) => getMetrics(post).engagementRate)),
@@ -632,7 +613,7 @@ export default function DashboardPage() {
       previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
       previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [effectivePosts, tasks, goals, latestScoreByPostId, categories, graphPeriod, posts]);
+  }, [effectivePosts, tasks, goals, latestScoreByPostId, graphPeriod, posts]);
 
   const latestSyncRun = syncRuns[0] ?? null;
   const latestScheduledSyncRun = syncRuns.find((run) => run.triggerType === "scheduled") ?? null;
@@ -978,12 +959,10 @@ export default function DashboardPage() {
 
           {/* 読み取りポイント */}
           <Panel className="mb-6">
-            <SectionLead eyebrow="Highlights" title="読み取りポイント" description="相対的に強い曜日、投稿タイプ、カテゴリをひと目で拾えるように整理しています。" />
-            <div className="mt-4 grid gap-3 md:grid-cols-5">
+            <SectionLead eyebrow="Highlights" title="読み取りポイント" description="相対的に強い曜日・投稿タイプをひと目で拾えるように整理しています。" />
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
               <Insight label="反応が良い投稿タイプ" value={data.bestType?.averageEngagementRate ? `${data.bestType.name} / ${data.bestType.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
               <Insight label="反応が良い曜日" value={data.bestWeekday?.averageEngagementRate ? `${data.bestWeekday.name}曜日 / ${data.bestWeekday.averageEngagementRate.toFixed(2)}%` : "データ不足"} />
-              <Insight label="保存されやすいカテゴリ" value={data.bestCategory ? `${data.bestCategory.name} / ${data.bestCategory.averageSaveRate.toFixed(2)}%` : "データ不足"} />
-              <Insight label="AI評価が高いカテゴリ" value={data.bestAiScoreCategory ? `${data.bestAiScoreCategory.name} / ${data.bestAiScoreCategory.averageAiScore.toFixed(1)}点` : "分析履歴なし"} />
               <Insight label="保存されやすい投稿" value={data.mostSavedPost ? `${data.mostSavedPost.date} / ${data.mostSavedPost.saves.toLocaleString()}保存` : "データ不足"} />
             </div>
           </Panel>
@@ -1039,20 +1018,8 @@ export default function DashboardPage() {
         <ChartPanel title="投稿タイプ別の平均表示数" description="動画・画像など、形式ごとの平均表示数を比較します。" accent="moss">
           <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageViews" name="平均表示数" fill="#53624a" /></BarChart>
         </ChartPanel>
-        <ChartPanel title="カテゴリ別の平均表示数" description="どのテーマが見られやすいかをカテゴリ単位で見ます。" accent="moss">
-          <BarChart data={data.categoryData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageViews" name="平均表示数" fill="#4f6b57" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="カテゴリ別の平均保存率" description="保存されやすいテーマを特定するための比較です。" accent="sky">
-          <BarChart data={data.categoryData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageSaveRate" name="平均保存率" fill="#2f766d" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="カテゴリ別の平均AIスコア" description="AI評価の高いカテゴリをまとめて確認します。" accent="plum">
-          <BarChart data={data.categoryData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis domain={[0, 100]} /><Tooltip /><Bar dataKey="averageAiScore" name="平均AIスコア" fill="#5a4356" /></BarChart>
-        </ChartPanel>
         <ChartPanel title="改善タスクの状態別件数" description="未着手、進行中、完了の件数バランスです。" accent="clay">
           <BarChart data={data.taskStatusData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="count" name="タスク数" fill="#b55d3e" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="カテゴリ別の改善タスク数" description="改善の集中先をカテゴリ別に見ます。" accent="moss">
-          <BarChart data={data.taskCategoryData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis allowDecimals={false} /><Tooltip /><Legend /><Bar dataKey="taskCount" name="全タスク" fill="#53624a" /><Bar dataKey="openTaskCount" name="未完了" fill="#b55d3e" /></BarChart>
         </ChartPanel>
         <ChartPanel title="投稿タイプ別の平均エンゲージメント率" description="反応率が高い投稿形式を比較します。" accent="clay">
           <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageEngagementRate" name="平均エンゲージメント率" fill="#b55d3e" /></BarChart>

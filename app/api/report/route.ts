@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMetrics, getPostCategoryLabel } from "@/lib/metrics";
-import { isSupabaseConfigured, listCategoriesFromSupabase } from "@/lib/supabase-admin";
+import { getMetrics } from "@/lib/metrics";
 import { InstagramAccount, InstagramPost, MonthlyReport } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -10,7 +9,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: ".env.local に OPENAI_API_KEY を設定してください。APIキーなしの場合はサンプル総評を使えます。" }, { status: 400 });
   }
 
-  const categories = isSupabaseConfigured ? await listCategoriesFromSupabase() : [];
   const prompt = `Instagram運用の月次レポート総評を日本語で作成してください。
 対象月: ${report.month}
 対象アカウント: ${account ? `${account.name} @${account.username}` : "すべて"}
@@ -22,7 +20,7 @@ export async function POST(request: Request) {
 平均保存数: ${report.averageSaves.toFixed(1)}
 平均エンゲージメント率: ${report.averageEngagementRate.toFixed(2)}%
 投稿一覧:
-${posts.map((post) => `- ${post.date} category=${getPostCategoryLabel(post.category, categories)} type=${post.type} views=${post.views} likes=${post.likes} saves=${post.saves} ER=${getMetrics(post).engagementRate.toFixed(2)}% caption=${post.caption}`).join("\n")}
+${posts.map((post) => `- ${post.date} type=${post.type} views=${post.views} likes=${post.likes} saves=${post.saves} ER=${getMetrics(post).engagementRate.toFixed(2)}% caption=${post.caption}`).join("\n")}
 
 400字以内で、良かった点、課題、来月の方針を含めてください。`;
 

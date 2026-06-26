@@ -1,7 +1,7 @@
-import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReportRecord, PostCategoryDefinition, PostType } from "@/lib/types";
-import { getMetrics, getPostCategoryLabel, postTypeLabels, taskStatusLabels } from "@/lib/metrics";
+import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReportRecord, PostType } from "@/lib/types";
+import { getMetrics, postTypeLabels, taskStatusLabels } from "@/lib/metrics";
 
-const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "category", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
+const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
 
 function parseCsvLine(line: string) {
   const cells: string[] = [];
@@ -36,7 +36,6 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
     const value = (key: string) => cells[index[key]]?.trim() ?? "";
     const rawType = value("type");
     const type: PostType = rawType === "video" || rawType === "reel" || rawType === "carousel" ? rawType : "image";
-    const category = value("category") || "other";
     const now = new Date().toISOString();
     return {
       id: `csv-${Date.now()}-${rowIndex}`,
@@ -49,7 +48,6 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
       caption: value("caption"),
       hashtags: value("hashtags"),
       type,
-      category,
       mediaCount: Number(value("mediaCount")) || 1,
       likes: Number(value("likes")) || 0,
       comments: Number(value("comments")) || 0,
@@ -62,7 +60,7 @@ export function parsePostsCsv(csv: string, accountIdByUsername: Record<string, s
 }
 
 export const csvTemplate = `${headers.join(",")}
-ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,product,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"`;
+ozops_outdoor,2026-05-01,2026-05-02,https://www.instagram.com/p/example/,"軽量焚き火ギアの紹介","#アウトドアギア #キャンプ道具",reel,1,438,28,96,42,12800,"動画冒頭で使用シーンを見せた"`;
 
 function escapeCsv(value: unknown) {
   const text = value === null || value === undefined ? "" : String(value);
@@ -95,7 +93,7 @@ export function exportAccountsCsv(accounts: InstagramAccount[]) {
   ]);
 }
 
-export function exportPostsCsv(posts: InstagramPost[], accountNameById: Record<string, string> = {}, categories: PostCategoryDefinition[] = []) {
+export function exportPostsCsv(posts: InstagramPost[], accountNameById: Record<string, string> = {}) {
   return createCsv([
     [
       "id",
@@ -108,8 +106,6 @@ export function exportPostsCsv(posts: InstagramPost[], accountNameById: Record<s
       "hashtags",
       "type",
       "typeLabel",
-      "category",
-      "categoryLabel",
       "mediaCount",
       "likes",
       "comments",
@@ -138,8 +134,6 @@ export function exportPostsCsv(posts: InstagramPost[], accountNameById: Record<s
         post.hashtags,
         post.type,
         postTypeLabels[post.type],
-        post.category ?? "other",
-        getPostCategoryLabel(post.category, categories),
         post.mediaCount,
         post.likes,
         post.comments,
@@ -159,13 +153,12 @@ export function exportPostsCsv(posts: InstagramPost[], accountNameById: Record<s
   ]);
 }
 
-export function exportAnalysesCsv(analyses: AiAnalysisRecord[], postById: Record<string, InstagramPost> = {}, categories: PostCategoryDefinition[] = []) {
+export function exportAnalysesCsv(analyses: AiAnalysisRecord[], postById: Record<string, InstagramPost> = {}) {
   return createCsv([
     [
       "id",
       "postId",
       "postDate",
-      "postCategory",
       "score",
       "scoreDelta",
       "firstImpression",
@@ -185,7 +178,6 @@ export function exportAnalysesCsv(analyses: AiAnalysisRecord[], postById: Record
         analysis.id,
         analysis.postId,
         post?.date ?? "",
-        post ? getPostCategoryLabel(post.category, categories) : "",
         analysis.score,
         analysis.scoreDelta ?? "",
         analysis.firstImpression,
@@ -240,13 +232,12 @@ export function exportMonthlyReportsCsv(reports: MonthlyReportRecord[]) {
   ]);
 }
 
-export function exportTasksCsv(tasks: ImprovementTask[], postById: Record<string, InstagramPost> = {}, categories: PostCategoryDefinition[] = []) {
+export function exportTasksCsv(tasks: ImprovementTask[], postById: Record<string, InstagramPost> = {}) {
   return createCsv([
     [
       "id",
       "postId",
       "postDate",
-      "postCategory",
       "analysisId",
       "title",
       "status",
@@ -264,7 +255,6 @@ export function exportTasksCsv(tasks: ImprovementTask[], postById: Record<string
         task.id,
         task.postId ?? "",
         post?.date ?? "",
-        post ? getPostCategoryLabel(post.category, categories) : "",
         task.analysisId ?? "",
         task.title,
         task.status,

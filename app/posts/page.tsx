@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { loadAnalysesData, loadCategoriesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
-import { AiAnalysis, InstagramPost, PostCategoryDefinition } from "@/lib/types";
-import { formatPercent, getMetrics, getPostCategoryLabel } from "@/lib/metrics";
+import { loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
+import { AiAnalysis, InstagramPost } from "@/lib/types";
+import { formatPercent, getMetrics } from "@/lib/metrics";
 import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia } from "@/lib/post-merge";
 
 // ── 型 ──────────────────────────────────────────────────────
@@ -30,7 +30,6 @@ interface UnifiedEntry {
   post: InstagramPost | null;
   media: ApiMedia | null;
   hasApi: boolean;
-  category: string | null;
 }
 
 // ── ヘルパー ────────────────────────────────────────────────
@@ -75,7 +74,6 @@ function TypeBadge({ type }: { type: UTypeFilter | null }) {
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [categories, setCategories] = useState<PostCategoryDefinition[]>([]);
   const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
@@ -84,19 +82,16 @@ export default function PostsPage() {
 
   const [sortKey, setSortKey] = useState<USort>("date");
   const [typeFilter, setTypeFilter] = useState<UTypeFilter>("");
-  const [category, setCategory] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
   useEffect(() => {
     Promise.all([
       loadPostsData(),
-      loadCategoriesData(),
       fetch("/api/instagram/media?limit=100")
         .then((r) => r.ok ? r.json() : { data: [] })
         .catch(() => ({ data: [] })),
-    ]).then(([loadedPosts, loadedCategories, mediaJson]) => {
+    ]).then(([loadedPosts, mediaJson]) => {
       setPosts(loadedPosts);
-      setCategories(loadedCategories);
       setApiMedia((mediaJson as { data: ApiMedia[] }).data ?? []);
       setLoading(false);
       Promise.all(
@@ -133,7 +128,6 @@ export default function PostsPage() {
         post,
         media: matched ?? null,
         hasApi: !!(ins && ((ins.views != null && ins.views > 0) || (ins.reach != null && ins.reach > 0))),
-        category: post.category ?? null,
       };
     });
 
@@ -163,7 +157,6 @@ export default function PostsPage() {
           post: null,
           media: m,
           hasApi: true,
-          category: null,
         };
       });
 
@@ -175,7 +168,6 @@ export default function PostsPage() {
   const filteredList = useMemo(() => {
     return unifiedList
       .filter((e) => !typeFilter || e.normalizedType === typeFilter)
-      .filter((e) => category === "all" || e.category === category)
       .sort((a, b) => {
         if (sortKey === "date") return b.date.localeCompare(a.date);
         if (sortKey === "views") return b.views - a.views;
@@ -185,7 +177,7 @@ export default function PostsPage() {
         if (sortKey === "engagementRate") return b.er - a.er;
         return 0;
       });
-  }, [unifiedList, typeFilter, category, sortKey]);
+  }, [unifiedList, typeFilter, sortKey]);
 
   // ── AI評価（手入力投稿のみ対象） ────────────────────────────
 
@@ -305,19 +297,6 @@ export default function PostsPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-stone-500 mb-1">カテゴリ</label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="text-sm border border-stone-200 rounded-md px-3 py-1.5 bg-white"
-          >
-            <option value="all">すべて</option>
-            {categories.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
           <label className="block text-xs text-stone-500 mb-1">表示形式</label>
           <div className="flex gap-1">
             <button
@@ -348,7 +327,6 @@ export default function PostsPage() {
                 <th>投稿</th>
                 <th>投稿日</th>
                 <th>タイプ</th>
-                <th>カテゴリ</th>
                 <th>キャプション</th>
                 <th>表示数</th>
                 <th>リーチ</th>
@@ -373,7 +351,6 @@ export default function PostsPage() {
                   </td>
                   <td className="whitespace-nowrap">{toJSTDate(e.date)}</td>
                   <td><TypeBadge type={e.normalizedType} /></td>
-                  <td>{e.category ? getPostCategoryLabel(e.category, categories) : "–"}</td>
                   <td className="max-w-xs">
                     <p className="line-clamp-2 text-sm">{e.caption || "（なし）"}</p>
                   </td>
@@ -451,7 +428,6 @@ export default function PostsPage() {
             <UnifiedCard
               key={e.key}
               entry={e}
-              categories={categories}
               aiScore={e.post ? latestScoreByPostId[e.post.id] : undefined}
             />
           ))}
@@ -470,11 +446,9 @@ export default function PostsPage() {
 
 function UnifiedCard({
   entry,
-  categories,
   aiScore,
 }: {
   entry: UnifiedEntry;
-  categories: PostCategoryDefinition[];
   aiScore?: number;
 }) {
   const cls =
@@ -503,11 +477,6 @@ function UnifiedCard({
       <div className="p-4">
         <div className="mb-3 flex flex-wrap gap-1.5">
           <TypeBadge type={entry.normalizedType} />
-          {entry.category && (
-            <span className="rounded-full bg-ink px-2 py-1 text-[11px] font-semibold text-white">
-              {getPostCategoryLabel(entry.category, categories)}
-            </span>
-          )}
           {entry.post && (
             <span className="rounded-full bg-skyglass px-2 py-1 text-[11px] font-semibold text-ink">
               AI {typeof aiScore === "number" ? `${aiScore}点` : "未分析"}

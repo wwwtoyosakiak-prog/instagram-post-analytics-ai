@@ -11,7 +11,6 @@ create table if not exists public.instagram_posts (
   caption text not null default '',
   hashtags text,
   type text not null default 'image' check (type in ('image', 'video', 'reel', 'carousel')),
-  category text not null default 'other',
   media_count integer not null default 1,
   likes integer not null default 0,
   comments integer not null default 0,

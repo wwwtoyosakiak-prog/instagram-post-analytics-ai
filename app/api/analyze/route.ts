@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMetrics, getPostCategoryLabel, postTypeLabels } from "@/lib/metrics";
-import { isSupabaseConfigured, listCategoriesFromSupabase } from "@/lib/supabase-admin";
+import { getMetrics, postTypeLabels } from "@/lib/metrics";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -19,7 +18,6 @@ export async function POST(request: Request) {
   }
 
   const metrics = getMetrics(post);
-  const categories = isSupabaseConfigured ? await listCategoriesFromSupabase() : [];
   const prompt = `あなたは中小企業向けInstagram運用コンサルタントです。以下の投稿を分析し、JSONだけを返してください。
 
 投稿:
@@ -33,7 +31,6 @@ export async function POST(request: Request) {
 - データ登録日: ${post.recordedDate ?? post.date}
 - 投稿URL: ${post.url || "なし"}
 - 投稿タイプ: ${postTypeLabels[post.type]}
-- 投稿カテゴリ: ${getPostCategoryLabel(post.category, categories)}
 - 投稿画像・動画の枚数: ${post.mediaCount ?? 1}
 - 投稿コメント: ${post.caption}
 - ハッシュタグ: ${post.hashtags || "なし"}

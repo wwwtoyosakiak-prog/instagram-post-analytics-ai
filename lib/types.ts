@@ -1,15 +1,4 @@
 export type PostType = "image" | "video" | "reel" | "carousel";
-export type PostCategory = string;
-
-export type PostCategoryDefinition = {
-  id: string;
-  value: string;
-  label: string;
-  sortOrder: number;
-  isSystem: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type InstagramAccountInput = {
   name: string;
@@ -39,7 +28,6 @@ export type InstagramPostInput = {
   caption: string;
   hashtags: string;
   type: PostType;
-  category: PostCategory;
   mediaCount: number;
   likes: number;
   comments: number;
@@ -223,15 +211,3 @@ export type ImprovementTask = ImprovementTaskInput & {
   completedAt?: string;
 };
 
-export type CategoryAiReportItem = {
-  category: string;
-  summary: string;
-  strength: string;
-  weakness: string;
-  recommendation: string;
-};
-
-export type CategoryAiReport = {
-  overall: string;
-  items: CategoryAiReportItem[];
-};
