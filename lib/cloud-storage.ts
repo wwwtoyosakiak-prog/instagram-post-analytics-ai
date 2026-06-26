@@ -4,29 +4,23 @@ import {
   addAccount,
   addGoal,
   addPost,
-  addTask,
   deleteAccount,
   deleteGoal,
   deletePost,
-  deleteTask,
   loadAccounts,
   loadGoals,
   loadPosts,
-  loadTasks,
   saveAccounts,
   saveGoals,
   savePosts,
-  saveTasks,
   updateAccount,
   updateGoal,
   updatePost,
-  updateTask,
   upsertManyAccounts,
   upsertManyGoals,
-  upsertManyPosts,
-  upsertManyTasks
+  upsertManyPosts
 } from "@/lib/storage";
-import { ImprovementTask, ImprovementTaskInput, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
+import { InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 
 type ServerStatus = {
@@ -195,13 +189,11 @@ export async function upsertPostsData(posts: InstagramPost[]) {
 export async function pushLocalBackupToServer() {
   const accounts = loadAccounts();
   const posts = loadPosts();
-  const tasks = loadTasks();
   const goals = loadGoals();
   await upsertAccountsData(accounts);
   await upsertPostsData(posts);
-  await upsertTasksData(tasks);
   await upsertGoalsData(goals);
-  return { accounts: accounts.length, posts: posts.length, tasks: tasks.length, goals: goals.length };
+  return { accounts: accounts.length, posts: posts.length, goals: goals.length };
 }
 
 export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord[]> {
@@ -279,76 +271,6 @@ export async function saveMonthlyReportData(report: MonthlyReport, accountId: st
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
     return null;
-  }
-}
-
-export async function loadTasksData(postId?: string): Promise<ImprovementTask[]> {
-  const params = new URLSearchParams();
-  if (postId) params.set("postId", postId);
-  try {
-    const data = await requestJson<{ tasks: ImprovementTask[] }>(`/api/data/tasks?${params.toString()}`);
-    if (postId) {
-      upsertManyTasks(data.tasks);
-    } else {
-      saveTasks(data.tasks);
-    }
-    return data.tasks;
-  } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
-    return loadTasks().filter((task) => !postId || task.postId === postId);
-  }
-}
-
-export async function addTaskData(input: ImprovementTaskInput) {
-  try {
-    const data = await requestJson<{ task: ImprovementTask }>("/api/data/tasks", {
-      method: "POST",
-      body: JSON.stringify({ task: input })
-    });
-    upsertManyTasks([data.task]);
-    return data.task;
-  } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
-    return addTask(input);
-  }
-}
-
-export async function updateTaskData(id: string, input: ImprovementTaskInput) {
-  try {
-    const data = await requestJson<{ task: ImprovementTask | null }>("/api/data/tasks", {
-      method: "PUT",
-      body: JSON.stringify({ id, task: input })
-    });
-    if (data.task) upsertManyTasks([data.task]);
-    return data.task;
-  } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
-    return updateTask(id, input);
-  }
-}
-
-export async function deleteTaskData(id: string) {
-  try {
-    await requestJson<{ ok: true }>(`/api/data/tasks?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    deleteTask(id);
-  } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
-    deleteTask(id);
-  }
-}
-
-export async function upsertTasksData(tasks: ImprovementTask[]) {
-  try {
-    const data = await requestJson<{ tasks: ImprovementTask[] }>("/api/data/tasks", {
-      method: "POST",
-      body: JSON.stringify({ tasks })
-    });
-    upsertManyTasks(data.tasks);
-    return data.tasks;
-  } catch (error) {
-    if (!isServerStorageDisabled(error)) console.warn(error);
-    upsertManyTasks(tasks);
-    return tasks;
   }
 }
 

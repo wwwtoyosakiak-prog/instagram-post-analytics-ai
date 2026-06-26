@@ -2,22 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp } from "lucide-react";
+import { CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { getServerStorageStatus, loadAnalysesData, loadPostsData, loadTasksData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, ImprovementTask, InstagramPost } from "@/lib/types";
-import { average, formatPercent, getMetrics, taskStatusLabels } from "@/lib/metrics";
+import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
+import { average, formatPercent, getMetrics } from "@/lib/metrics";
 
 export default function Home() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [serverStorageEnabled, setServerStorageEnabled] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadPostsData(), loadTasksData(), getServerStorageStatus()]).then(([loadedPosts, loadedTasks, status]) => {
+    Promise.all([loadPostsData(), getServerStorageStatus()]).then(([loadedPosts, status]) => {
       setPosts(loadedPosts);
-      setTasks(loadedTasks);
       setServerStorageEnabled(status.serverStorageEnabled);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
@@ -32,12 +30,6 @@ export default function Home() {
     const topPost = [...posts].sort((a, b) => getMetrics(b).engagementRate - getMetrics(a).engagementRate)[0];
     const latest = [...posts].sort((a, b) => new Date(b.recordedDate ?? b.date).getTime() - new Date(a.recordedDate ?? a.date).getTime())[0];
     const monthlyPosts = posts.filter((post) => post.date.startsWith(currentMonth));
-    const openTasks = tasks.filter((task) => task.status !== "done");
-    const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < todayKey);
-    const dueSoonTasks = openTasks
-      .filter((task) => task.dueDate)
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-      .slice(0, 4);
     const highScorePosts = posts
       .map((post) => ({ post, analysis: latestAnalysisByPostId[post.id] }))
       .filter((item): item is { post: InstagramPost; analysis: AiAnalysisRecord } => Boolean(item.analysis))
@@ -53,26 +45,20 @@ export default function Home() {
       monthlyPostCount: monthlyPosts.length,
       monthlyAverageSaveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
       screenshotCount: posts.filter((post) => Boolean(post.screenshot)).length,
-      openTasks,
-      overdueTasks,
-      dueSoonTasks,
       highScorePosts,
       nextPostToCheck,
       topPost,
       latest
     };
-  }, [posts, tasks, latestAnalysisByPostId]);
+  }, [posts, latestAnalysisByPostId]);
 
   return (
     <div>
       <PageHeader
         title="今日のInstagram運用を確認"
-        description="未完了タスク、期限切れ、今月の投稿状況、AIスコアの高い投稿をまとめて確認できます。"
-        action={<ButtonLink href="/tasks">タスクを見る</ButtonLink>}
+        description="今月の投稿状況、AIスコアの高い投稿をまとめて確認できます。"
       />
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
-        <QuickStat label="未完了タスク" value={`${summary.openTasks.length}件`} tone="moss" />
-        <QuickStat label="期限切れタスク" value={`${summary.overdueTasks.length}件`} tone="clay" />
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
         <QuickStat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} tone="plum" />
         <QuickStat label="今月の平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} tone="sky" />
       </div>
@@ -80,19 +66,11 @@ export default function Home() {
         <Panel className="relative overflow-hidden">
           <div className="absolute right-0 top-0 h-full w-1 bg-clay" />
           <h2 className="flex items-center gap-2 font-semibold"><TrendingUp size={18} className="text-clay" />今日見るべきこと</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <ButtonLink href="/tasks">未完了タスク</ButtonLink>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <ButtonLink href="/calendar">カレンダー</ButtonLink>
             <ButtonLink href="/dashboard">成果を見る</ButtonLink>
           </div>
           <div className="mt-5 grid gap-3 text-sm text-stone-700">
-            <WorkItem
-              icon={<AlertTriangle size={17} />}
-              title="期限切れタスク"
-              body={summary.overdueTasks.length ? `${summary.overdueTasks.length}件あります。優先して確認してください。` : "期限切れタスクはありません。"}
-              href="/tasks"
-              urgent={summary.overdueTasks.length > 0}
-            />
             <WorkItem
               icon={<ClipboardList size={17} />}
               title="次に確認すべき投稿"
@@ -106,7 +84,6 @@ export default function Home() {
           <div className="mt-4 grid gap-3 text-sm">
             <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件登録済み` : "未登録"} active={posts.length > 0} />
             <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
-            <StatusRow label="改善タスク" value={`${summary.openTasks.length}件が未完了`} active={summary.openTasks.length > 0} />
             <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー保存" : "ブラウザ保存"} active={serverStorageEnabled} />
             <StatusRow label="AI接続" value="設定ページで確認" active />
           </div>
@@ -119,19 +96,7 @@ export default function Home() {
           </div>
         </Panel>
       </div>
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <Panel>
-          <h2 className="flex items-center gap-2 font-semibold"><CalendarClock size={18} className="text-clay" />期限が近いタスク</h2>
-          <div className="mt-4 grid gap-2">
-            {summary.dueSoonTasks.map((task) => (
-              <Link key={task.id} href="/tasks" className="rounded-md border border-stone-200 bg-white/80 p-3 text-sm hover:border-moss">
-                <span className="font-semibold text-ink">{task.title}</span>
-                <span className="mt-1 block text-xs text-stone-600">期限: {task.dueDate} / {taskStatusLabels[task.status]}</span>
-              </Link>
-            ))}
-            {!summary.dueSoonTasks.length ? <p className="rounded-md bg-fog p-4 text-sm text-stone-600">期限付きの未完了タスクはありません。</p> : null}
-          </div>
-        </Panel>
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <Panel>
           <h2 className="flex items-center gap-2 font-semibold"><Sparkles size={18} className="text-amber-700" />最近スコアが高かった投稿</h2>
           <div className="mt-4 grid gap-2">

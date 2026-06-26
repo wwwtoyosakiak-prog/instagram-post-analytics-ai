@@ -1,5 +1,5 @@
-import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReportRecord, PostType } from "@/lib/types";
-import { getMetrics, postTypeLabels, taskStatusLabels } from "@/lib/metrics";
+import { AiAnalysisRecord, InstagramAccount, InstagramPost, MonthlyGoal, MonthlyReportRecord, PostType } from "@/lib/types";
+import { getMetrics, postTypeLabels } from "@/lib/metrics";
 
 const headers = ["accountUsername", "date", "recordedDate", "url", "caption", "hashtags", "type", "mediaCount", "likes", "comments", "saves", "shares", "views", "memo"];
 
@@ -229,44 +229,6 @@ export function exportMonthlyReportsCsv(reports: MonthlyReportRecord[]) {
       report.createdAt,
       report.updatedAt
     ])
-  ]);
-}
-
-export function exportTasksCsv(tasks: ImprovementTask[], postById: Record<string, InstagramPost> = {}) {
-  return createCsv([
-    [
-      "id",
-      "postId",
-      "postDate",
-      "analysisId",
-      "title",
-      "status",
-      "statusLabel",
-      "assignee",
-      "dueDate",
-      "memo",
-      "completedAt",
-      "createdAt",
-      "updatedAt"
-    ],
-    ...tasks.map((task) => {
-      const post = task.postId ? postById[task.postId] : undefined;
-      return [
-        task.id,
-        task.postId ?? "",
-        post?.date ?? "",
-        task.analysisId ?? "",
-        task.title,
-        task.status,
-        taskStatusLabels[task.status],
-        task.assignee,
-        task.dueDate,
-        task.memo,
-        task.completedAt ?? "",
-        task.createdAt,
-        task.updatedAt
-      ];
-    })
   ]);
 }
 

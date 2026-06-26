@@ -10,14 +10,14 @@ import { Button, PageHeader, Panel } from "@/components/ui";
 import {
   loadAllInsightData, loadAnalysesData,
   loadGoalsData, loadPostsData,
-  loadSyncRunsData, loadTasksData,
+  loadSyncRunsData,
 } from "@/lib/cloud-storage";
 import {
-  ImprovementTask, InstagramInsightSnapshot,
+  InstagramInsightSnapshot,
   InstagramPost, InstagramSyncRun, MonthlyGoal,
   PostType,
 } from "@/lib/types";
-import { average, getMetrics, postTypeLabels, taskStatusLabels, weekdayJa } from "@/lib/metrics";
+import { average, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
 import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia, type ApiMediaInsights } from "@/lib/post-merge";
 
@@ -316,7 +316,6 @@ function syncStatusLabel(status: InstagramSyncRun["status"]) {
 export default function DashboardPage() {
   // ── 手入力データ state ──
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [insightDate, setInsightDate] = useState("");
@@ -339,12 +338,11 @@ export default function DashboardPage() {
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
   const refreshDashboard = async () => {
-    const [loadedPosts, loadedTasks, loadedGoals, loadedInsights, loadedSyncRuns] = await Promise.all([
-      loadPostsData(), loadTasksData(), loadGoalsData(),
+    const [loadedPosts, loadedGoals, loadedInsights, loadedSyncRuns] = await Promise.all([
+      loadPostsData(), loadGoalsData(),
       loadAllInsightData(), loadSyncRunsData()
     ]);
     setPosts(loadedPosts);
-    setTasks(loadedTasks);
     setGoals(loadedGoals);
     setInsightHistory(loadedInsights);
     setSyncRuns(loadedSyncRuns);
@@ -552,13 +550,6 @@ export default function DashboardPage() {
       engagementRate: average(monthlyPosts.map((post) => getMetrics(post).engagementRate))
     };
     const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && goal.accountId == null) ?? goals.find((goal) => goal.month === currentMonthKey) ?? null;
-    const postById = Object.fromEntries(posts.map((post) => [post.id, post]));
-    const targetTasks = tasks;
-    const today = toDateKey(new Date());
-    const openTasks = targetTasks.filter((task) => task.status !== "done");
-    const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < today);
-    const completedTasks = targetTasks.filter((task) => task.status === "done");
-    const completionRate = targetTasks.length ? (completedTasks.length / targetTasks.length) * 100 : 0;
     const dailyViews = Array.from(
       graphPosts.reduce((daily, post) => {
         daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
@@ -577,13 +568,8 @@ export default function DashboardPage() {
       const items = graphPosts.filter((post) => weekdayJa(post.date) === day);
       return { name: day, averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2)) };
     });
-    const taskStatusData = (["todo", "doing", "done"] as const).map((status) => ({
-      name: taskStatusLabels[status],
-      count: targetTasks.filter((task) => task.status === status).length
-    }));
-    const nextTask = [...openTasks].filter((task) => task.dueDate).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
     return {
-      dailyViews, typeData, weekdayData, taskStatusData,
+      dailyViews, typeData, weekdayData,
       saveRank: [...graphPosts].sort((a, b) => b.saves - a.saves).slice(0, 5).map((post) => ({ name: post.date, saves: post.saves })),
       likeRank: [...graphPosts].sort((a, b) => b.likes - a.likes).slice(0, 5).map((post) => ({ name: post.date, likes: post.likes })),
       totalViews: targetPosts.reduce((sum, post) => sum + post.views, 0),
@@ -593,9 +579,6 @@ export default function DashboardPage() {
       bestWeekday: [...weekdayData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
       currentMonthKey, monthlyActual, selectedGoal,
-      taskCount: targetTasks.length, openTaskCount: openTasks.length,
-      overdueTaskCount: overdueTasks.length, completionRate, nextTask,
-      nextTaskPost: nextTask?.postId ? postById[nextTask.postId] : undefined,
       count: targetPosts.length, graphCount: graphPosts.length,
       graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "全期間",
 
@@ -613,7 +596,7 @@ export default function DashboardPage() {
       previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
       previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [effectivePosts, tasks, goals, latestScoreByPostId, graphPeriod, posts]);
+  }, [effectivePosts, goals, latestScoreByPostId, graphPeriod, posts]);
 
   const latestSyncRun = syncRuns[0] ?? null;
   const latestScheduledSyncRun = syncRuns.find((run) => run.triggerType === "scheduled") ?? null;
@@ -967,17 +950,6 @@ export default function DashboardPage() {
             </div>
           </Panel>
 
-          {/* タスク進捗 */}
-          <Panel className="mb-6">
-            <SectionLead eyebrow="Tasks" title="改善タスク進捗" description="進み具合だけでなく、次に手を付ける期限付きタスクもすぐ確認できます。" />
-            <div className="mt-4 grid gap-3 md:grid-cols-4">
-              <Insight label="未完了タスク" value={`${data.openTaskCount}件`} />
-              <Insight label="完了率" value={`${data.completionRate.toFixed(1)}%`} />
-              <Insight label="期限切れ" value={`${data.overdueTaskCount}件`} />
-              <Insight label="次の期限" value={data.nextTask ? `${data.nextTask.dueDate} / ${data.nextTaskPost?.date ?? "投稿未紐づけ"}` : "期限付きタスクなし"} />
-            </div>
-          </Panel>
-
           {/* 目標達成率 */}
           <Panel className="mb-6">
             <SectionLead eyebrow="Goals" title="今月の目標達成率" description="今月の実績と目標値の差を指標ごとに比較します。" />
@@ -1017,9 +989,6 @@ export default function DashboardPage() {
         </ChartPanel>
         <ChartPanel title="投稿タイプ別の平均表示数" description="動画・画像など、形式ごとの平均表示数を比較します。" accent="moss">
           <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageViews" name="平均表示数" fill="#53624a" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="改善タスクの状態別件数" description="未着手、進行中、完了の件数バランスです。" accent="clay">
-          <BarChart data={data.taskStatusData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="count" name="タスク数" fill="#b55d3e" /></BarChart>
         </ChartPanel>
         <ChartPanel title="投稿タイプ別の平均エンゲージメント率" description="反応率が高い投稿形式を比較します。" accent="clay">
           <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageEngagementRate" name="平均エンゲージメント率" fill="#b55d3e" /></BarChart>

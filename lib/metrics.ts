@@ -1,4 +1,4 @@
-import { ImprovementTaskStatus, InstagramPost, PostMetrics, PostType } from "@/lib/types";
+import { InstagramPost, PostMetrics, PostType } from "@/lib/types";
 
 export const postTypeLabels: Record<PostType, string> = {
   image: "画像",
@@ -6,14 +6,6 @@ export const postTypeLabels: Record<PostType, string> = {
   reel: "リール",
   carousel: "カルーセル"
 };
-
-export const taskStatusLabels: Record<ImprovementTaskStatus, string> = {
-  todo: "対応前",
-  doing: "対応中",
-  done: "完了"
-};
-
-export const taskStatusOptions = Object.entries(taskStatusLabels).map(([value, label]) => ({ value: value as ImprovementTaskStatus, label }));
 
 export function getMetrics(post: Pick<InstagramPost, "likes" | "comments" | "saves" | "shares" | "views">): PostMetrics {
   const engagement = post.likes + post.comments + post.saves + post.shares;

@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, loadTasksData, saveMonthlyReportData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, ImprovementTask, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
-import { average, formatPercent, getMetrics, taskStatusLabels } from "@/lib/metrics";
+import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
+import { average, formatPercent, getMetrics } from "@/lib/metrics";
 import { calculateInsightGrowth, InsightGrowthSummary } from "@/lib/insight-growth";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
-  const [tasks, setTasks] = useState<ImprovementTask[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
@@ -30,10 +29,9 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setReportGeneratedAt(new Date().toISOString());
-    Promise.all([loadPostsData(), loadAccountsData(), loadTasksData(), loadGoalsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedTasks, loadedGoals, loadedInsights]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadGoalsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedGoals, loadedInsights]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
-      setTasks(loadedTasks);
       setGoals(loadedGoals);
       setInsightHistory(loadedInsights);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
@@ -70,26 +68,6 @@ export default function ReportsPage() {
     return posts.filter((post) => post.date.startsWith(month)).filter((post) => accountId === "all" || post.accountId === accountId);
   }, [posts, month, accountId]);
 
-  const taskProgress = useMemo(() => {
-    const monthlyPostIds = new Set(monthlyPosts.map((post) => post.id));
-    const targetTasks = tasks
-      .filter((task) => task.dueDate?.startsWith(month))
-      .filter((task) => accountId === "all" || Boolean(task.postId && monthlyPostIds.has(task.postId)));
-    const todo = targetTasks.filter((task) => task.status === "todo").length;
-    const doing = targetTasks.filter((task) => task.status === "doing").length;
-    const done = targetTasks.filter((task) => task.status === "done").length;
-    const overdue = targetTasks.filter((task) => task.status !== "done" && task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10)).length;
-    return {
-      tasks: targetTasks,
-      total: targetTasks.length,
-      todo,
-      doing,
-      done,
-      overdue,
-      completionRate: targetTasks.length ? (done / targetTasks.length) * 100 : 0
-    };
-  }, [tasks, monthlyPosts, month, accountId]);
-
   const selectedGoal = useMemo(() => {
     return goals.find((goal) => goal.month === month && (goal.accountId ?? null) === (accountId === "all" ? null : accountId)) ?? null;
   }, [goals, month, accountId]);
@@ -98,7 +76,6 @@ export default function ReportsPage() {
     const months = fiscalMonths(Number(fiscalYear), fiscalStartMonth);
     const monthSet = new Set(months);
     const annualPosts = posts.filter((post) => monthSet.has(post.date.slice(0, 7))).filter((post) => accountId === "all" || post.accountId === accountId);
-    const annualTasks = tasks.filter((task) => task.dueDate && monthSet.has(task.dueDate.slice(0, 7)));
     const annualGoals = goals.filter((goal) => monthSet.has(goal.month) && (goal.accountId ?? null) === (accountId === "all" ? null : accountId));
     const ranked = [...annualPosts].sort((a, b) => getMetrics(b).engagementRate - getMetrics(a).engagementRate);
     const monthlyRows = months.map((targetMonth) => {
@@ -118,7 +95,6 @@ export default function ReportsPage() {
     return {
       months,
       posts: annualPosts,
-      tasks: annualTasks,
       goals: annualGoals,
       totalPosts: annualPosts.length,
       totalViews: annualPosts.reduce((sum, post) => sum + post.views, 0),
@@ -131,11 +107,9 @@ export default function ReportsPage() {
       monthlyRows,
       targetPosts,
       targetViews,
-      targetSaves,
-      taskTotal: annualTasks.length,
-      taskDone: annualTasks.filter((task) => task.status === "done").length
+      targetSaves
     };
-  }, [posts, tasks, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId]);
+  }, [posts, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId]);
 
   const displayReport = selectedReport ?? report;
 
@@ -275,11 +249,10 @@ export default function ReportsPage() {
             <Stat label="平均保存率" value={formatPercent(annualReport.averageSaveRate)} />
             <Stat label="平均ER" value={formatPercent(annualReport.averageEngagementRate)} />
           </div>
-          <div className="mt-6 grid gap-3 md:grid-cols-4">
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
             <GoalProgress label="投稿数 年度目標" actual={annualReport.totalPosts} target={annualReport.targetPosts} suffix="件" />
             <GoalProgress label="表示数 年度目標" actual={annualReport.totalViews} target={annualReport.targetViews} suffix="" />
             <GoalProgress label="保存数 年度目標" actual={annualReport.totalSaves} target={annualReport.targetSaves} suffix="" />
-            <ProgressCard label="改善タスク完了率" value={annualReport.taskTotal ? `${((annualReport.taskDone / annualReport.taskTotal) * 100).toFixed(1)}%` : "タスクなし"} />
           </div>
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -345,26 +318,6 @@ export default function ReportsPage() {
           <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
           <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
         </div>
-        <Panel className="mt-6">
-          <h2 className="font-semibold">改善タスク進捗</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-5">
-            <ProgressCard label="全タスク" value={`${taskProgress.total}件`} />
-            <ProgressCard label="対応前" value={`${taskProgress.todo}件`} />
-            <ProgressCard label="対応中" value={`${taskProgress.doing}件`} />
-            <ProgressCard label="完了" value={`${taskProgress.done}件`} />
-            <ProgressCard label="完了率" value={`${taskProgress.completionRate.toFixed(1)}%`} />
-          </div>
-          <p className="mt-3 text-sm text-stone-600">期限切れ: {taskProgress.overdue}件</p>
-          <div className="mt-4 grid gap-2">
-            {taskProgress.tasks.slice(0, 8).map((task) => (
-              <div key={task.id} className="rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-sm">
-                <p className="font-semibold">{task.title}</p>
-                <p className="mt-1 text-xs text-stone-600">期限: {task.dueDate || "未設定"} / 状態: {taskStatusLabels[task.status]} / 担当: {task.assignee || "未設定"}</p>
-              </div>
-            ))}
-            {!taskProgress.tasks.length ? <p className="text-sm text-stone-500">対象月の改善タスクはありません。</p> : null}
-          </div>
-        </Panel>
         <Panel className="mt-6">
           <h2 className="font-semibold">AIによる総評</h2>
           <p className="mt-2 text-sm leading-6 text-stone-700">{displayReport.summary}</p>
