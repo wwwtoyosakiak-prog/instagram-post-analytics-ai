@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, Database, FileUp, ListChecks, Sparkles, TrendingUp } from "lucide-react";
+import { CheckCircle2, ClipboardList, Database, ListChecks, RefreshCcw, Sparkles, TrendingUp } from "lucide-react";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
@@ -56,7 +56,7 @@ export default function Home() {
     <div>
       <PageHeader
         title="今日のInstagram運用を確認"
-        description="今月の投稿状況、AIスコアの高い投稿をまとめて確認できます。"
+        description="API同期した投稿の動きと、今見るべき数値をまとめて確認できます。"
       />
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <QuickStat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} tone="plum" />
@@ -75,23 +75,23 @@ export default function Home() {
               icon={<ClipboardList size={17} />}
               title="次に確認すべき投稿"
               body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
-              href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/posts/new"}
+              href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/dashboard"}
             />
           </div>
         </Panel>
         <Panel>
           <h2 className="flex items-center gap-2 font-semibold"><CheckCircle2 size={18} className="text-moss" />運用ステータス</h2>
           <div className="mt-4 grid gap-3 text-sm">
-            <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件登録済み` : "未登録"} active={posts.length > 0} />
+            <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件同期済み` : "未同期"} active={posts.length > 0} />
             <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
             <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー保存" : "ブラウザ保存"} active={serverStorageEnabled} />
-            <StatusRow label="AI接続" value="設定ページで確認" active />
+            <StatusRow label="AI接続" value="分析・提案に利用可能" active />
           </div>
           <div className="mt-5 rounded-md border border-stone-200/80 bg-fog/80 p-3">
-            <p className="text-sm font-semibold">データ保全</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">ブラウザ保存のため、定期的なバックアップがおすすめです。</p>
+            <p className="text-sm font-semibold">同期の基本動線</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">普段はダッシュボードからInstagramデータを同期し、トークン管理ページで期限切れだけ監視すれば運用できます。</p>
             <div className="mt-3">
-              <ButtonLink href="/settings">バックアップ管理</ButtonLink>
+              <ButtonLink href="/token-management">トークン管理を見る</ButtonLink>
             </div>
           </div>
         </Panel>
@@ -121,14 +121,14 @@ export default function Home() {
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <Panel>
-          <FileUp className="mb-4 text-clay" />
-          <h2 className="font-semibold">手入力・CSV登録</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">投稿URL、キャプション、表示数、保存数などを1件ずつ登録できます。CSVでまとめて取り込みも可能です。</p>
+          <RefreshCcw className="mb-4 text-clay" />
+          <h2 className="font-semibold">Instagram API同期</h2>
+          <p className="mt-2 text-sm leading-6 text-stone-600">投稿、表示数、保存数、インサイト履歴はAPI同期を基本に扱います。手入力を前提にしない運用に寄せています。</p>
         </Panel>
         <Panel>
           <Database className="mb-4 text-moss" />
           <h2 className="font-semibold">Supabase保存</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">Supabaseに接続するとデータがサーバーに保存されます。未設定の場合はブラウザ保存で動作します。</p>
+          <p className="mt-2 text-sm leading-6 text-stone-600">同期した投稿履歴、インサイト履歴、トークン更新履歴をまとめて保存します。継続運用の土台として使います。</p>
         </Panel>
         <Panel>
           <Sparkles className="mb-4 text-amber-700" />

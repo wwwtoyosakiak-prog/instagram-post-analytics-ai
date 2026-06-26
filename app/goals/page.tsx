@@ -2,39 +2,34 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
-import { addGoalData, deleteGoalData, loadAccountsData, loadGoalsData, loadPostsData, updateGoalData } from "@/lib/cloud-storage";
-import { InstagramAccount, InstagramPost, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
+import { addGoalData, deleteGoalData, loadGoalsData, loadPostsData, updateGoalData } from "@/lib/cloud-storage";
+import { InstagramPost, MonthlyGoal, MonthlyGoalInput } from "@/lib/types";
 import { average, getMetrics } from "@/lib/metrics";
 
 export default function GoalsPage() {
-  const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
-  const [accountId, setAccountId] = useState("all");
   const [month, setMonth] = useState(currentMonth());
   const [form, setForm] = useState<MonthlyGoalInput>(emptyGoal(currentMonth(), null));
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([loadAccountsData(), loadPostsData(), loadGoalsData()]).then(([loadedAccounts, loadedPosts, loadedGoals]) => {
-      setAccounts(loadedAccounts);
+    Promise.all([loadPostsData(), loadGoalsData()]).then(([loadedPosts, loadedGoals]) => {
       setPosts(loadedPosts);
       setGoals(loadedGoals);
     });
   }, []);
 
   const selectedGoal = useMemo(() => {
-    const selectedAccountId = accountId === "all" ? null : accountId;
-    return goals.find((goal) => goal.month === month && (goal.accountId ?? null) === selectedAccountId) ?? null;
-  }, [goals, accountId, month]);
+    return goals.find((goal) => goal.month === month) ?? null;
+  }, [goals, month]);
 
   useEffect(() => {
-    const selectedAccountId = accountId === "all" ? null : accountId;
-    setForm(selectedGoal ? toInput(selectedGoal) : emptyGoal(month, selectedAccountId));
-  }, [selectedGoal, accountId, month]);
+    setForm(selectedGoal ? toInput(selectedGoal) : emptyGoal(month, null));
+  }, [selectedGoal, month]);
 
   const actual = useMemo(() => {
-    const targetPosts = posts.filter((post) => post.date.startsWith(month)).filter((post) => accountId === "all" || post.accountId === accountId);
+    const targetPosts = posts.filter((post) => post.date.startsWith(month));
     return {
       posts: targetPosts.length,
       views: targetPosts.reduce((sum, post) => sum + post.views, 0),
@@ -42,11 +37,11 @@ export default function GoalsPage() {
       saveRate: average(targetPosts.map((post) => getMetrics(post).saveRate)),
       engagementRate: average(targetPosts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [posts, month, accountId]);
+  }, [posts, month]);
 
   const saveGoal = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const input = normalizeGoal({ ...form, month, accountId: accountId === "all" ? null : accountId });
+    const input = normalizeGoal({ ...form, month, accountId: null });
     const saved = selectedGoal ? await updateGoalData(selectedGoal.id, input) : await addGoalData(input);
     if (!saved) {
       setMessage("目標を保存できませんでした。設定を確認してください。");
@@ -68,19 +63,10 @@ export default function GoalsPage() {
     <div>
       <PageHeader title="目標管理" description="月間投稿数、表示数、保存数、平均保存率、平均ERの目標を設定し、達成率を確認します。" />
       <Panel className="mb-6">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-1">
           <div>
             <label>対象月</label>
             <input className="mt-1" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-          </div>
-          <div>
-            <label>アカウント</label>
-            <select className="mt-1" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-              <option value="all">すべて</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
-            </select>
           </div>
         </div>
       </Panel>
@@ -120,18 +106,16 @@ export default function GoalsPage() {
           <h2 className="font-semibold">保存済み目標</h2>
           <div className="mt-4 grid gap-2">
             {goals.slice(0, 12).map((goal) => {
-              const account = goal.accountId ? accounts.find((item) => item.id === goal.accountId)?.name ?? "不明なアカウント" : "すべて";
               return (
                 <button
                   key={goal.id}
                   type="button"
                   onClick={() => {
-                    setAccountId(goal.accountId ?? "all");
                     setMonth(goal.month);
                   }}
                   className="rounded-md border border-stone-200 bg-white/80 px-3 py-3 text-left hover:border-moss"
                 >
-                  <p className="font-semibold">{goal.month} / {account}</p>
+                  <p className="font-semibold">{goal.month}</p>
                   <p className="mt-1 text-sm text-stone-600">投稿 {goal.targetPosts}件 / 表示 {goal.targetViews.toLocaleString()} / 保存 {goal.targetSaves.toLocaleString()}</p>
                 </button>
               );

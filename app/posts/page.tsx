@@ -54,7 +54,7 @@ function toJSTDate(value?: string) {
 function SourceBadge({ source }: { source: MetricSource }) {
   return source === "api"
     ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">手入力</span>;
+    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">補完</span>;
 }
 
 function TypeBadge({ type }: { type: UTypeFilter | null }) {
@@ -179,7 +179,7 @@ export default function PostsPage() {
       });
   }, [unifiedList, typeFilter, sortKey]);
 
-  // ── AI評価（手入力投稿のみ対象） ────────────────────────────
+  // ── AI評価（保存済み投稿が対象） ────────────────────────────
 
   const manualFilteredPosts = useMemo(
     () => filteredList.filter((e) => e.post !== null).map((e) => e.post!),
@@ -232,14 +232,14 @@ export default function PostsPage() {
   if (loading) return <div><PageHeader title="投稿一覧" description="読み込み中..." /></div>;
 
   const apiMatchCount = unifiedList.filter((e) => e.post && e.hasApi).length;
-  const manualOnlyCount = unifiedList.filter((e) => e.post && !e.hasApi).length;
+  const supplementOnlyCount = unifiedList.filter((e) => e.post && !e.hasApi).length;
   const apiOnlyCount = unifiedList.filter((e) => !e.post).length;
 
   return (
     <div>
       <PageHeader
         title="投稿一覧"
-        description={`APIマッチ ${apiMatchCount}件 / 手入力のみ ${manualOnlyCount}件 / APIのみ ${apiOnlyCount}件`}
+        description={`API同期 ${apiMatchCount}件 / 補完データ ${supplementOnlyCount}件 / API履歴のみ ${apiOnlyCount}件`}
       />
 
       {/* AI評価 */}
@@ -248,7 +248,7 @@ export default function PostsPage() {
           <div>
             <h2 className="font-semibold">実投稿のAI評価</h2>
             <p className="mt-1 text-sm leading-6 text-stone-600">
-              手入力投稿をOpenAI APIで評価し、スコア・改善案を保存します。絞り込み結果に連動します。
+              保存済み投稿をOpenAI APIで評価し、スコア・改善案を保存します。絞り込み結果に連動します。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -457,7 +457,7 @@ function UnifiedCard({
   const sourceBadge = (src: MetricSource) =>
     src === "api"
       ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-      : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">手入力</span>;
+      : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">補完</span>;
 
   const body = (
     <>
@@ -484,11 +484,11 @@ function UnifiedCard({
           )}
           {entry.hasApi ? (
             <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-semibold text-blue-700">
-              APIマッチ
+              API同期済み
             </span>
           ) : (
             <span className="rounded-full bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-500">
-              {entry.post ? "手入力のみ" : "APIのみ"}
+              {entry.post ? "補完データ" : "API履歴のみ"}
             </span>
           )}
         </div>

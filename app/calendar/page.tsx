@@ -14,7 +14,6 @@ export default function CalendarPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [accountId, setAccountId] = useState("all");
 
   useEffect(() => {
     Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
@@ -29,9 +28,8 @@ export default function CalendarPage() {
 
   const monthlyPosts = useMemo(() => {
     return posts
-      .filter((post) => accountId === "all" || post.accountId === accountId)
       .filter((post) => post.date.startsWith(month) || (post.recordedDate ?? post.date).startsWith(month));
-  }, [posts, accountId, month]);
+  }, [posts, month]);
 
   const postedThisMonth = useMemo(() => monthlyPosts.filter((post) => post.date.startsWith(month)), [monthlyPosts, month]);
   const recordedThisMonth = useMemo(() => monthlyPosts.filter((post) => (post.recordedDate ?? post.date).startsWith(month)), [monthlyPosts, month]);
@@ -54,19 +52,10 @@ export default function CalendarPage() {
       />
 
       <Panel className="mb-6">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label>表示月</label>
             <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-          </div>
-          <div>
-            <label>アカウント</label>
-            <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-              <option value="all">すべて</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
-            </select>
           </div>
           <div className="rounded-md border border-stone-200 bg-fog p-3">
             <p className="text-xs font-semibold uppercase text-stone-500">見方</p>
@@ -155,7 +144,7 @@ function CalendarItem({ post, accountName, tone, sameDayRecorded = false }: { po
   return (
     <Link href={`/posts/detail?id=${post.id}`} className={`block rounded-md border px-2 py-1 text-xs shadow-sm transition hover:opacity-90 ${toneClass}`}>
       <span className="block font-semibold">{label}</span>
-      <span className="mt-0.5 block truncate opacity-90">{postTypeLabels[post.type]} / {accountName ?? "未選択"}</span>
+      <span className="mt-0.5 block truncate opacity-90">{postTypeLabels[post.type]}{accountName ? ` / ${accountName}` : ""}</span>
     </Link>
   );
 }

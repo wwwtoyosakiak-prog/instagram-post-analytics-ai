@@ -5,12 +5,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Instagram投稿分析AI",
-  description: "手入力・CSV登録でInstagram投稿を分析する運用改善ツール"
+  description: "Instagram Graph APIで同期した投稿を分析する運用改善ツール"
 };
 
 const nav = [
   { href: "/", label: "トップ", icon: Home },
-  { href: "/accounts", label: "アカウント", icon: User },
+  { href: "/accounts", label: "プロフィール", icon: User },
   { href: "/posts", label: "一覧", icon: ListChecks },
   { href: "/calendar", label: "カレンダー", icon: CalendarDays },
   { href: "/goals", label: "目標", icon: Target },

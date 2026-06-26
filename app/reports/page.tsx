@@ -179,19 +179,10 @@ export default function ReportsPage() {
     <div>
       <PageHeader title="月次レポート" description="登録済み投稿を月別に集計し、伸びた投稿と改善が必要な投稿を確認します。" />
       <Panel className="mb-6">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-1">
           <div>
             <label>対象月</label>
             <input className="mt-1" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setFiscalYear(String(getFiscalYear(e.target.value, fiscalStartMonth))); setSelectedReport(null); }} />
-          </div>
-          <div>
-            <label>アカウント</label>
-            <select className="mt-1" value={accountId} onChange={(e) => { setAccountId(e.target.value); setSelectedReport(null); }}>
-              <option value="all">すべて</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
-            </select>
           </div>
         </div>
       </Panel>
@@ -236,7 +227,7 @@ export default function ReportsPage() {
         <Panel className="hidden print:block">
           <p className="text-xs font-semibold uppercase text-clay">Instagram Analytics Report</p>
           <h1 className="mt-2 text-2xl font-bold text-ink">{displayReport.month} 月次レポート</h1>
-          <p className="mt-2 text-sm text-stone-600">対象: {accounts.find((account) => account.id === accountId)?.name ?? "すべて"} / 出力日時: {formatDateTime(reportGeneratedAt)}</p>
+          <p className="mt-2 text-sm text-stone-600">対象: このInstagramアカウント / 出力日時: {formatDateTime(reportGeneratedAt)}</p>
         </Panel>
 
         <Panel className="mb-6">
@@ -329,7 +320,7 @@ export default function ReportsPage() {
       </div>
       <Panel className="mt-6 print-hide">
         <h2 className="font-semibold">過去レポート一覧</h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">同じ月・同じアカウントで保存したレポートを履歴として確認できます。</p>
+        <p className="mt-2 text-sm leading-6 text-stone-600">同じ月に保存したレポートを履歴として確認できます。</p>
         <div className="mt-4 grid gap-2">
           {savedReports.map((saved) => (
             <button
