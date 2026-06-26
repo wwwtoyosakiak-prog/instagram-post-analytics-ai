@@ -73,6 +73,16 @@ export type InstagramAccessTokenStatus =
   | "expired"
   | "refresh_failed";
 
+export type InstagramWarningLevel =
+  | "normal"
+  | "warning_30_days"
+  | "danger_7_days"
+  | "expired";
+
+export type InstagramOperationDomain = "token_management" | "data_sync";
+export type InstagramOperationType = string;
+export type InstagramOperationResult = "success" | "failed" | "skipped";
+
 export type InstagramAccessTokenStorage = {
   provider: string;
   accessToken: string;
@@ -87,12 +97,24 @@ export type InstagramAccessTokenStorage = {
   updatedAt?: string;
 };
 
+export type InstagramOperationLog = {
+  id: string;
+  domain: InstagramOperationDomain;
+  operationType: InstagramOperationType;
+  result: InstagramOperationResult;
+  message: string;
+  errorDetail?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type InstagramAccessTokenRecord = {
   provider: string;
   maskedToken: string;
   source: "database" | "environment" | "missing";
   status: InstagramAccessTokenStatus;
   remainingDays: number | null;
+  daysRemaining: number | null;
   issuedAt?: string | null;
   expiresAt?: string | null;
   lastRefreshedAt?: string | null;
@@ -100,7 +122,15 @@ export type InstagramAccessTokenRecord = {
   lastError?: string | null;
   lastCheckedAt?: string | null;
   canRefresh: boolean;
+  refreshReason?: string | null;
   refreshBlockedReason?: string | null;
+  warningLevel: InstagramWarningLevel;
+  lastCronRunAt?: string | null;
+  nextCronRunAt?: string | null;
+  lastCronResult?: InstagramOperationResult | null;
+  lastCronMessage?: string | null;
+  lastCronError?: string | null;
+  recentLogs: InstagramOperationLog[];
 };
 
 export type InstagramSyncRun = {

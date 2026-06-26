@@ -7,7 +7,7 @@ export const maxDuration = 60;
 export async function POST() {
   try {
     const result = await refreshInstagramAccessToken("manual");
-    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+    return NextResponse.json(result, { status: result.ok || result.skipped ? 200 : 400 });
   } catch (error) {
     return NextResponse.json(
       { ok: false, refreshed: false, message: error instanceof Error ? error.message : "トークン更新に失敗しました。" },

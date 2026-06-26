@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { getInstagramAccessTokenState, updateInstagramTokenCheckTimestamp } from "@/lib/instagram-token-manager";
+import { recordInstagramTokenStatusCheck } from "@/lib/instagram-token-manager";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await updateInstagramTokenCheckTimestamp();
-    const { state } = await getInstagramAccessTokenState();
+    const state = await recordInstagramTokenStatusCheck();
     return NextResponse.json(state);
   } catch (error) {
     return NextResponse.json(

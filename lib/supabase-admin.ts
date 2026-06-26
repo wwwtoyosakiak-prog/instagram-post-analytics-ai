@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -146,6 +146,17 @@ type InstagramAccessTokenRow = {
   last_checked_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type InstagramOperationLogRow = {
+  id: string;
+  domain: InstagramOperationDomain;
+  operation_type: InstagramOperationType;
+  result: InstagramOperationResult;
+  message: string | null;
+  error_detail: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 };
 
 function assertConfigured() {
@@ -350,6 +361,31 @@ function instagramAccessTokenToRow(record: InstagramAccessTokenStorage) {
   };
 }
 
+function mapInstagramOperationLog(row: InstagramOperationLogRow): InstagramOperationLog {
+  return {
+    id: row.id,
+    domain: row.domain,
+    operationType: row.operation_type,
+    result: row.result,
+    message: row.message ?? "",
+    errorDetail: row.error_detail,
+    metadata: row.metadata ?? {},
+    createdAt: row.created_at
+  };
+}
+
+function instagramOperationLogToRow(log: Omit<InstagramOperationLog, "id" | "createdAt"> & { id?: string; createdAt?: string }) {
+  return {
+    id: log.id,
+    domain: log.domain,
+    operation_type: log.operationType,
+    result: log.result,
+    message: log.message,
+    error_detail: log.errorDetail ?? null,
+    metadata: log.metadata ?? {},
+    created_at: log.createdAt
+  };
+}
 
 function analysisToRow(postId: string, analysis: AiAnalysis, scoreDelta: number | null) {
   return {
@@ -603,6 +639,28 @@ export async function upsertInstagramAccessTokenInSupabase(record: InstagramAcce
     body: JSON.stringify(instagramAccessTokenToRow(record))
   });
   return rows[0] ? mapInstagramAccessToken(rows[0]) : null;
+}
+
+export async function createInstagramOperationLogInSupabase(log: Omit<InstagramOperationLog, "id" | "createdAt"> & { id?: string; createdAt?: string }) {
+  const rows = await supabaseRequest<InstagramOperationLogRow[]>("instagram_operation_logs", {
+    method: "POST",
+    body: JSON.stringify(instagramOperationLogToRow(log))
+  });
+  return rows[0] ? mapInstagramOperationLog(rows[0]) : null;
+}
+
+export async function listInstagramOperationLogsFromSupabase(domain?: InstagramOperationDomain, limit = 20) {
+  const filters = ["select=*", "order=created_at.desc", `limit=${limit}`];
+  if (domain) filters.push(`domain=eq.${encodeURIComponent(domain)}`);
+  const rows = await supabaseRequest<InstagramOperationLogRow[]>(`instagram_operation_logs?${filters.join("&")}`);
+  return rows.map(mapInstagramOperationLog);
+}
+
+export async function getLatestInstagramOperationLogFromSupabase(domain: InstagramOperationDomain, operationType: InstagramOperationType) {
+  const rows = await supabaseRequest<InstagramOperationLogRow[]>(
+    `instagram_operation_logs?domain=eq.${encodeURIComponent(domain)}&operation_type=eq.${encodeURIComponent(operationType)}&select=*&order=created_at.desc&limit=1`
+  );
+  return rows[0] ? mapInstagramOperationLog(rows[0]) : null;
 }
 
 export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {
