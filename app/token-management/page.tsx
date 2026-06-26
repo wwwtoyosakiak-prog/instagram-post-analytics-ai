@@ -42,6 +42,10 @@ function getNextRefreshLabel(token: InstagramAccessTokenRecord | null) {
   return "更新後に計算";
 }
 
+function isRefreshCooldownReason(reason?: string | null) {
+  return Boolean(reason?.includes("24時間経過していない"));
+}
+
 export default function TokenManagementPage() {
   const [token, setToken] = useState<InstagramAccessTokenRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +91,9 @@ export default function TokenManagementPage() {
     }
   };
 
+  const isCooldownBlocked = isRefreshCooldownReason(token?.refreshBlockedReason);
+  const showBlockedReason = !loading && token?.refreshBlockedReason && !(message && isCooldownBlocked);
+
   return (
     <div>
       <PageHeader
@@ -112,8 +119,8 @@ export default function TokenManagementPage() {
           <Field label="最終更新日時">{formatDateTime(token?.lastRefreshedAt)}</Field>
           <Field label="最終確認日時">{formatDateTime(token?.lastCheckedAt)}</Field>
         </div>
-        {!loading && token?.refreshBlockedReason ? (
-          <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        {showBlockedReason ? (
+          <div className={`mt-5 rounded-md px-4 py-3 text-sm ${isCooldownBlocked ? "border border-sky-200 bg-sky-50 text-sky-900" : "border border-amber-200 bg-amber-50 text-amber-900"}`}>
             {token.refreshBlockedReason}
           </div>
         ) : null}
