@@ -49,10 +49,10 @@ function getNextRefreshAt(expiresAt: Date) {
 
 function computeStatus(storage: InstagramAccessTokenStorage | null, source: "database" | "environment" | "missing"): InstagramAccessTokenStatus {
   if (source === "missing") return "missing";
+  if (!storage?.expiresAt) return "environment_only";
   const expiresAt = storage?.expiresAt ? new Date(storage.expiresAt).getTime() : null;
   if (expiresAt != null && expiresAt <= Date.now()) return "expired";
   if (storage?.status === "refresh_failed") return "refresh_failed";
-  if (storage?.status === "environment_only" && expiresAt == null) return "environment_only";
   const remainingDays = getRemainingDays(storage?.expiresAt);
   if (remainingDays != null && remainingDays < REFRESH_THRESHOLD_DAYS) return "expiring_soon";
   if (source === "environment") return "environment_only";

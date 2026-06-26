@@ -14,7 +14,7 @@ type RefreshResponse = {
 
 const statusLabels: Record<InstagramAccessTokenRecord["status"], string> = {
   missing: "未設定",
-  environment_only: "環境変数のみ",
+  environment_only: "初回更新待ち",
   active: "正常",
   expiring_soon: "期限が近い",
   expired: "期限切れ",
@@ -22,8 +22,24 @@ const statusLabels: Record<InstagramAccessTokenRecord["status"], string> = {
 };
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "未記録";
+  if (!value) return "初回更新後に表示";
   return new Date(value).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+}
+
+function getRemainingDaysLabel(token: InstagramAccessTokenRecord | null) {
+  if (!token) return "読込中";
+  if (token.remainingDays != null) return `${token.remainingDays}日`;
+  if (token.status === "environment_only") return "初回更新待ち";
+  if (token.status === "missing") return "未設定";
+  return "更新後に表示";
+}
+
+function getNextRefreshLabel(token: InstagramAccessTokenRecord | null) {
+  if (!token) return "読込中";
+  if (token.nextRefreshAt) return formatDateTime(token.nextRefreshAt);
+  if (token.status === "environment_only") return "初回更新後に計算";
+  if (token.status === "missing") return "未設定";
+  return "更新後に計算";
 }
 
 export default function TokenManagementPage() {
@@ -81,8 +97,8 @@ export default function TokenManagementPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Stat label="トークン状態" value={token ? statusLabels[token.status] : "読込中"} />
-        <Stat label="残り日数" value={token?.remainingDays != null ? `${token.remainingDays}日` : "不明"} />
-        <Stat label="次回更新予定" value={token?.nextRefreshAt ? formatDateTime(token.nextRefreshAt) : "未計算"} />
+        <Stat label="残り日数" value={getRemainingDaysLabel(token)} />
+        <Stat label="次回更新予定" value={getNextRefreshLabel(token)} />
         <Stat label="保存元" value={token?.source === "database" ? "DB" : token?.source === "environment" ? "環境変数" : "未設定"} />
       </div>
 
