@@ -336,7 +336,6 @@ export default function DashboardPage() {
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
-  const [syncingNow, setSyncingNow] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
@@ -380,43 +379,51 @@ export default function DashboardPage() {
   const handleFullSync = async () => {
     setSyncing(true);
     setSyncMsg('同期中...');
+    setSyncMessage("");
+    setSyncErrorMessage("");
     try {
-      const res = await fetch('/api/instagram/full-sync', { method: 'POST' });
-      const d = await res.json() as { ok: boolean; media_fetched: number; insights_fetched: number; error?: string; type?: string };
-      if (!res.ok || !d.ok) {
-        if (d.type === 'token_expired') setSyncMsg('⚠️ トークンが期限切れです。再連携してください。');
-        else if (d.type === 'permission_denied') setSyncMsg('⚠️ 必要なAPI権限がありません。');
-        else setSyncMsg(`❌ 同期エラー: ${d.error ?? '不明なエラー'}`);
-      } else {
-        await refreshApiData();
-        setSyncMsg(`✅ 完了: 投稿${d.media_fetched}件 / インサイト${d.insights_fetched}件`);
+      const [fullSyncResponse, historySyncResponse] = await Promise.all([
+        fetch('/api/instagram/full-sync', { method: 'POST' }),
+        fetch("/api/instagram/sync", { method: "POST" })
+      ]);
+      const fullSyncData = await fullSyncResponse.json() as { ok: boolean; media_fetched: number; insights_fetched: number; error?: string; type?: string };
+      const historySyncData = await historySyncResponse.json() as {
+        success: boolean;
+        savedPosts: number;
+        savedSnapshots: number;
+        failedPosts: number;
+        error?: string;
+      };
+
+      if (!fullSyncResponse.ok || !fullSyncData.ok) {
+        if (fullSyncData.type === 'token_expired') setSyncMsg('⚠️ トークンが期限切れです。再連携してください。');
+        else if (fullSyncData.type === 'permission_denied') setSyncMsg('⚠️ 必要なAPI権限がありません。');
+        else setSyncMsg(`❌ API同期エラー: ${fullSyncData.error ?? '不明なエラー'}`);
+        return;
       }
-    } catch {
-      setSyncMsg('❌ 通信エラーが発生しました');
+
+      if (!historySyncResponse.ok && historySyncResponse.status !== 207) {
+        throw new Error(historySyncData.error ?? "投稿履歴の保存に失敗しました。");
+      }
+
+      await Promise.all([refreshApiData(), refreshDashboard()]);
+
+      setSyncMsg(`✅ API同期完了: 投稿${fullSyncData.media_fetched}件 / インサイト${fullSyncData.insights_fetched}件`);
+      setSyncMessage(historySyncData.success
+        ? `${historySyncData.savedPosts}件の投稿と${historySyncData.savedSnapshots}件の履歴を保存しました。`
+        : `${historySyncData.savedPosts}件を保存しましたが、${historySyncData.failedPosts}件でエラーが発生しました。`);
+      if (!historySyncData.success) {
+        setSyncErrorMessage("一部の投稿履歴で保存エラーがありました。");
+      }
+    } catch (error) {
+      setSyncMsg('');
+      setSyncErrorMessage(error instanceof Error ? error.message : '❌ 通信エラーが発生しました');
     } finally {
       setSyncing(false);
     }
   };
 
-  // ── 手入力投稿同期 ──
-  const runSyncNow = async () => {
-    setSyncingNow(true);
-    setSyncMessage("");
-    setSyncErrorMessage("");
-    try {
-      const response = await fetch("/api/instagram/sync", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok && response.status !== 207) throw new Error(data.error ?? "同期に失敗しました。");
-      await refreshDashboard();
-      setSyncMessage(data.success
-        ? `${data.savedPosts}件の投稿と${data.savedSnapshots}件の履歴を保存しました。`
-        : `${data.savedPosts}件を保存しましたが、一部でエラーが発生しました。`);
-    } catch (error) {
-      setSyncErrorMessage(error instanceof Error ? error.message : "同期に失敗しました。");
-    } finally {
-      setSyncingNow(false);
-    }
-  };
+  const syncButtonLabel = syncing ? "同期中..." : "Instagramデータを同期";
 
   // ── 統合ロジック ──────────────────────────────────────
 
@@ -719,11 +726,8 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={handleFullSync} disabled={syncing}
               className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-bold disabled:opacity-50 hover:bg-pink-600 transition">
-              {syncing ? '同期中...' : '🔄 Instagram APIを同期'}
+              {syncButtonLabel}
             </button>
-            <Button onClick={runSyncNow} disabled={syncingNow}>
-              {syncingNow ? "同期中..." : "投稿履歴を同期"}
-            </Button>
           </div>
         </div>
         {(syncMsg || syncMessage || syncErrorMessage) && (
