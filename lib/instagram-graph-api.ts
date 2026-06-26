@@ -5,9 +5,9 @@
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
-// Facebook Login トークン（instagram_business_manage_insights スコープ）は
-// graph.facebook.com を使う。Instagram Login トークンは graph.instagram.com。
-const API_MODE = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'facebook_business';
+// Instagram Login トークン（IGAA...）は graph.instagram.com のみ有効。
+// Facebook Business トークンを使う場合は INSTAGRAM_GRAPH_API_MODE=facebook_business を設定。
+const API_MODE = process.env.INSTAGRAM_GRAPH_API_MODE ?? 'instagram_login';
 const BASE = API_MODE === 'instagram_login'
   ? `https://graph.instagram.com/${API_VERSION}`
   : `https://graph.facebook.com/${API_VERSION}`;
@@ -16,7 +16,7 @@ const BASE = API_MODE === 'instagram_login'
 
 export interface IgAccountInfo {
   id: string;
-  username: string;
+  username?: string;
   name: string;
   biography: string;
   profile_picture_url: string;
@@ -24,7 +24,6 @@ export interface IgAccountInfo {
   follows_count: number;
   media_count: number;
   website: string;
-  account_type: string;
 }
 
 export interface IgMedia {
@@ -106,7 +105,14 @@ async function igFetch(url: string): Promise<unknown> {
   if (!res.ok || (json as { error?: { message: string; code: number } }).error) {
     const err = (json as { error?: { message: string; code: number } }).error;
     console.error('[Instagram API Error]', debugUrl, JSON.stringify(err));
-    if (err?.code === 190) throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。', debug_url: debugUrl, raw: err } as ApiError;
+    if (err?.code === 190) {
+      const msg = (err?.message ?? '').toLowerCase();
+      if (msg.includes('parse')) {
+        // "Cannot parse access token" はトークン種別とエンドポイントの不一致（設定ミス）
+        throw { type: 'unknown', message: 'アクセストークンの形式エラーです（parse error）。INSTAGRAM_GRAPH_API_MODE 環境変数またはトークンの種類を確認してください。', debug_url: debugUrl, raw: err } as ApiError;
+      }
+      throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。', debug_url: debugUrl, raw: err } as ApiError;
+    }
     if (err?.code === 10 || err?.code === 200) throw { type: 'permission_denied', message: '必要なAPI権限がありません。', debug_url: debugUrl, raw: err } as ApiError;
     throw { type: 'unknown', message: err?.message ?? 'API エラー', raw: json, debug_url: debugUrl } as ApiError;
   }
@@ -118,7 +124,7 @@ async function igFetch(url: string): Promise<unknown> {
 export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo> {
   const token = getToken();
   const uid = getUid(igUserId);
-  const fields = 'id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website';
+  const fields = 'id,name,biography,profile_picture_url,followers_count,follows_count,media_count,website';
   const url = `${BASE}/${uid}?fields=${fields}&access_token=${token}`;
   const data = await igFetch(url) as IgAccountInfo;
   return data;

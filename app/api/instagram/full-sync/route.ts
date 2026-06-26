@@ -43,15 +43,15 @@ async function handler() {
   try {
     // 1. アカウント情報取得
     const account = await fetchAccountInfo();
-    console.log('[full-sync] account:', account.username, account.id);
-    results.account = { username: account.username, id: account.id };
+    console.log('[full-sync] account:', account.username ?? '(username unavailable)', account.id);
+    results.account = { username: account.username ?? null, id: account.id };
 
     // Supabase に upsert（ig_user_id で一致させる）
     const { data: accountRow, error: accErr } = await db
       .from('instagram_accounts')
       .upsert({
         ig_user_id: account.id,
-        username: account.username,
+        username: account.username ?? null,
         name: account.name,
         biography: account.biography,
         profile_picture_url: account.profile_picture_url,
