@@ -174,6 +174,7 @@ const COMMON_METRICS = [
 const VIDEO_METRICS = [
   ...COMMON_METRICS,
   'ig_reels_avg_watch_time',
+  'ig_reels_video_view_total_time',
 ];
 
 function metricsForType(mediaType: string): string[] {
@@ -204,7 +205,8 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string): Pr
     }
     return result;
   } catch (e) {
-    console.warn(`[fetchMediaInsights] ${mediaId} failed:`, e);
+    const detail = e instanceof Error ? e.message : 'unknown error';
+    console.warn(`[fetchMediaInsights] ${mediaId} failed: ${detail}`);
     return { raw_response: raw ?? e };
   }
 }
