@@ -26,10 +26,35 @@ type ExistingAccountRow = {
   id: string;
 };
 
-export async function POST() {
+function isAuthorizedCronRequest(request: Request) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return { ok: false, status: 500, message: 'CRON_SECRETが設定されていません。' };
+  }
+  const bearer = request.headers.get('authorization');
+  const cronHeader = request.headers.get('x-cron-secret');
+  const providedSecret = bearer?.startsWith('Bearer ') ? bearer.slice(7) : cronHeader;
+  if (providedSecret !== cronSecret) {
+    return { ok: false, status: 401, message: 'CRON_SECRETが一致しません。' };
+  }
+  return { ok: true as const };
+}
+
+export async function POST(request: Request) {
+  const isScheduled = Boolean(request.headers.get('x-cron-secret') || request.headers.get('authorization'));
+  if (isScheduled) {
+    const auth = isAuthorizedCronRequest(request);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.message, type: 'unauthorized' }, { status: auth.status });
+    }
+  }
   return handler();
 }
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = isAuthorizedCronRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, error: auth.message, type: 'unauthorized' }, { status: auth.status });
+  }
   return handler();
 }
 

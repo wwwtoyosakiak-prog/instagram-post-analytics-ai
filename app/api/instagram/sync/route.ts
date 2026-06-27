@@ -578,9 +578,37 @@ async function handler(triggerType: SyncTriggerType) {
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
+    const now = new Date().toISOString();
+    await safeSaveSyncRun({
+      triggerType: "scheduled",
+      status: "failed",
+      startedAt: now,
+      finishedAt: now,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "unknown",
+      errorSummary: "CRON_SECRETが設定されていません。",
+      errors: [{ stage: "auth", message: "CRON_SECRETが設定されていません。" }]
+    });
     return NextResponse.json({ error: "CRON_SECRETが設定されていません。" }, { status: 500 });
   }
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    const now = new Date().toISOString();
+    await safeSaveSyncRun({
+      triggerType: "scheduled",
+      status: "failed",
+      startedAt: now,
+      finishedAt: now,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "unknown",
+      errorSummary: "CRON_SECRETが一致しません。",
+      errors: [{ stage: "auth", message: "CRON_SECRETが一致しません。" }]
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return handler("scheduled");

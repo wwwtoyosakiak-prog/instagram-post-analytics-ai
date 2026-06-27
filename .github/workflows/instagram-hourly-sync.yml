@@ -13,8 +13,8 @@ jobs:
       - name: Call full-sync API
         run: |
           RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
-            -X POST "${{ secrets.VERCEL_URL }}/api/instagram/full-sync" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+            -X GET "${{ secrets.VERCEL_URL }}/api/instagram/full-sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           echo "HTTP Status: $RESPONSE"
           cat /tmp/response.json
           if [ "$RESPONSE" -eq 401 ]; then
