@@ -1031,7 +1031,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="font-semibold">時間別の閲覧数変化</h2>
-            <p className="mt-1 text-sm text-stone-600">1日6回の定期同期で保存したインサイトを、選択日の時間帯ごとに表示します。</p>
+            <p className="mt-1 text-sm text-stone-600">1日4回の定期同期で保存したインサイトを、選択日の時間帯ごとに表示します。</p>
           </div>
           <div className="w-full sm:w-52">
             <label htmlFor="insight-date">表示する日</label>
