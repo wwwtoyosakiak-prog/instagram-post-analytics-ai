@@ -67,6 +67,18 @@ const fmtSec = (ms: number | null | undefined) => {
   return `${Math.floor(s / 60)}分${s % 60}秒`;
 };
 
+const fmtApiMetric = (v: number | null | undefined) =>
+  v == null ? 'API未返却' : v.toLocaleString('ja-JP');
+
+const fmtApiPct = (v: number | null | undefined) =>
+  v == null ? 'API未返却' : `${v.toFixed(2)}%`;
+
+const fmtApiSec = (ms: number | null | undefined) => {
+  if (ms == null) return 'API未返却';
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}分${s % 60}秒`;
+};
+
 // ── メトリクスカード ──────────────────────────────────────
 
 function MetricCard({
@@ -309,8 +321,8 @@ function ReelInsightsContent() {
           <MetricCard label="保存数" value={fmt(latest?.saved)} highlight />
           <MetricCard label="シェア数" value={fmt(latest?.shares)} highlight />
           <MetricCard label="合計インタラクション" value={fmt(latest?.total_interactions)} />
-          <MetricCard label="フォロー数" value={fmt(latest?.follows)} />
-          <MetricCard label="プロフィールアクセス" value={fmt(latest?.profile_visits)} />
+          <MetricCard label="フォロー数" value={fmtApiMetric(latest?.follows)} sub={latest?.follows == null ? "API対象ですが、この投稿では返っていません" : undefined} />
+          <MetricCard label="プロフィールアクセス" value={fmtApiMetric(latest?.profile_visits)} sub={latest?.profile_visits == null ? "API対象ですが、この投稿では返っていません" : undefined} />
         </div>
       </section>
 
@@ -323,8 +335,8 @@ function ReelInsightsContent() {
           <MetricCard label="保存率 (saved/views)" value={fmtPct(saveRate)} highlight />
           <MetricCard label="シェア率 (shares/views)" value={fmtPct(shareRate)} highlight />
           <MetricCard label="エンゲージメント率 (total/reach)" value={fmtPct(engRate)} />
-          <MetricCard label="フォロー転換率 (follows/reach)" value={fmtPct(followRate)} />
-          <MetricCard label="プロフィールアクセス率" value={fmtPct(profileRate)} />
+          <MetricCard label="フォロー転換率 (follows/reach)" value={fmtApiPct(followRate)} sub={followRate == null ? "元データがAPI未返却です" : undefined} />
+          <MetricCard label="プロフィールアクセス率" value={fmtApiPct(profileRate)} sub={profileRate == null ? "元データがAPI未返却です" : undefined} />
         </div>
       </section>
 
@@ -334,23 +346,25 @@ function ReelInsightsContent() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <MetricCard
             label="平均再生時間"
-            value={fmtSec(latest?.ig_reels_avg_watch_time)}
+            value={fmtApiSec(latest?.ig_reels_avg_watch_time)}
             sub="ig_reels_avg_watch_time"
           />
           <MetricCard
             label="総再生時間"
-            value={fmtSec(latest?.ig_reels_video_view_total_time)}
+            value={fmtApiSec(latest?.ig_reels_video_view_total_time)}
             sub="ig_reels_video_view_total_time"
           />
-          <MetricCard label="動画の長さ" value="APIでは取得不可" />
-          <MetricCard label="平均視聴維持率" value="APIでは取得不可" sub="動画の長さ不明のため" />
+          <MetricCard label="動画の長さ" value="API対象外" sub="Instagram APIでは返りません" />
+          <MetricCard label="平均視聴維持率" value="API対象外" sub="動画長が返らないため計算不可" />
         </div>
         <div className="mt-3 p-4 bg-gray-50 rounded-xl text-sm text-gray-600 space-y-1">
-          <p className="font-bold">📌 APIで取得不可な項目</p>
-          <p>• スキップ率 — 未取得</p>
-          <p>• 再投稿率 — 未取得</p>
-          <p>• 秒ごとの視聴維持率グラフ — APIでは取得不可</p>
-          <p>• 閲覧数の上位ソース（リールタブ/発見タブ） — APIでは取得不可</p>
+          <p className="font-bold">📌 表示の見方</p>
+          <p>• API未返却 — 取得対象ですが、この投稿ではAPIが値を返していません</p>
+          <p>• API対象外 — Instagram APIの仕様上取得できません</p>
+          <p>• スキップ率 — API対象外</p>
+          <p>• 再投稿率 — API対象外</p>
+          <p>• 秒ごとの視聴維持率グラフ — API対象外</p>
+          <p>• 閲覧数の上位ソース（リールタブ/発見タブ） — API対象外</p>
         </div>
       </section>
 
