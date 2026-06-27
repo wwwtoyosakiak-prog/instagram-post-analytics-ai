@@ -1,9 +1,9 @@
-name: Instagram full sync (hourly)
+name: Instagram scheduled sync
 
 on:
   schedule:
-    # 毎時5分に実行（UTC）= 日本時間 毎時14分
-    - cron: '5 * * * *'
+    # 1日6回（UTC）= 日本時間 01:17 / 05:17 / 09:17 / 13:17 / 17:17 / 21:17
+    - cron: '17 16,20,0,4,8,12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -30,3 +30,15 @@ jobs:
             exit 1
           fi
           echo "同期完了"
+      - name: Call snapshot sync API
+        run: |
+          RESPONSE=$(curl -s -o /tmp/snapshot-response.json -w "%{http_code}" \
+            -X GET "${{ secrets.VERCEL_URL }}/api/instagram/sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP Status: $RESPONSE"
+          cat /tmp/snapshot-response.json
+          if [ "$RESPONSE" -ne 200 ] && [ "$RESPONSE" -ne 207 ]; then
+            echo "::error::履歴同期APIエラー: HTTP $RESPONSE"
+            exit 1
+          fi
+          echo "履歴同期完了"

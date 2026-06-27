@@ -261,19 +261,41 @@ function filterPostsByPeriod(posts: InstagramPost[], period: "7" | "30" | "90" |
 }
 
 function getNextScheduledSyncTime(now: Date) {
-  const next = new Date(now);
+  const slots = [1, 5, 9, 13, 17, 21];
+  const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const next = new Date(jstNow);
   next.setSeconds(0, 0);
-  if (next.getMinutes() >= 17) next.setHours(next.getHours() + 1);
-  next.setMinutes(17, 0, 0);
-  return next;
+
+  const currentMinutes = next.getHours() * 60 + next.getMinutes();
+  const nextSlot = slots.find((hour) => currentMinutes < (hour * 60 + 17));
+
+  if (typeof nextSlot === "number") {
+    next.setHours(nextSlot, 17, 0, 0);
+  } else {
+    next.setDate(next.getDate() + 1);
+    next.setHours(slots[0], 17, 0, 0);
+  }
+
+  return new Date(next.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 }
 
 function getLatestExpectedScheduledTime(now: Date) {
-  const expected = new Date(now);
+  const slots = [1, 5, 9, 13, 17, 21];
+  const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const expected = new Date(jstNow);
   expected.setSeconds(0, 0);
-  expected.setMinutes(17, 0, 0);
-  if (now.getMinutes() < 17) expected.setHours(expected.getHours() - 1);
-  return expected;
+
+  const currentMinutes = expected.getHours() * 60 + expected.getMinutes();
+  const pastSlots = slots.filter((hour) => currentMinutes >= (hour * 60 + 17));
+
+  if (pastSlots.length) {
+    expected.setHours(pastSlots[pastSlots.length - 1], 17, 0, 0);
+  } else {
+    expected.setDate(expected.getDate() - 1);
+    expected.setHours(slots[slots.length - 1], 17, 0, 0);
+  }
+
+  return new Date(expected.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 }
 
 function getSyncMonitor(now: Date, latestScheduledFinishedAt?: string) {
@@ -626,10 +648,10 @@ export default function DashboardPage() {
     if (!latestScheduledSyncRun && latestSyncRun?.triggerType === "manual") {
       return {
         action: "GitHub Actions と CRON_SECRET の一致確認を優先してください。",
-        title: "手動同期は動いていますが、自動同期だけ記録されていません",
+        title: "手動同期は動いていますが、定期同期だけ記録されていません",
         summary: "Instagram API や保存処理ではなく、自動実行の起動経路に問題がある可能性が高い状態です。",
         checks: [
-          "GitHub Actions の Instagram hourly sync が 20:17 台に実行されているか",
+          "GitHub Actions の Instagram scheduled sync が予定時刻台に実行されているか",
           "GitHub Actions 側の CRON_SECRET が設定されているか",
           "Vercel 側の CRON_SECRET と同じ値になっているか"
         ]
@@ -638,7 +660,7 @@ export default function DashboardPage() {
     if (!latestScheduledSyncRun) {
       return {
         action: "自動同期の起動設定と秘密鍵の設定有無を確認してください。",
-        title: "自動同期の履歴がまだ 1 件もありません",
+        title: "定期同期の履歴がまだ 1 件もありません",
         summary: "GitHub Actions から Vercel の同期 API まで到達できていない可能性があります。",
         checks: [
           "GitHub Actions のワークフローが有効か",
@@ -649,11 +671,11 @@ export default function DashboardPage() {
     }
     return {
       action: "直近の Actions 実行ログと認証設定のずれを確認してください。",
-      title: "前回の自動同期以降、次の定時実行が記録されていません",
-      summary: "前回までは自動同期できていたため、一時的な実行失敗か認証ずれの可能性があります。",
-      checks: [
-        "直近の GitHub Actions 実行ログで curl が失敗していないか",
-        "CRON_SECRET を最近変更していないか",
+        title: "前回の定期同期以降、次の予定実行が記録されていません",
+        summary: "前回までは自動同期できていたため、一時的な実行失敗か認証ずれの可能性があります。",
+        checks: [
+          "直近の GitHub Actions 実行ログで curl が失敗していないか",
+          "CRON_SECRET を最近変更していないか",
         "Vercel 側のデプロイ後に環境変数が反映されているか"
       ]
     };
@@ -1009,7 +1031,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="font-semibold">時間別の閲覧数変化</h2>
-            <p className="mt-1 text-sm text-stone-600">自動同期で保存したインサイトを、選択日の1時間ごとに表示します。</p>
+            <p className="mt-1 text-sm text-stone-600">1日6回の定期同期で保存したインサイトを、選択日の時間帯ごとに表示します。</p>
           </div>
           <div className="w-full sm:w-52">
             <label htmlFor="insight-date">表示する日</label>

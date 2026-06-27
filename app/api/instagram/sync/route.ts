@@ -171,14 +171,47 @@ async function getLatestScheduledSyncRun() {
   return rows[0]?.finished_at ?? null;
 }
 
+const SCHEDULED_SYNC_HOURS_JST = [1, 5, 9, 13, 17, 21];
+const SCHEDULED_SYNC_MINUTE_JST = 17;
+
+function getJstParts(date: Date) {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(date).map((part) => [part.type, part.value])
+  );
+}
+
 function getCurrentScheduledSlotStart(now: Date) {
-  const slot = new Date(now);
-  slot.setSeconds(0, 0);
-  slot.setMinutes(17, 0, 0);
-  if (now.getMinutes() < 17) {
-    slot.setHours(slot.getHours() - 1);
+  const jst = getJstParts(now);
+  const hour = Number(jst.hour);
+  const minute = Number(jst.minute);
+  let slotHour = SCHEDULED_SYNC_HOURS_JST[0];
+  let offsetDays = 0;
+
+  for (const candidate of SCHEDULED_SYNC_HOURS_JST) {
+    if (hour > candidate || (hour === candidate && minute >= SCHEDULED_SYNC_MINUTE_JST)) {
+      slotHour = candidate;
+    } else {
+      break;
+    }
   }
-  return slot;
+
+  if (hour < SCHEDULED_SYNC_HOURS_JST[0] || (hour === SCHEDULED_SYNC_HOURS_JST[0] && minute < SCHEDULED_SYNC_MINUTE_JST)) {
+    slotHour = SCHEDULED_SYNC_HOURS_JST[SCHEDULED_SYNC_HOURS_JST.length - 1];
+    offsetDays = -1;
+  }
+
+  const base = new Date(`${jst.year}-${jst.month}-${jst.day}T00:00:00+09:00`);
+  base.setDate(base.getDate() + offsetDays);
+  base.setHours(slotHour, SCHEDULED_SYNC_MINUTE_JST, 0, 0);
+  return base;
 }
 
 function hasRunForScheduledSlot(latestScheduledFinishedAt: string | null, slotStart: Date) {
