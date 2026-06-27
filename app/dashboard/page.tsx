@@ -261,7 +261,7 @@ function filterPostsByPeriod(posts: InstagramPost[], period: "7" | "30" | "90" |
 }
 
 function getNextScheduledSyncTime(now: Date) {
-  const slots = [1, 5, 9, 13, 17, 21];
+  const slots = [5, 11, 17, 23];
   const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const next = new Date(jstNow);
   next.setSeconds(0, 0);
@@ -280,7 +280,7 @@ function getNextScheduledSyncTime(now: Date) {
 }
 
 function getLatestExpectedScheduledTime(now: Date) {
-  const slots = [1, 5, 9, 13, 17, 21];
+  const slots = [5, 11, 17, 23];
   const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const expected = new Date(jstNow);
   expected.setSeconds(0, 0);
