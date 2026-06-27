@@ -347,12 +347,10 @@ function ReelInsightsContent() {
           <MetricCard
             label="平均再生時間"
             value={fmtApiSec(latest?.ig_reels_avg_watch_time)}
-            sub="ig_reels_avg_watch_time"
           />
           <MetricCard
             label="総再生時間"
             value={fmtApiSec(latest?.ig_reels_video_view_total_time)}
-            sub="ig_reels_video_view_total_time"
           />
           <MetricCard label="動画の長さ" value="API対象外" sub="Instagram APIでは返りません" />
           <MetricCard label="平均視聴維持率" value="API対象外" sub="動画長が返らないため計算不可" />
