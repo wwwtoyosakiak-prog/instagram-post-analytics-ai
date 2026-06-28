@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { User } from "lucide-react";
-import { ButtonLink, PageHeader, Panel } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { loadAccountsData } from "@/lib/cloud-storage";
 import { InstagramAccount } from "@/lib/types";
 
@@ -63,7 +63,7 @@ export default function AccountPage() {
 
   return (
     <div>
-      <PageHeader title="プロフィール" description="連携中のInstagramプロフィールと、この運用で使う設定情報をまとめて確認できます。" />
+      <PageHeader title="プロフィール" description="連携中のInstagramプロフィールとAPI同期済み情報を確認できます。" />
 
       {/* プロフィールカード */}
       <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
@@ -144,28 +144,6 @@ export default function AccountPage() {
           フォロワー数・プロフィール画像・bioを表示するには、ダッシュボードからInstagramデータを同期してください。
         </div>
       )}
-
-      <Panel className="mt-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="font-semibold">連携設定</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              一アカウント運用のため、プロフィールと設定はこのページにまとめています。
-            </p>
-          </div>
-          <ButtonLink href="/token-management">トークン管理を開く</ButtonLink>
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <Field label="アカウント名" value={account?.name || graphAccount?.name || "未設定"} />
-          <Field label="ユーザー名" value={displayUsername ? `@${displayUsername}` : "未設定"} />
-          <Field label="プロフィールURL" value={account?.profileUrl || graphAccount?.website || "未設定"} className="md:col-span-2" />
-          <Field label="Instagram APIユーザー名" value={account?.instagramApiUsername || graphAccount?.username || "未設定"} />
-          <div className="rounded-md border border-stone-200 bg-fog/80 p-4 text-sm leading-6 text-stone-600 md:col-span-2">
-            新規アカウント登録や追加作成は行いません。認証や自動同期の確認はトークン管理ページで行います。
-          </div>
-        </div>
-      </Panel>
     </div>
   );
 }
@@ -175,17 +153,6 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="text-center">
       <p className="text-xl font-bold text-stone-900 leading-tight">{value}</p>
       <p className="mt-0.5 text-xs text-stone-500">{label}</p>
-    </div>
-  );
-}
-
-function Field({ label, value, className = "" }: { label: string; value: string; className?: string }) {
-  return (
-    <div className={className}>
-      <p className="mb-2 text-sm font-semibold text-stone-700">{label}</p>
-      <div className="rounded-md border border-stone-200 bg-white px-4 py-3 text-base text-ink">
-        {value}
-      </div>
     </div>
   );
 }
