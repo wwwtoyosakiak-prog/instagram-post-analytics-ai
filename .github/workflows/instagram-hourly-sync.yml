@@ -10,11 +10,37 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve Vercel base URL
+        run: |
+          BASE_URL="${{ secrets.VERCEL_URL }}"
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::VERCEL_URL が未設定です。"
+            exit 1
+          fi
+
+          case "$BASE_URL" in
+            http://*|https://*) ;;
+            *) BASE_URL="https://$BASE_URL" ;;
+          esac
+
+          BASE_URL="${BASE_URL%/}"
+          echo "BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+          echo "Using scheduled sync target: $BASE_URL"
+
       - name: Call full-sync API
         run: |
-          RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
-            -X GET "${{ secrets.VERCEL_URL }}/api/instagram/full-sync" \
+          set +e
+          RESPONSE=$(curl -sS --connect-timeout 15 --max-time 60 -o /tmp/response.json -w "%{http_code}" \
+            -X GET "$BASE_URL/api/instagram/full-sync" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::同期APIへの接続に失敗しました。curl exit code: $CURL_EXIT"
+            exit 1
+          fi
+
           echo "HTTP Status: $RESPONSE"
           cat /tmp/response.json
           if [ "$RESPONSE" -eq 401 ]; then
@@ -32,9 +58,18 @@ jobs:
           echo "同期完了"
       - name: Call snapshot sync API
         run: |
-          RESPONSE=$(curl -s -o /tmp/snapshot-response.json -w "%{http_code}" \
-            -X GET "${{ secrets.VERCEL_URL }}/api/instagram/sync" \
+          set +e
+          RESPONSE=$(curl -sS --connect-timeout 15 --max-time 60 -o /tmp/snapshot-response.json -w "%{http_code}" \
+            -X GET "$BASE_URL/api/instagram/sync" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::履歴同期APIへの接続に失敗しました。curl exit code: $CURL_EXIT"
+            exit 1
+          fi
+
           echo "HTTP Status: $RESPONSE"
           cat /tmp/snapshot-response.json
           if [ "$RESPONSE" -ne 200 ] && [ "$RESPONSE" -ne 207 ]; then
