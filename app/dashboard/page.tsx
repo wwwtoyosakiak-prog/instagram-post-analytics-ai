@@ -627,14 +627,12 @@ export default function DashboardPage() {
   const pastSyncError = showPastSyncError ? latestSyncError : null;
   const syncMonitor = useMemo(() => getSyncMonitor(new Date(), latestScheduledSyncRun?.finishedAt), [latestScheduledSyncRun?.finishedAt]);
   const latestSyncFinishedAt = latestSyncRun ? new Date(latestSyncRun.finishedAt) : null;
-  const latestSyncAgeMs = latestSyncFinishedAt ? Date.now() - latestSyncFinishedAt.getTime() : Number.POSITIVE_INFINITY;
-  const hasFreshTodaySync = Boolean(
-    latestSyncRun?.status === "success" && latestSyncFinishedAt &&
-    toTokyoDateKey(latestSyncFinishedAt) === data.todayKey && latestSyncAgeMs <= 2 * 60 * 60 * 1000
-  );
   const showTodayMissingAlert = Boolean(
-    hasFreshTodaySync && !syncMonitor.isDelayed &&
-    data.todayPosts.length === 0 && new Date().getHours() >= 12
+    latestSyncRun?.status === "partial" &&
+    latestSyncFinishedAt &&
+    toTokyoDateKey(latestSyncFinishedAt) === data.todayKey &&
+    !syncMonitor.isDelayed &&
+    data.todayPosts.length === 0
   );
   const syncStatusValue = syncMonitor.isDelayed
     ? "同期遅延"
