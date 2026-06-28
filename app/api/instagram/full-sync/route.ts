@@ -14,6 +14,7 @@ import {
   type ApiError,
 } from '@/lib/instagram-graph-api';
 import { createClient } from '@supabase/supabase-js';
+import type { InstagramSyncRun } from '@/lib/types';
 
 function supabase() {
   const url = process.env.SUPABASE_URL;
@@ -40,26 +41,85 @@ function isAuthorizedCronRequest(request: Request) {
   return { ok: true as const };
 }
 
+type SyncTriggerType = "manual" | "scheduled";
+
+async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
+  const db = supabase();
+  await db.from('instagram_sync_runs').insert({
+    trigger_type: run.triggerType,
+    status: run.status,
+    started_at: run.startedAt,
+    finished_at: run.finishedAt,
+    fetched_posts: run.fetchedPosts,
+    saved_posts: run.savedPosts,
+    saved_snapshots: run.savedSnapshots,
+    failed_posts: run.failedPosts,
+    api_mode: run.apiMode,
+    account_id: run.accountId ?? null,
+    account_name: run.accountName ?? null,
+    account_username: run.accountUsername ?? null,
+    error_summary: run.errorSummary ?? null,
+    errors: run.errors,
+  });
+}
+
+async function safeSaveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
+  try {
+    await saveScheduledSyncRun(run);
+  } catch (error) {
+    console.error('[full-sync-run-save]', error);
+  }
+}
+
 export async function POST(request: Request) {
   const isScheduled = Boolean(request.headers.get('x-cron-secret') || request.headers.get('authorization'));
   if (isScheduled) {
     const auth = isAuthorizedCronRequest(request);
     if (!auth.ok) {
+      const now = new Date().toISOString();
+      await safeSaveScheduledSyncRun({
+        triggerType: "scheduled",
+        status: "failed",
+        startedAt: now,
+        finishedAt: now,
+        fetchedPosts: 0,
+        savedPosts: 0,
+        savedSnapshots: 0,
+        failedPosts: 0,
+        apiMode: "full-sync",
+        errorSummary: auth.message,
+        errors: [{ stage: "auth", message: auth.message }],
+      });
       return NextResponse.json({ ok: false, error: auth.message, type: 'unauthorized' }, { status: auth.status });
     }
   }
-  return handler();
+  return handler(isScheduled ? "scheduled" : "manual");
 }
 export async function GET(request: Request) {
   const auth = isAuthorizedCronRequest(request);
   if (!auth.ok) {
+    const now = new Date().toISOString();
+    await safeSaveScheduledSyncRun({
+      triggerType: "scheduled",
+      status: "failed",
+      startedAt: now,
+      finishedAt: now,
+      fetchedPosts: 0,
+      savedPosts: 0,
+      savedSnapshots: 0,
+      failedPosts: 0,
+      apiMode: "full-sync",
+      errorSummary: auth.message,
+      errors: [{ stage: "auth", message: auth.message }],
+    });
     return NextResponse.json({ ok: false, error: auth.message, type: 'unauthorized' }, { status: auth.status });
   }
-  return handler();
+  return handler("scheduled");
 }
 
-async function handler() {
+async function handler(triggerType: SyncTriggerType) {
   const db = supabase();
+  const startedAt = new Date().toISOString();
   const results = {
     account: null as unknown,
     media_fetched: 0,
@@ -148,6 +208,21 @@ async function handler() {
     if (accErr) {
       console.error('[full-sync] account upsert error:', accErr);
       results.errors.push(`アカウント保存エラー: ${accErr.message}`);
+      if (triggerType === "scheduled") {
+        await safeSaveScheduledSyncRun({
+          triggerType,
+          status: "failed",
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          fetchedPosts: 0,
+          savedPosts: 0,
+          savedSnapshots: 0,
+          failedPosts: 0,
+          apiMode: "full-sync",
+          errorSummary: `アカウント保存エラー: ${accErr.message}`,
+          errors: [{ stage: "account", message: `アカウント保存エラー: ${accErr.message}` }],
+        });
+      }
       return NextResponse.json({ ok: false, ...results }, { status: 500 });
     }
 
@@ -274,11 +349,52 @@ async function handler() {
       console.warn('[full-sync] snapshot exception:', e);
     }
 
+    if (triggerType === "scheduled") {
+      const account = results.account as { username?: string | null; id?: string | null } | null;
+      await safeSaveScheduledSyncRun({
+        triggerType,
+        status: results.errors.length === 0 ? "success" : "partial",
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        fetchedPosts: results.media_fetched,
+        savedPosts: results.media_fetched,
+        savedSnapshots: results.snapshot_saved ? 1 : 0,
+        failedPosts: results.insights_failed,
+        apiMode: "full-sync",
+        accountId: account?.id ?? undefined,
+        accountUsername: account?.username ?? undefined,
+        errorSummary: results.errors[0],
+        errors: results.errors.map((message) => ({ stage: "full-sync", message })),
+      });
+    }
+
     return NextResponse.json({ ok: true, ...results });
 
   } catch (e) {
     const err = e as ApiError;
+    const errMeta = err as ApiError & { code?: number; subcode?: number; trace_id?: string };
     const status = err.type === 'token_expired' ? 401 : err.type === 'permission_denied' ? 403 : 500;
+    if (triggerType === "scheduled") {
+      await safeSaveScheduledSyncRun({
+        triggerType,
+        status: "failed",
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        fetchedPosts: results.media_fetched,
+        savedPosts: 0,
+        savedSnapshots: results.snapshot_saved ? 1 : 0,
+        failedPosts: results.insights_failed,
+        apiMode: "full-sync",
+        errorSummary: err.message ?? String(e),
+        errors: [{
+          stage: err.type ?? 'unknown',
+          message: err.message ?? String(e),
+          code: errMeta.code,
+          subcode: errMeta.subcode,
+          traceId: errMeta.trace_id,
+        }],
+      });
+    }
     return NextResponse.json(
       {
         ok: false,
