@@ -182,12 +182,6 @@ export default function IgMediaListPage() {
                     className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
                     開く
                   </a>
-                  {isVideo && (
-                    <Link href={`/reel-insights?id=${m.id}`}
-                      className="text-xs px-3 py-1.5 bg-pink-500 text-white rounded-lg text-center hover:bg-pink-600">
-                      詳細分析
-                    </Link>
-                  )}
                 </div>
               </div>
             </div>

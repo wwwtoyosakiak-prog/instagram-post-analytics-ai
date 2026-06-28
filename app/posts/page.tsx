@@ -401,14 +401,6 @@ export default function PostsPage() {
                           IG
                         </a>
                       )}
-                      {e.media?.media_type === "VIDEO" && (
-                        <Link
-                          className="text-xs font-semibold text-pink-500 hover:underline"
-                          href={`/reel-insights?id=${e.media.id}`}
-                        >
-                          分析
-                        </Link>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -512,15 +504,6 @@ function UnifiedCard({
             <span className="mt-1 block font-bold text-ink">{formatPercent(entry.er)}</span>
           </div>
         </div>
-        {entry.media?.media_type === "VIDEO" && (
-          <Link
-            href={`/reel-insights?id=${entry.media.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 block rounded-md bg-pink-500 px-3 py-1.5 text-center text-xs font-bold text-white hover:bg-pink-600"
-          >
-            リール詳細分析
-          </Link>
-        )}
       </div>
     </>
   );

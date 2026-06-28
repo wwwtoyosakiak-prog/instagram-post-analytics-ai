@@ -60,8 +60,7 @@ function SummaryCard({ label, value, icon }: { label: string; value: string; ico
 
 function RankRow({ rank, item, value }: { rank: number; item: MediaItem; value: string }) {
   return (
-    <a href={`/reel-insights?id=${item.id}`}
-      className="flex items-center gap-3 py-2 border-b border-gray-100 hover:bg-gray-50 rounded px-2 transition">
+    <div className="flex items-center gap-3 py-2 border-b border-gray-100 rounded px-2">
       <span className="text-sm font-bold text-gray-400 w-5">{rank}</span>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-700 truncate">{item.caption ?? '（キャプションなし）'}</p>
@@ -70,7 +69,7 @@ function RankRow({ rank, item, value }: { rank: number; item: MediaItem; value: 
         </p>
       </div>
       <span className="text-sm font-bold text-pink-500 whitespace-nowrap">{value}</span>
-    </a>
+    </div>
   );
 }
 
