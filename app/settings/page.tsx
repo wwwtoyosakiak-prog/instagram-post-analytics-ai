@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Button, ButtonLink, PageHeader, Panel } from "@/components/ui";
-import { addAccountData, loadAccountsData, updateAccountData } from "@/lib/cloud-storage";
+import { loadAccountsData, updateAccountData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramAccountInput } from "@/lib/types";
 
 const initialAccountForm: InstagramAccountInput = {
@@ -53,17 +53,16 @@ export default function SettingsPage() {
 
   const saveAccount = async (event: FormEvent) => {
     event.preventDefault();
+    if (!account) {
+      setAccountError("既存アカウントが未登録です。新規登録は使わず、既存データを確認してください。");
+      return;
+    }
     setAccountSaving(true);
     setAccountError("");
     const input = { ...accountForm, username: accountForm.username.replace(/^@/, "") };
     try {
-      if (account) {
-        await updateAccountData(account.id, input);
-        setAccountMessage("アカウント情報を更新しました。");
-      } else {
-        await addAccountData(input);
-        setAccountMessage("アカウント情報を登録しました。");
-      }
+      await updateAccountData(account.id, input);
+      setAccountMessage("アカウント情報を更新しました。");
       const accounts = await loadAccountsData();
       if (accounts[0]) setAccount(accounts[0]);
     } catch (caught) {
@@ -100,9 +99,15 @@ export default function SettingsPage() {
           <div className="md:col-span-2 rounded-md border border-stone-200 bg-fog/80 p-4 text-sm leading-6 text-stone-600">
             APIや自動同期の認証情報はトークン管理ページで確認します。OpenAIやバックアップ関連の詳細設定は通常運用では表示しません。
           </div>
-          <div className="md:col-span-2">
-            <Button type="submit" disabled={accountSaving}>{accountSaving ? "保存中..." : account ? "変更を保存" : "登録する"}</Button>
-          </div>
+          {account ? (
+            <div className="md:col-span-2">
+              <Button type="submit" disabled={accountSaving}>{accountSaving ? "保存中..." : "変更を保存"}</Button>
+            </div>
+          ) : (
+            <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              この画面では新規登録を行いません。既存アカウントがある前提で運用します。
+            </div>
+          )}
         </form>
         {accountMessage ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{accountMessage}</p> : null}
         {accountError ? <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm leading-6 text-red-800">{accountError}</p> : null}
