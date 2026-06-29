@@ -66,6 +66,7 @@ export type InstagramInsightSnapshot = {
   profileVisits: number;
   reelAvgWatchTime: number | null;
   reelTotalViewTime: number | null;
+  reelClipsReplaysCount: number | null;
 };
 
 export type InstagramSyncTriggerType = "manual" | "scheduled";

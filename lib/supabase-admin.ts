@@ -82,6 +82,7 @@ type InsightSnapshotRow = {
   profile_visits: number;
   ig_reels_avg_watch_time: number | null;
   ig_reels_video_view_total_time: number | null;
+  clips_replays_count: number | null;
 };
 
 type MonthlyReportRow = {
@@ -320,6 +321,7 @@ function mapInsightSnapshot(row: InsightSnapshotRow): InstagramInsightSnapshot {
     profileVisits: Number(row.profile_visits ?? 0),
     reelAvgWatchTime: row.ig_reels_avg_watch_time != null ? Number(row.ig_reels_avg_watch_time) : null,
     reelTotalViewTime: row.ig_reels_video_view_total_time != null ? Number(row.ig_reels_video_view_total_time) : null,
+    reelClipsReplaysCount: row.clips_replays_count != null ? Number(row.clips_replays_count) : null,
   };
 }
 
