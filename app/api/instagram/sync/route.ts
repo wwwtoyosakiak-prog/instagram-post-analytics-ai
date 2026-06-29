@@ -308,8 +308,15 @@ async function fetchInsights(postId: string, config: InstagramGraphConfig, isRee
   };
 }
 
-function legacyPostType(mediaType: string | undefined, mediaProductType: string | undefined) {
-  if (mediaProductType === "REELS") return "reel";
+function isReelPost(mediaType: string | undefined, mediaProductType: string | undefined, permalink: string | undefined): boolean {
+  if (mediaProductType === "REELS") return true;
+  // Fallback: graph.instagram.com may not return media_product_type; detect by permalink shape.
+  if (mediaType === "VIDEO" && permalink?.includes("/reel/")) return true;
+  return false;
+}
+
+function legacyPostType(mediaType: string | undefined, mediaProductType: string | undefined, permalink: string | undefined) {
+  if (isReelPost(mediaType, mediaProductType, permalink)) return "reel";
   if (mediaType === "CAROUSEL_ALBUM") return "carousel";
   if (mediaType === "VIDEO") return "video";
   return "image";
@@ -329,7 +336,6 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
         account_id: accountId,
         caption: post.caption || "",
         media_type: post.media_type || null,
-        media_product_type: post.media_product_type || null,
         media_url: post.media_url || null,
         thumbnail_url: post.thumbnail_url || null,
         permalink: post.permalink || null,
@@ -342,7 +348,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
         date,
         recorded_date: capturedAt.slice(0, 10),
         url: post.permalink || "",
-        type: legacyPostType(post.media_type, post.media_product_type),
+        type: legacyPostType(post.media_type, post.media_product_type, post.permalink),
         likes: post.like_count || 0,
         comments: post.comments_count || 0
       })
@@ -356,7 +362,9 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
 
   let insights;
   try {
-    insights = await fetchInsights(post.id, config, post.media_product_type === "REELS");
+    const isReel = isReelPost(post.media_type, post.media_product_type, post.permalink);
+    console.log(`[instagram-sync] post ${post.id} media_type=${post.media_type} media_product_type=${post.media_product_type} permalink=${post.permalink} isReel=${isReel}`);
+    insights = await fetchInsights(post.id, config, isReel);
   } catch (error) {
     const detail = toSyncError(error, "insights", post.id);
     logSyncError(detail);
