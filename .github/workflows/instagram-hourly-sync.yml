@@ -1,9 +1,6 @@
 name: Instagram scheduled sync
 
 on:
-  schedule:
-    # 1日4回（UTC）= 日本時間 05:17 / 11:17 / 17:17 / 23:17
-    - cron: '17 20,2,8,14 * * *'
   workflow_dispatch:
 
 jobs:

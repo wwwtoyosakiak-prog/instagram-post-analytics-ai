@@ -627,6 +627,9 @@ export default function DashboardPage() {
   const pastSyncError = showPastSyncError ? latestSyncError : null;
   const syncMonitor = useMemo(() => getSyncMonitor(new Date(), latestScheduledSyncRun?.finishedAt), [latestScheduledSyncRun?.finishedAt]);
   const latestSyncFinishedAt = latestSyncRun ? new Date(latestSyncRun.finishedAt) : null;
+  const latestScheduledErrorMessage = latestScheduledSyncRun?.errorSummary
+    || latestScheduledSyncRun?.errors[0]?.message
+    || null;
   const showTodayMissingAlert = Boolean(
     latestSyncRun?.status === "partial" &&
     latestSyncFinishedAt &&
@@ -641,43 +644,6 @@ export default function DashboardPage() {
       : latestSyncRun?.triggerType === "manual"
         ? "手動のみ"
         : latestSyncRun ? syncStatusLabel(latestSyncRun.status) : "履歴なし";
-  const syncDiagnosis = useMemo(() => {
-    if (!syncMonitor.isDelayed) return null;
-    if (!latestScheduledSyncRun && latestSyncRun?.triggerType === "manual") {
-      return {
-        action: "GitHub Actions と CRON_SECRET の一致確認を優先してください。",
-        title: "手動同期は動いていますが、定期同期だけ記録されていません",
-        summary: "Instagram API や保存処理ではなく、自動実行の起動経路に問題がある可能性が高い状態です。",
-        checks: [
-          "GitHub Actions の Instagram scheduled sync が予定時刻台に実行されているか",
-          "GitHub Actions 側の CRON_SECRET が設定されているか",
-          "Vercel 側の CRON_SECRET と同じ値になっているか"
-        ]
-      };
-    }
-    if (!latestScheduledSyncRun) {
-      return {
-        action: "自動同期の起動設定と秘密鍵の設定有無を確認してください。",
-        title: "定期同期の履歴がまだ 1 件もありません",
-        summary: "GitHub Actions から Vercel の同期 API まで到達できていない可能性があります。",
-        checks: [
-          "GitHub Actions のワークフローが有効か",
-          "GitHub Secrets に CRON_SECRET が入っているか",
-          "Vercel の環境変数に CRON_SECRET が入っているか"
-        ]
-      };
-    }
-    return {
-      action: "直近の Actions 実行ログと認証設定のずれを確認してください。",
-        title: "前回の定期同期以降、次の予定実行が記録されていません",
-        summary: "前回までは自動同期できていたため、一時的な実行失敗か認証ずれの可能性があります。",
-        checks: [
-          "直近の GitHub Actions 実行ログで curl が失敗していないか",
-          "CRON_SECRET を最近変更していないか",
-        "Vercel 側のデプロイ後に環境変数が反映されているか"
-      ]
-    };
-  }, [latestScheduledSyncRun, latestSyncRun, syncMonitor.isDelayed]);
 
   // ── レンダー ──────────────────────────────────────────
 
@@ -770,30 +736,11 @@ export default function DashboardPage() {
               {syncMonitor.isDelayed ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <p className="font-semibold">定時同期が遅れています</p>
-                  <p className="mt-1">予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の自動同期がまだ記録されていません。</p>
-                  <p className="mt-2 text-xs text-amber-700">最終同期: {latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"}</p>
-                  <p className="mt-1 text-xs text-amber-700">最終自動: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}</p>
-                  {syncDiagnosis ? (
-                    <div className="mt-3 grid gap-3 rounded-lg border border-amber-200/80 bg-white/60 p-3">
-                      <div className="rounded-md border border-amber-100 bg-amber-50/80 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">今やること</p>
-                        <p className="mt-1 text-sm font-semibold text-amber-950">{syncDiagnosis.action}</p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold tracking-[0.12em] text-amber-900">推定原因</span>
-                        <p className="text-xs font-semibold text-amber-900">{syncDiagnosis.title}</p>
-                      </div>
-                      <p className="text-xs text-amber-800">{syncDiagnosis.summary}</p>
-                      <div className="rounded-md border border-amber-100 bg-amber-50/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">確認順</p>
-                        <ol className="mt-2 grid gap-2 text-xs text-amber-800">
-                          {syncDiagnosis.checks.map((item, index) => <li key={item}>{index + 1}. {item}</li>)}
-                        </ol>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-amber-700">GitHub Actions の実行履歴、CRON_SECRET、Vercel の環境変数を確認してください。</p>
-                  )}
+                  <p className="mt-1">予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の自動同期がまだ反映されていません。</p>
+                  <p className="mt-2 text-xs text-amber-700">最終自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}</p>
+                  {latestScheduledErrorMessage ? (
+                    <p className="mt-1 text-xs text-amber-700">失敗理由: {latestScheduledErrorMessage}</p>
+                  ) : null}
                 </div>
               ) : null}
               {latestSyncRun ? (
@@ -806,15 +753,15 @@ export default function DashboardPage() {
               ) : null}
               {latestSyncRun?.status === "failed" && latestSyncError ? (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
-                  <p className="font-semibold">最新の同期エラー</p>
-                  <p className="mt-1">{latestSyncError.errorSummary || "同期でエラーが発生しました。"}</p>
+                  <p className="font-semibold">自動同期に失敗しました</p>
+                  <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "同期でエラーが発生しました。"}</p>
                   <p className="mt-2 text-xs text-red-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
               {latestSyncRun?.status === "partial" && latestSyncError ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                  <p className="font-semibold">最新の同期で一部エラーが発生しました</p>
-                  <p className="mt-1">{latestSyncError.errorSummary || "一部のデータ保存に失敗しました。"}</p>
+                  <p className="font-semibold">自動同期で一部失敗しました</p>
+                  <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "一部のデータ保存に失敗しました。"}</p>
                   <p className="mt-2 text-xs text-amber-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
