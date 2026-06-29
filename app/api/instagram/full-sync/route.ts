@@ -244,6 +244,7 @@ async function handler(triggerType: SyncTriggerType) {
           ig_user_id: account.id,
           caption: media.caption ?? null,
           media_type: media.media_type,
+          media_product_type: media.media_product_type ?? null,
           media_url: media.media_url ?? null,
           thumbnail_url: media.thumbnail_url ?? null,
           permalink: media.permalink,
@@ -262,7 +263,7 @@ async function handler(triggerType: SyncTriggerType) {
       // インサイト保存（fetchMediaList でフィールド展開済み）
       try {
         const ins = media.insights ?? null;
-        const detailedInsights = await fetchMediaInsights(media.id, media.media_type);
+        const detailedInsights = await fetchMediaInsights(media.id, media.media_type, media.media_product_type);
         const { error: insErr } = await db
           .from('instagram_media_insights')
           .insert({

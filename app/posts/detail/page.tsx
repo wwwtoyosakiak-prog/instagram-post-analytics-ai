@@ -189,6 +189,13 @@ function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) 
   );
 }
 
+function formatWatchTime(ms: number | null): string {
+  if (ms == null) return "–";
+  const s = ms / 1000;
+  if (s >= 60) return `${Math.floor(s / 60)}分${Math.round(s % 60)}秒`;
+  return `${s.toFixed(1)}秒`;
+}
+
 function LatestInsightSection({ insight, loading }: { insight: InstagramInsightSnapshot | null; loading: boolean }) {
   return (
     <section className="mt-7 border-y border-stone-200 py-6">
@@ -202,12 +209,23 @@ function LatestInsightSection({ insight, loading }: { insight: InstagramInsightS
       {loading ? (
         <p className="text-sm text-stone-600">インサイトを読み込んでいます。</p>
       ) : insight ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Stat label="閲覧数" value={insight.views.toLocaleString()} />
-          <Stat label="リーチ" value={insight.reach.toLocaleString()} />
-          <Stat label="保存数" value={insight.saved.toLocaleString()} />
-          <Stat label="シェア数" value={insight.shares.toLocaleString()} />
-          <Stat label="総インタラクション" value={insight.totalInteractions.toLocaleString()} />
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat label="閲覧数" value={insight.views.toLocaleString()} />
+            <Stat label="リーチ" value={insight.reach.toLocaleString()} />
+            <Stat label="保存数" value={insight.saved.toLocaleString()} />
+            <Stat label="シェア数" value={insight.shares.toLocaleString()} />
+            <Stat label="コメント数" value={insight.comments.toLocaleString()} />
+            <Stat label="総インタラクション" value={insight.totalInteractions.toLocaleString()} />
+            <Stat label="プロフィールアクセス" value={insight.profileVisits.toLocaleString()} />
+            <Stat label="フォロー数" value={insight.follows.toLocaleString()} />
+          </div>
+          {(insight.reelAvgWatchTime != null || insight.reelTotalViewTime != null) && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat label="総再生時間（リール）" value={formatWatchTime(insight.reelTotalViewTime)} />
+              <Stat label="平均視聴時間（リール）" value={formatWatchTime(insight.reelAvgWatchTime)} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">

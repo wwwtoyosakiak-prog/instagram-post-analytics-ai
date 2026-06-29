@@ -10,13 +10,18 @@ export interface ApiMediaInsights {
   saved?: number | null;
   shares?: number | null;
   total_interactions?: number | null;
+  follows?: number | null;
+  profile_visits?: number | null;
+  plays?: number | null;
   ig_reels_avg_watch_time?: number | null;
+  ig_reels_video_view_total_time?: number | null;
 }
 
 export interface ApiMedia {
   id: string;
   caption?: string;
   media_type: string;
+  media_product_type?: string | null;
   media_url?: string;
   thumbnail_url?: string;
   permalink: string;

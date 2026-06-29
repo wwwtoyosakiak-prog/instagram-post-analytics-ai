@@ -39,6 +39,7 @@ export interface IgMedia {
   id: string;
   caption?: string;
   media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  media_product_type?: 'REELS' | 'FEED' | string;
   media_url?: string;
   thumbnail_url?: string;
   permalink: string;
@@ -151,8 +152,10 @@ export function getMetric(
 export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgMedia[]> {
   const token = await getToken();
   const uid = getUid(igUserId);
-  const insightMetrics = 'reach,views,saved,total_interactions,likes,shares,ig_reels_avg_watch_time';
-  const fields = `id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
+  // media_product_type=REELS のみリール指標を取得。フィード動画(FEED)では API がエラーを返すため混在リクエストは避ける。
+  // ただし fields expansion でのインライン取得は API 側で型チェックが緩い場合があるため、全指標をリクエストし null を許容する。
+  const insightMetrics = 'reach,views,saved,total_interactions,likes,comments,shares,follows,profile_visits,ig_reels_avg_watch_time,ig_reels_video_view_total_time';
+  const fields = `id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
   const results: IgMedia[] = [];
   let url: string | null = `${getApiBase()}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
 
@@ -177,8 +180,8 @@ const VIDEO_METRICS = [
   'ig_reels_video_view_total_time',
 ];
 
-function metricsForType(mediaType: string): string[] {
-  if (mediaType === 'VIDEO') return VIDEO_METRICS;
+function metricsForType(mediaType: string, mediaProductType?: string): string[] {
+  if (mediaProductType === 'REELS') return VIDEO_METRICS;
   if (mediaType === 'CAROUSEL_ALBUM') return COMMON_METRICS;
   return COMMON_METRICS;
 }
@@ -189,9 +192,9 @@ type InsightItem = {
   values?: { value: number }[];
 };
 
-export async function fetchMediaInsights(mediaId: string, mediaType: string): Promise<IgMediaInsights> {
+export async function fetchMediaInsights(mediaId: string, mediaType: string, mediaProductType?: string): Promise<IgMediaInsights> {
   const token = await getToken();
-  const metrics = metricsForType(mediaType).join(',');
+  const metrics = metricsForType(mediaType, mediaProductType).join(',');
   const url = `${getApiBase()}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
   let raw: unknown;
   try {

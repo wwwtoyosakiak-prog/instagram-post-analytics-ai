@@ -17,6 +17,7 @@ type GraphMedia = {
   id: string;
   caption?: string;
   media_type?: string;
+  media_product_type?: string;
   media_url?: string;
   thumbnail_url?: string;
   permalink?: string;
@@ -77,6 +78,7 @@ const MEDIA_FIELDS = [
   "id",
   "caption",
   "media_type",
+  "media_product_type",
   "media_url",
   "thumbnail_url",
   "permalink",
@@ -86,7 +88,8 @@ const MEDIA_FIELDS = [
   "comments_count"
 ].join(",");
 
-const INSIGHT_METRICS = "views,reach,saved,shares,total_interactions";
+const INSIGHT_METRICS = "views,reach,likes,comments,saved,shares,total_interactions,follows,profile_visits";
+const REEL_INSIGHT_METRICS = `${INSIGHT_METRICS},ig_reels_avg_watch_time,ig_reels_video_view_total_time`;
 
 function graphErrorMessage(error: GraphError | undefined, fallback: string) {
   return error?.message || fallback;
@@ -281,9 +284,9 @@ async function fetchAllMedia(config: InstagramGraphConfig) {
   return posts;
 }
 
-async function fetchInsights(postId: string, config: InstagramGraphConfig) {
+async function fetchInsights(postId: string, config: InstagramGraphConfig, isReel: boolean) {
   const url = createInstagramGraphUrl(config, `${postId}/insights`);
-  url.searchParams.set("metric", INSIGHT_METRICS);
+  url.searchParams.set("metric", isReel ? REEL_INSIGHT_METRICS : INSIGHT_METRICS);
   url.searchParams.set("access_token", config.accessToken);
   const response = await graphRequest<GraphInsightsResponse>(url);
   const values = Object.fromEntries(
@@ -292,13 +295,20 @@ async function fetchInsights(postId: string, config: InstagramGraphConfig) {
   return {
     views: values.views || 0,
     reach: values.reach || 0,
+    likes: values.likes || 0,
+    comments: values.comments || 0,
     saved: values.saved || 0,
     shares: values.shares || 0,
-    total_interactions: values.total_interactions || 0
+    total_interactions: values.total_interactions || 0,
+    follows: values.follows || 0,
+    profile_visits: values.profile_visits || 0,
+    ig_reels_avg_watch_time: isReel ? (values.ig_reels_avg_watch_time ?? null) : null,
+    ig_reels_video_view_total_time: isReel ? (values.ig_reels_video_view_total_time ?? null) : null,
   };
 }
 
-function legacyPostType(mediaType: string | undefined) {
+function legacyPostType(mediaType: string | undefined, mediaProductType: string | undefined) {
+  if (mediaProductType === "REELS") return "reel";
   if (mediaType === "CAROUSEL_ALBUM") return "carousel";
   if (mediaType === "VIDEO") return "video";
   return "image";
@@ -318,6 +328,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
         account_id: accountId,
         caption: post.caption || "",
         media_type: post.media_type || null,
+        media_product_type: post.media_product_type || null,
         media_url: post.media_url || null,
         thumbnail_url: post.thumbnail_url || null,
         permalink: post.permalink || null,
@@ -330,7 +341,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
         date,
         recorded_date: capturedAt.slice(0, 10),
         url: post.permalink || "",
-        type: legacyPostType(post.media_type),
+        type: legacyPostType(post.media_type, post.media_product_type),
         likes: post.like_count || 0,
         comments: post.comments_count || 0
       })
@@ -344,7 +355,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
 
   let insights;
   try {
-    insights = await fetchInsights(post.id, config);
+    insights = await fetchInsights(post.id, config, post.media_product_type === "REELS");
   } catch (error) {
     const detail = toSyncError(error, "insights", post.id);
     logSyncError(detail);

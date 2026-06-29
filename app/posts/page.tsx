@@ -25,7 +25,13 @@ interface UnifiedEntry {
   likes: number; likesSrc: MetricSource;
   saves: number; savesSrc: MetricSource;
   comments: number; commentsSrc: MetricSource;
+  shares: number;
   reach: number | null;
+  totalInteractions: number;
+  profileVisits: number;
+  follows: number;
+  reelAvgWatchTimeMs: number | null;
+  reelTotalViewTimeMs: number | null;
   er: number;
   post: InstagramPost | null;
   media: ApiMedia | null;
@@ -47,6 +53,13 @@ function normalizeType(apiType?: string | null, manualType?: string | null): UTy
 function toJSTDate(value?: string) {
   if (!value) return "未記録";
   return new Date(value).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+}
+
+function formatWatchTime(ms: number | null): string {
+  if (ms == null) return "–";
+  const s = ms / 1000;
+  if (s >= 60) return `${Math.floor(s / 60)}分${Math.round(s % 60)}秒`;
+  return `${s.toFixed(1)}秒`;
 }
 
 // ── UI コンポーネント ────────────────────────────────────────
@@ -123,7 +136,13 @@ export default function PostsPage() {
         likes: m.likes, likesSrc: m.likesSrc,
         saves: m.saves, savesSrc: m.savesSrc,
         comments: m.comments, commentsSrc: m.commentsSrc,
+        shares: m.shares,
         reach: ins?.reach ?? null,
+        totalInteractions: ins?.total_interactions ?? 0,
+        profileVisits: ins?.profile_visits ?? 0,
+        follows: ins?.follows ?? 0,
+        reelAvgWatchTimeMs: matched?.media_product_type === "REELS" ? (ins?.ig_reels_avg_watch_time ?? null) : null,
+        reelTotalViewTimeMs: matched?.media_product_type === "REELS" ? (ins?.ig_reels_video_view_total_time ?? null) : null,
         er: getMetrics({ views: m.views, likes: m.likes, saves: m.saves, comments: m.comments, shares: m.shares }).engagementRate,
         post,
         media: matched ?? null,
@@ -152,7 +171,13 @@ export default function PostsPage() {
           likes, likesSrc: "api" as MetricSource,
           saves, savesSrc: "api" as MetricSource,
           comments, commentsSrc: "api" as MetricSource,
+          shares,
           reach: ins?.reach ?? null,
+          totalInteractions: ins?.total_interactions ?? 0,
+          profileVisits: ins?.profile_visits ?? 0,
+          follows: ins?.follows ?? 0,
+          reelAvgWatchTimeMs: m.media_product_type === "REELS" ? (ins?.ig_reels_avg_watch_time ?? null) : null,
+          reelTotalViewTimeMs: m.media_product_type === "REELS" ? (ins?.ig_reels_video_view_total_time ?? null) : null,
           er: views > 0 ? ((likes + saves + comments + shares) / views) * 100 : 0,
           post: null,
           media: m,
@@ -332,6 +357,13 @@ export default function PostsPage() {
                 <th>リーチ</th>
                 <th>いいね</th>
                 <th>保存</th>
+                <th>コメント</th>
+                <th>シェア</th>
+                <th>総IA</th>
+                <th>PFアクセス</th>
+                <th>フォロー</th>
+                <th>総再生時間</th>
+                <th>平均視聴</th>
                 <th>ER</th>
                 <th>AIスコア</th>
                 <th>詳細</th>
@@ -373,6 +405,18 @@ export default function PostsPage() {
                       <SourceBadge source={e.savesSrc} />
                     </div>
                   </td>
+                  <td>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span>{e.comments.toLocaleString("ja-JP")}</span>
+                      <SourceBadge source={e.commentsSrc} />
+                    </div>
+                  </td>
+                  <td>{e.shares.toLocaleString("ja-JP")}</td>
+                  <td>{e.totalInteractions > 0 ? e.totalInteractions.toLocaleString("ja-JP") : "–"}</td>
+                  <td>{e.profileVisits > 0 ? e.profileVisits.toLocaleString("ja-JP") : "–"}</td>
+                  <td>{e.follows > 0 ? e.follows.toLocaleString("ja-JP") : "–"}</td>
+                  <td>{formatWatchTime(e.reelTotalViewTimeMs)}</td>
+                  <td>{formatWatchTime(e.reelAvgWatchTimeMs)}</td>
                   <td>{formatPercent(e.er)}</td>
                   <td>
                     {e.post
@@ -400,6 +444,14 @@ export default function PostsPage() {
                         >
                           IG
                         </a>
+                      )}
+                      {e.media?.media_product_type === "REELS" && (
+                        <Link
+                          className="text-xs font-semibold text-pink-500 hover:underline"
+                          href={`/reel-insights?id=${e.media.id}`}
+                        >
+                          分析
+                        </Link>
                       )}
                     </div>
                   </td>
@@ -504,6 +556,15 @@ function UnifiedCard({
             <span className="mt-1 block font-bold text-ink">{formatPercent(entry.er)}</span>
           </div>
         </div>
+        {entry.media?.media_product_type === "REELS" && (
+          <Link
+            href={`/reel-insights?id=${entry.media.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-3 block rounded-md bg-pink-500 px-3 py-1.5 text-center text-xs font-bold text-white hover:bg-pink-600"
+          >
+            リール詳細分析
+          </Link>
+        )}
       </div>
     </>
   );

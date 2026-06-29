@@ -60,6 +60,12 @@ export type InstagramInsightSnapshot = {
   totalInteractions: number;
   likeCount: number;
   commentsCount: number;
+  likes: number;
+  comments: number;
+  follows: number;
+  profileVisits: number;
+  reelAvgWatchTime: number | null;
+  reelTotalViewTime: number | null;
 };
 
 export type InstagramSyncTriggerType = "manual" | "scheduled";
