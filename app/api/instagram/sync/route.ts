@@ -89,7 +89,8 @@ const MEDIA_FIELDS = [
 ].join(",");
 
 const INSIGHT_METRICS = "views,reach,likes,comments,saved,shares,total_interactions,follows,profile_visits";
-const REEL_INSIGHT_METRICS = `${INSIGHT_METRICS},ig_reels_avg_watch_time,ig_reels_video_view_total_time,clips_replays_count`;
+// clips_replays_count は Graph API v25 で無効なメトリクス名のため除外。
+const REEL_INSIGHT_METRICS = `${INSIGHT_METRICS},ig_reels_avg_watch_time,ig_reels_video_view_total_time`;
 
 function graphErrorMessage(error: GraphError | undefined, fallback: string) {
   return error?.message || fallback;
@@ -304,7 +305,7 @@ async function fetchInsights(postId: string, config: InstagramGraphConfig, isRee
     profile_visits: values.profile_visits || 0,
     ig_reels_avg_watch_time: isReel ? (values.ig_reels_avg_watch_time ?? null) : null,
     ig_reels_video_view_total_time: isReel ? (values.ig_reels_video_view_total_time ?? null) : null,
-    clips_replays_count: isReel ? (values.clips_replays_count ?? null) : null,
+    clips_replays_count: null, // API v25 では clips_replays_count は取得不可
   };
 }
 
