@@ -735,8 +735,8 @@ export default function DashboardPage() {
               </div>
               {syncMonitor.isDelayed ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                  <p className="font-semibold">定時同期が遅れています</p>
-                  <p className="mt-1">予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の自動同期がまだ反映されていません。</p>
+                  <p className="font-semibold">自動同期が未反映です</p>
+                  <p className="mt-1">予定 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の同期がまだ記録されていません。</p>
                   <p className="mt-2 text-xs text-amber-700">最終自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}</p>
                   {latestScheduledErrorMessage ? (
                     <p className="mt-1 text-xs text-amber-700">失敗理由: {latestScheduledErrorMessage}</p>

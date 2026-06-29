@@ -507,7 +507,10 @@ export function isCronAuthorized(request: Request) {
   if (!cronSecret) {
     return { ok: false, status: 500, message: "CRON_SECRETが設定されていません。" };
   }
-  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+  const bearer = request.headers.get("authorization");
+  const cronHeader = request.headers.get("x-cron-secret");
+  const providedSecret = bearer?.startsWith("Bearer ") ? bearer.slice(7) : cronHeader;
+  if (providedSecret !== cronSecret) {
     return { ok: false, status: 401, message: "CRON_SECRETが一致しません。" };
   }
   return { ok: true as const, status: 200, message: "" };
