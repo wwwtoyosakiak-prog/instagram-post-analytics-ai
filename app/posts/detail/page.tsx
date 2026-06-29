@@ -113,7 +113,7 @@ function PostDetailContent() {
         <Stat label="保存率" value={formatPercent(metrics.saveRate)} />
         <Stat label="コメント率" value={formatPercent(metrics.commentRate)} />
       </div>
-      <LatestInsightSection insight={latestInsight} loading={insightLoading} />
+      <LatestInsightSection insight={latestInsight} loading={insightLoading} isReel={post.type === "reel"} />
       <InsightTrend snapshots={insightHistory} />
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <Panel>
@@ -196,7 +196,8 @@ function formatWatchTime(ms: number | null): string {
   return `${s.toFixed(1)}秒`;
 }
 
-function LatestInsightSection({ insight, loading }: { insight: InstagramInsightSnapshot | null; loading: boolean }) {
+function LatestInsightSection({ insight, loading, isReel }: { insight: InstagramInsightSnapshot | null; loading: boolean; isReel: boolean }) {
+  const v = (n: number | null | undefined) => (n != null ? n.toLocaleString() : "–");
   return (
     <section className="mt-7 border-y border-stone-200 py-6">
       <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
@@ -211,23 +212,22 @@ function LatestInsightSection({ insight, loading }: { insight: InstagramInsightS
       ) : insight ? (
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="閲覧数" value={insight.views != null ? insight.views.toLocaleString() : "–"} />
-            <Stat label="リーチ" value={insight.reach != null ? insight.reach.toLocaleString() : "–"} />
-            <Stat label="いいね数" value={insight.likes != null ? insight.likes.toLocaleString() : "–"} />
-            <Stat label="保存数" value={insight.saved != null ? insight.saved.toLocaleString() : "–"} />
-            <Stat label="コメント数" value={insight.comments != null ? insight.comments.toLocaleString() : "–"} />
-            <Stat label="シェア数" value={insight.shares != null ? insight.shares.toLocaleString() : "–"} />
-            <Stat label="総インタラクション" value={insight.totalInteractions != null ? insight.totalInteractions.toLocaleString() : "–"} />
-            <Stat label="プロフィールアクセス" value={insight.profileVisits != null ? insight.profileVisits.toLocaleString() : "–"} />
-            <Stat label="フォロー数" value={insight.follows != null ? insight.follows.toLocaleString() : "–"} />
+            <Stat label="閲覧数" value={v(insight.views)} />
+            <Stat label="リーチ" value={v(insight.reach)} />
+            <Stat label="いいね数" value={v(insight.likes)} />
+            <Stat label="保存数" value={v(insight.saved)} />
+            <Stat label="コメント数" value={v(insight.comments)} />
+            <Stat label="シェア数" value={v(insight.shares)} />
+            <Stat label="総インタラクション" value={v(insight.totalInteractions)} />
+            <Stat label="プロフィールアクセス" value={v(insight.profileVisits)} />
+            <Stat label="フォロー数" value={v(insight.follows)} />
           </div>
-          {(insight.reelTotalViewTime != null || insight.reelAvgWatchTime != null || insight.reelClipsReplaysCount != null) && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat label="総再生時間" value={formatWatchTime(insight.reelTotalViewTime)} />
-              <Stat label="平均視聴時間" value={formatWatchTime(insight.reelAvgWatchTime)} />
-              {insight.reelClipsReplaysCount != null && (
-                <Stat label="リプレイ回数" value={insight.reelClipsReplaysCount.toLocaleString()} />
-              )}
+          {isReel && insight.reelAvgWatchTime != null && (
+            <div className="rounded-lg border border-pink-200 bg-pink-50 p-4">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-pink-600">リール指標</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Stat label="平均視聴時間" value={formatWatchTime(insight.reelAvgWatchTime)} />
+              </div>
             </div>
           )}
         </div>

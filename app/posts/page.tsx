@@ -448,7 +448,7 @@ export default function PostsPage() {
                       {e.media?.media_product_type === "REELS" && (
                         <Link
                           className="text-xs font-semibold text-pink-500 hover:underline"
-                          href={`/reel-insights?id=${e.media.id}`}
+                          href={`/posts/detail?id=${e.media.id}`}
                         >
                           分析
                         </Link>
@@ -558,7 +558,7 @@ function UnifiedCard({
         </div>
         {entry.media?.media_product_type === "REELS" && (
           <Link
-            href={`/reel-insights?id=${entry.media.id}`}
+            href={`/posts/detail?id=${entry.media.id}`}
             onClick={(e) => e.stopPropagation()}
             className="mt-3 block rounded-md bg-pink-500 px-3 py-1.5 text-center text-xs font-bold text-white hover:bg-pink-600"
           >
