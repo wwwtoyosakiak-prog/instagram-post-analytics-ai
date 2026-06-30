@@ -223,11 +223,6 @@ function LatestInsightSection({
   apiInsights: ApiMedia["latest_insights"] | null;
 }) {
   const v = (n: number | null | undefined) => (n != null ? n.toLocaleString() : "–");
-  const hasExtraApiMetrics =
-    apiInsights?.impressions != null ||
-    apiInsights?.plays != null ||
-    insight?.reelTotalViewTime != null ||
-    insight?.reelClipsReplaysCount != null;
   return (
     <section className="mt-7 border-y border-stone-200 py-6">
       <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
@@ -263,17 +258,15 @@ function LatestInsightSection({
               </div>
             </div>
           )}
-          {hasExtraApiMetrics ? (
-            <div className="rounded-lg border border-stone-200 bg-white/80 p-4">
-              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-stone-500">追加のAPI指標</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Stat label="インプレッション" value={v(apiInsights?.impressions)} />
-                <Stat label="再生回数" value={v(apiInsights?.plays)} />
-                <Stat label="総再生時間" value={formatWatchTime(insight?.reelTotalViewTime ?? null)} />
-                <Stat label="リプレイ回数" value={v(insight?.reelClipsReplaysCount)} />
-              </div>
+          <div className="rounded-lg border border-stone-200 bg-white/80 p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-stone-500">追加のAPI指標</p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Stat label="インプレッション" value={v(apiInsights?.impressions)} />
+              <Stat label="再生回数" value={v(apiInsights?.plays)} />
+              <Stat label="総再生時間" value={formatWatchTime(insight?.reelTotalViewTime ?? null)} />
+              <Stat label="リプレイ回数" value={v(insight?.reelClipsReplaysCount)} />
             </div>
-          ) : null}
+          </div>
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">
