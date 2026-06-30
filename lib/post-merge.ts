@@ -3,6 +3,7 @@ import { InstagramPost } from './types';
 export type MetricSource = 'api' | 'manual';
 
 export interface ApiMediaInsights {
+  impressions?: number | null;
   views?: number | null;
   reach?: number | null;
   likes?: number | null;

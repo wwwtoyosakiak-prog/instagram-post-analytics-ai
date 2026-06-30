@@ -8,6 +8,7 @@ import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { deletePostData, loadAccountsData, loadAnalysesData, loadInsightData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
 import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
+import { matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
 import { createSampleAnalysis } from "@/lib/sample-analysis";
 
 export default function PostDetailPage() {
@@ -28,6 +29,7 @@ function PostDetailContent() {
   const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
   const [latestInsight, setLatestInsight] = useState<InstagramInsightSnapshot | null>(null);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
+  const [matchedMedia, setMatchedMedia] = useState<ApiMedia | null>(null);
   const [insightLoading, setInsightLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [savingAnalysis, setSavingAnalysis] = useState(false);
@@ -36,7 +38,13 @@ function PostDetailContent() {
 
   useEffect(() => {
     setInsightLoading(true);
-    Promise.all([loadPostsData(), loadAccountsData(), loadAnalysesData(id), loadInsightData(id)]).then(([posts, accounts, analyses, insightData]) => {
+    Promise.all([
+      loadPostsData(),
+      loadAccountsData(),
+      loadAnalysesData(id),
+      loadInsightData(id),
+      fetch("/api/instagram/media?limit=200").then((r) => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+    ]).then(([posts, accounts, analyses, insightData, mediaJson]) => {
       const foundPost = posts.find((item) => item.id === id) ?? null;
       setPost(foundPost);
       setAccount(accounts[0] ?? null);
@@ -44,6 +52,8 @@ function PostDetailContent() {
       setAnalysis(analyses[0] ?? null);
       setLatestInsight(insightData.insight);
       setInsightHistory(insightData.insights);
+      const mediaList = (mediaJson as { data?: ApiMedia[] }).data ?? [];
+      setMatchedMedia(foundPost ? matchPostToMedia(foundPost, mediaList) ?? null : null);
       setInsightLoading(false);
     });
   }, [id]);
@@ -113,7 +123,12 @@ function PostDetailContent() {
         <Stat label="保存率" value={formatPercent(metrics.saveRate)} />
         <Stat label="コメント率" value={formatPercent(metrics.commentRate)} />
       </div>
-      <LatestInsightSection insight={latestInsight} loading={insightLoading} isReel={post.type === "reel"} />
+      <LatestInsightSection
+        insight={latestInsight}
+        loading={insightLoading}
+        isReel={post.type === "reel"}
+        apiInsights={matchedMedia?.latest_insights ?? null}
+      />
       <InsightTrend snapshots={insightHistory} />
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <Panel>
@@ -196,8 +211,23 @@ function formatWatchTime(ms: number | null): string {
   return `${s.toFixed(1)}秒`;
 }
 
-function LatestInsightSection({ insight, loading, isReel }: { insight: InstagramInsightSnapshot | null; loading: boolean; isReel: boolean }) {
+function LatestInsightSection({
+  insight,
+  loading,
+  isReel,
+  apiInsights
+}: {
+  insight: InstagramInsightSnapshot | null;
+  loading: boolean;
+  isReel: boolean;
+  apiInsights: ApiMedia["latest_insights"] | null;
+}) {
   const v = (n: number | null | undefined) => (n != null ? n.toLocaleString() : "–");
+  const hasExtraApiMetrics =
+    apiInsights?.impressions != null ||
+    apiInsights?.plays != null ||
+    insight?.reelTotalViewTime != null ||
+    insight?.reelClipsReplaysCount != null;
   return (
     <section className="mt-7 border-y border-stone-200 py-6">
       <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
@@ -227,9 +257,23 @@ function LatestInsightSection({ insight, loading, isReel }: { insight: Instagram
               <p className="mb-3 text-xs font-bold uppercase tracking-wide text-pink-600">リール指標</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Stat label="平均視聴時間" value={formatWatchTime(insight.reelAvgWatchTime)} />
+                <Stat label="総再生時間" value={formatWatchTime(insight.reelTotalViewTime)} />
+                <Stat label="再生回数" value={v(apiInsights?.plays)} />
+                <Stat label="リプレイ回数" value={v(insight.reelClipsReplaysCount)} />
               </div>
             </div>
           )}
+          {hasExtraApiMetrics ? (
+            <div className="rounded-lg border border-stone-200 bg-white/80 p-4">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-stone-500">追加のAPI指標</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Stat label="インプレッション" value={v(apiInsights?.impressions)} />
+                <Stat label="再生回数" value={v(apiInsights?.plays)} />
+                <Stat label="総再生時間" value={formatWatchTime(insight?.reelTotalViewTime ?? null)} />
+                <Stat label="リプレイ回数" value={v(insight?.reelClipsReplaysCount)} />
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">
