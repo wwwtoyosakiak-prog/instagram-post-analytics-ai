@@ -38,11 +38,12 @@ export function Button({ children, type = "button", onClick, variant = "primary"
   );
 }
 
-export function Stat({ label, value }: { label: string; value: string | number }) {
+export function Stat({ label, value, note }: { label: string; value: string | number; note?: string }) {
   return (
     <div className="rounded-lg border border-white/70 bg-white/78 p-4 shadow-panel backdrop-blur">
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
       <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
+      {note ? <p className="mt-1 text-[11px] text-stone-400">{note}</p> : null}
     </div>
   );
 }

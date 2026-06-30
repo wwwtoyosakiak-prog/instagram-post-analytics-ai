@@ -119,7 +119,7 @@ function PostDetailContent() {
       <PageHeader title="投稿詳細・AI分析" description="投稿内容、画像、数値をもとに改善案を確認します。" />
       <div className="grid gap-4 md:grid-cols-4">
         <Stat label="エンゲージメント数" value={metrics.engagement.toLocaleString()} />
-        <Stat label="エンゲージメント率" value={formatPercent(metrics.engagementRate)} />
+        <Stat label="反応率（エンゲージメント率）" value={formatPercent(metrics.engagementRate)} note="いいね等の反応 ÷ 表示数" />
         <Stat label="保存率" value={formatPercent(metrics.saveRate)} />
         <Stat label="コメント率" value={formatPercent(metrics.commentRate)} />
       </div>

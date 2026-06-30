@@ -357,7 +357,7 @@ export default function PostsPage() {
             <option value="reach">リーチ順</option>
             <option value="likes">いいね順</option>
             <option value="saves">保存順</option>
-            <option value="engagementRate">ER順</option>
+            <option value="engagementRate">反応率順</option>
           </select>
         </div>
         <div>
@@ -417,7 +417,7 @@ export default function PostsPage() {
                 <th>総再生時間</th>
                 <th>平均視聴</th>
                 <th>動画尺</th>
-                <th>ER</th>
+                <th>反応率</th>
                 <th>AIスコア</th>
                 <th>詳細・分析</th>
               </tr>
@@ -601,7 +601,7 @@ function UnifiedCard({
             {sourceBadge(entry.savesSrc)}
           </div>
           <div className="rounded-md bg-fog px-2 py-2">
-            <span className="block text-[11px] font-semibold text-stone-500">ER</span>
+            <span className="block text-[11px] font-semibold text-stone-500">反応率</span>
             <span className="mt-1 block font-bold text-ink">{formatPercent(entry.er)}</span>
           </div>
         </div>
