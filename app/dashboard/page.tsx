@@ -820,14 +820,14 @@ export default function DashboardPage() {
 
           {/* 同期履歴 */}
           <Panel className="mb-6">
-            <SectionLead eyebrow="History" title="同期履歴一覧" description="直近20回の実行結果を確認できます。" />
+            <SectionLead eyebrow="History" title="同期履歴一覧" description="直近5回の実行結果を確認できます。" />
             <div className="mt-4 overflow-auto">
               <table>
                 <thead>
                   <tr><th>実行時刻</th><th>種別</th><th>状態</th><th>取得</th><th>投稿保存</th><th>履歴保存</th><th>エラー内容</th></tr>
                 </thead>
                 <tbody>
-                  {syncRuns.map((run) => (
+                  {syncRuns.slice(0, 5).map((run) => (
                     <tr key={run.id}>
                       <td>{formatDateTimeJst(run.finishedAt)}</td>
                       <td>{run.triggerType === "manual" ? "手動" : "自動"}</td>
