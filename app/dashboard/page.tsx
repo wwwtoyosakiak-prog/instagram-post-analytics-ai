@@ -327,6 +327,8 @@ function formatDateTimeJst(value: string) {
   });
 }
 
+const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
+
 function syncStatusLabel(status: InstagramSyncRun["status"]) {
   if (status === "success") return "成功";
   if (status === "partial") return "一部失敗";
@@ -727,6 +729,10 @@ export default function DashboardPage() {
             {/* 同期状況 */}
             <Panel className="border-stone-200/80 bg-white/88">
               <SectionLead eyebrow="Sync" title="同期状況" description="自動反映のタイミングと、最後の同期結果をすぐ確認できます。" />
+              <div className="mt-4 rounded-xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm leading-6 text-sky-900">
+                <p className="font-semibold">自動更新の予定時刻</p>
+                <p className="mt-1">{SCHEDULED_SYNC_TIMES_LABEL}</p>
+              </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Insight label="最終同期時刻" value={latestSyncRun ? formatDateTimeJst(latestSyncRun.finishedAt) : "未同期"} />
                 <Insight label="最終自動同期" value={latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"} />
