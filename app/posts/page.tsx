@@ -366,7 +366,7 @@ export default function PostsPage() {
                 <th>平均視聴</th>
                 <th>ER</th>
                 <th>AIスコア</th>
-                <th>詳細</th>
+                <th>詳細・分析</th>
               </tr>
             </thead>
             <tbody>
@@ -432,7 +432,7 @@ export default function PostsPage() {
                           className="text-xs font-semibold text-clay hover:underline"
                           href={`/posts/detail?id=${e.post.id}`}
                         >
-                          詳細
+                          詳細・分析
                         </Link>
                       )}
                       {!e.post && e.permalink && (
@@ -444,14 +444,6 @@ export default function PostsPage() {
                         >
                           IG
                         </a>
-                      )}
-                      {e.media?.media_product_type === "REELS" && (
-                        <Link
-                          className="text-xs font-semibold text-pink-500 hover:underline"
-                          href={`/posts/detail?id=${e.media.id}`}
-                        >
-                          分析
-                        </Link>
                       )}
                     </div>
                   </td>
@@ -556,15 +548,11 @@ function UnifiedCard({
             <span className="mt-1 block font-bold text-ink">{formatPercent(entry.er)}</span>
           </div>
         </div>
-        {entry.media?.media_product_type === "REELS" && (
-          <Link
-            href={`/posts/detail?id=${entry.media.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 block rounded-md bg-pink-500 px-3 py-1.5 text-center text-xs font-bold text-white hover:bg-pink-600"
-          >
-            リール詳細分析
-          </Link>
-        )}
+        {entry.post ? (
+          <span className="mt-3 block rounded-md bg-pink-500 px-3 py-1.5 text-center text-xs font-bold text-white">
+            詳細・分析を見る
+          </span>
+        ) : null}
       </div>
     </>
   );
