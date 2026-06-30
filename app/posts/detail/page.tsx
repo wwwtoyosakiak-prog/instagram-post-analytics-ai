@@ -258,15 +258,6 @@ function LatestInsightSection({
               </div>
             </div>
           )}
-          <div className="rounded-lg border border-stone-200 bg-white/80 p-4">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-stone-500">追加のAPI指標</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat label="インプレッション" value={v(apiInsights?.impressions)} />
-              <Stat label="再生回数" value={v(apiInsights?.plays)} />
-              <Stat label="総再生時間" value={formatWatchTime(insight?.reelTotalViewTime ?? null)} />
-              <Stat label="リプレイ回数" value={v(insight?.reelClipsReplaysCount)} />
-            </div>
-          </div>
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">
