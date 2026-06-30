@@ -1,6 +1,9 @@
 name: Instagram scheduled sync
 
 on:
+  schedule:
+    # Runs at 00:17, 06:17, 12:17, 18:17 JST every day.
+    - cron: '17 3,9,15,21 * * *'
   workflow_dispatch:
 
 jobs:

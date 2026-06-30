@@ -177,7 +177,7 @@ async function getLatestScheduledSyncRun() {
   return rows[0]?.finished_at ?? null;
 }
 
-const SCHEDULED_SYNC_HOURS_JST = [5, 11, 17, 23];
+const SCHEDULED_SYNC_HOURS_JST = [0, 6, 12, 18];
 const SCHEDULED_SYNC_MINUTE_JST = 17;
 
 function getJstParts(date: Date) {
