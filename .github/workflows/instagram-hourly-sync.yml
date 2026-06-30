@@ -9,23 +9,11 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://instagram-post-analytics-ai.vercel.app
     steps:
-      - name: Resolve Vercel base URL
-        run: |
-          BASE_URL="${{ secrets.VERCEL_URL }}"
-          if [ -z "$BASE_URL" ]; then
-            echo "::error::VERCEL_URL が未設定です。"
-            exit 1
-          fi
-
-          case "$BASE_URL" in
-            http://*|https://*) ;;
-            *) BASE_URL="https://$BASE_URL" ;;
-          esac
-
-          BASE_URL="${BASE_URL%/}"
-          echo "BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
-          echo "Using scheduled sync target: $BASE_URL"
+      - name: Confirm production sync target
+        run: echo "Using scheduled sync target: $BASE_URL"
 
       - name: Call full-sync API
         run: |
