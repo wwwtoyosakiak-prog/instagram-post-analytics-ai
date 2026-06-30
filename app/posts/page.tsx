@@ -77,7 +77,7 @@ function formatVideoDuration(seconds: number | null): string {
 function SourceBadge({ source }: { source: MetricSource }) {
   return source === "api"
     ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">補完</span>;
+    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">未取得</span>;
 }
 
 function TypeBadge({ type }: { type: UTypeFilter | null }) {
@@ -316,7 +316,7 @@ export default function PostsPage() {
     <div>
       <PageHeader
         title="投稿一覧"
-        description={`API同期 ${apiMatchCount}件 / 補完データ ${supplementOnlyCount}件 / API履歴のみ ${apiOnlyCount}件`}
+        description={`API同期 ${apiMatchCount}件 / 未取得 ${supplementOnlyCount}件 / API履歴のみ ${apiOnlyCount}件`}
       />
 
       {/* AI評価 */}
@@ -550,7 +550,7 @@ function UnifiedCard({
   const sourceBadge = (src: MetricSource) =>
     src === "api"
       ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-      : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">補完</span>;
+      : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">未取得</span>;
 
   const body = (
     <>
@@ -581,7 +581,7 @@ function UnifiedCard({
             </span>
           ) : (
             <span className="rounded-full bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-500">
-              {entry.post ? "補完データ" : "API履歴のみ"}
+              {entry.post ? "未取得" : "API履歴のみ"}
             </span>
           )}
         </div>

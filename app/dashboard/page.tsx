@@ -52,7 +52,7 @@ const fmt = (v: number | null | undefined) =>
 function SourceBadge({ source }: { source: MetricSource }) {
   return source === 'api'
     ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">補完</span>;
+    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">未取得</span>;
 }
 
 function GrowthPattern({ title, items }: { title: string; items: string[] }) {
@@ -697,26 +697,26 @@ export default function DashboardPage() {
           label="対象投稿"
           value={`${effectivePosts.length}件`}
           note={mergeStats.total > 0
-            ? `API同期 ${mergeStats.apiCount}件 / 補完 ${mergeStats.manualCount}件`
+            ? `API同期 ${mergeStats.apiCount}件 / 未取得 ${mergeStats.manualCount}件`
             : "全投稿合計"}
           tone="moss"
         />
         <HeroStat
           label="合計表示数"
           value={effectivePosts.reduce((s, p) => s + p.views, 0).toLocaleString()}
-          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件 + 補完 ${mergeStats.manualCount}件` : "補完データから集計"}
+          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件 + 未取得 ${mergeStats.manualCount}件` : "未取得データから集計"}
           tone="clay"
         />
         <HeroStat
           label="平均ER"
           value={`${average(effectivePosts.map(p => getMetrics(p).engagementRate)).toFixed(2)}%`}
-          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "補完データから算出"}
+          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "未取得データから算出"}
           tone="sky"
         />
         <HeroStat
           label="平均保存数"
           value={Math.round(average(effectivePosts.map(p => p.saves))).toLocaleString()}
-          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "補完データから算出"}
+          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "未取得データから算出"}
           tone="plum"
         />
       </div>
