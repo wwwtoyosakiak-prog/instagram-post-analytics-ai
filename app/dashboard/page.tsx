@@ -267,13 +267,13 @@ function getNextScheduledSyncTime(now: Date) {
   next.setSeconds(0, 0);
 
   const currentMinutes = next.getHours() * 60 + next.getMinutes();
-  const nextSlot = slots.find((hour) => currentMinutes < (hour * 60 + 17));
+  const nextSlot = slots.find((hour) => currentMinutes < hour * 60);
 
   if (typeof nextSlot === "number") {
-    next.setHours(nextSlot, 17, 0, 0);
+    next.setHours(nextSlot, 0, 0, 0);
   } else {
     next.setDate(next.getDate() + 1);
-    next.setHours(slots[0], 17, 0, 0);
+    next.setHours(slots[0], 0, 0, 0);
   }
 
   return new Date(next.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
@@ -286,13 +286,13 @@ function getLatestExpectedScheduledTime(now: Date) {
   expected.setSeconds(0, 0);
 
   const currentMinutes = expected.getHours() * 60 + expected.getMinutes();
-  const pastSlots = slots.filter((hour) => currentMinutes >= (hour * 60 + 17));
+  const pastSlots = slots.filter((hour) => currentMinutes >= hour * 60);
 
   if (pastSlots.length) {
-    expected.setHours(pastSlots[pastSlots.length - 1], 17, 0, 0);
+    expected.setHours(pastSlots[pastSlots.length - 1], 0, 0, 0);
   } else {
     expected.setDate(expected.getDate() - 1);
-    expected.setHours(slots[slots.length - 1], 17, 0, 0);
+    expected.setHours(slots[slots.length - 1], 0, 0, 0);
   }
 
   return new Date(expected.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
@@ -327,7 +327,7 @@ function formatDateTimeJst(value: string) {
   });
 }
 
-const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
+const SCHEDULED_SYNC_TIMES_LABEL = "毎日 0:00 / 6:00 / 12:00 / 18:00";
 
 function syncStatusLabel(status: InstagramSyncRun["status"]) {
   if (status === "success") return "成功";
@@ -771,11 +771,11 @@ export default function DashboardPage() {
                   <p className="mt-2 text-xs text-amber-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
-              {latestSyncRun?.status === "success" && pastSyncError ? (
+              {latestSyncRun && latestSyncRun.status !== "success" && latestSyncRun.failedPosts > 0 && latestSyncError ? (
                 <div className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-4 text-sm leading-6 text-stone-700">
                   <p className="font-semibold text-ink">前回の失敗履歴</p>
-                  <p className="mt-1">{pastSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
-                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(pastSyncError.finishedAt)}</p>
+                  <p className="mt-1">{latestSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
+                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
             </Panel>
