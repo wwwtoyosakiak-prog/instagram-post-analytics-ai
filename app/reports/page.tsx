@@ -178,6 +178,8 @@ export default function ReportsPage() {
   return (
     <div>
       <PageHeader title="月次レポート" description="登録済み投稿を月別に集計し、伸びた投稿と改善が必要な投稿を確認します。" />
+
+      {/* 設定エリア */}
       <Panel className="mb-6">
         <div className="grid gap-3 md:grid-cols-1">
           <div>
@@ -208,29 +210,45 @@ export default function ReportsPage() {
           </div>
         </div>
       </Panel>
-      <Panel className="mb-6 print-hide">
-        <h2 className="font-semibold">レポート操作</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={createAiReport} disabled={loading}>{loading ? "作成中..." : "AI総評を作成"}</Button>
-          <Button variant="secondary" onClick={() => { setAiSummary("リールは表示数獲得に強く、カルーセルは保存に貢献しています。来月は実演リールで認知を広げ、保存されるチェックリスト投稿で見込み顧客との接点を増やす方針が有効です。"); setSelectedReport(null); }}>サンプル総評</Button>
-          <Button variant="secondary" onClick={saveCurrentReport} disabled={saving}>{saving ? "保存中..." : "月次レポートを保存"}</Button>
-          {selectedReport ? <Button variant="secondary" onClick={resetToCurrentReport}>現在データに戻す</Button> : null}
-          <Button onClick={printReport}>PDF出力</Button>
-        </div>
-        <p className="mt-3 text-sm text-stone-600">PDF出力を押した後、印刷画面で「PDFとして保存」を選んでください。</p>
-        {error ? <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-        {message ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}
-        {selectedReport ? <p className="mt-4 rounded-md bg-fog px-3 py-2 text-sm text-stone-700">保存日時: {formatDateTime(selectedReport.createdAt)} / 対象: {selectedReport.accountName}</p> : null}
-      </Panel>
 
       <div className="print-area">
+        {/* 印刷用見出し */}
         <Panel className="hidden print:block">
           <p className="text-xs font-semibold uppercase text-clay">Instagram Analytics Report</p>
           <h1 className="mt-2 text-2xl font-bold text-ink">{displayReport.month} 月次レポート</h1>
           <p className="mt-2 text-sm text-stone-600">対象: このInstagramアカウント / 出力日時: {formatDateTime(reportGeneratedAt)}</p>
         </Panel>
 
-        <Panel className="mb-6">
+        {/* 月次レポート本体 */}
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <Stat label="合計表示数" value={displayReport.totalViews.toLocaleString()} />
+          <Stat label="平均いいね数" value={Math.round(displayReport.averageLikes).toLocaleString()} />
+          <Stat label="平均保存数" value={Math.round(displayReport.averageSaves).toLocaleString()} />
+          <Stat label="平均エンゲージメント率" value={formatPercent(displayReport.averageEngagementRate)} />
+        </div>
+        <Panel className="mt-6">
+          <h2 className="font-semibold">週次・月次の伸びレポート</h2>
+          <p className="mt-2 text-sm text-stone-600">Instagram APIの同期履歴を基準に、閲覧数などの増加を集計しています。</p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <GrowthReportBlock title="直近7日" summary={growthReport.week} />
+            <GrowthReportBlock title="直近30日" summary={growthReport.month} />
+          </div>
+        </Panel>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
+          <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
+        </div>
+        <Panel className="mt-6">
+          <h2 className="font-semibold">AIによる総評</h2>
+          <p className="mt-2 text-sm leading-6 text-stone-700">{displayReport.summary}</p>
+          <h2 className="mt-5 font-semibold">来月の投稿方針</h2>
+          <ul className="mt-2 grid gap-2">
+            {displayReport.nextMonthPolicy.map((item) => <li className="rounded-md bg-stone-100 px-3 py-2 text-sm" key={item}>{item}</li>)}
+          </ul>
+        </Panel>
+
+        {/* 年度レポート本体 */}
+        <Panel className="mt-6">
           <h2 className="font-semibold">{fiscalYear}年度レポート</h2>
           <p className="mt-2 text-sm text-stone-600">対象期間: {annualReport.months[0]} 〜 {annualReport.months[11]}</p>
           <div className="mt-4 grid gap-4 md:grid-cols-5">
@@ -276,13 +294,6 @@ export default function ReportsPage() {
             <AnnualRanking title="年度で改善が必要な投稿TOP3" posts={annualReport.needsWorkPosts} />
           </div>
         </Panel>
-
-        <div className="grid gap-4 md:grid-cols-4">
-          <Stat label="合計表示数" value={displayReport.totalViews.toLocaleString()} />
-          <Stat label="平均いいね数" value={Math.round(displayReport.averageLikes).toLocaleString()} />
-          <Stat label="平均保存数" value={Math.round(displayReport.averageSaves).toLocaleString()} />
-          <Stat label="平均エンゲージメント率" value={formatPercent(displayReport.averageEngagementRate)} />
-        </div>
         <Panel className="mt-6">
           <h2 className="font-semibold">目標達成率</h2>
           {selectedGoal ? (
@@ -297,27 +308,25 @@ export default function ReportsPage() {
             <p className="mt-3 text-sm text-stone-600">この月の目標は未設定です。目標管理ページで設定すると、レポートにも達成率が表示されます。</p>
           )}
         </Panel>
-        <Panel className="mt-6">
-          <h2 className="font-semibold">週次・月次の伸びレポート</h2>
-          <p className="mt-2 text-sm text-stone-600">Instagram APIの同期履歴を基準に、閲覧数などの増加を集計しています。</p>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <GrowthReportBlock title="直近7日" summary={growthReport.week} />
-            <GrowthReportBlock title="直近30日" summary={growthReport.month} />
-          </div>
-        </Panel>
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <Ranking title="伸びた投稿TOP3" posts={displayReport.topPosts} />
-          <Ranking title="改善が必要な投稿TOP3" posts={displayReport.needsWorkPosts} />
-        </div>
-        <Panel className="mt-6">
-          <h2 className="font-semibold">AIによる総評</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-700">{displayReport.summary}</p>
-          <h2 className="mt-5 font-semibold">来月の投稿方針</h2>
-          <ul className="mt-2 grid gap-2">
-            {displayReport.nextMonthPolicy.map((item) => <li className="rounded-md bg-stone-100 px-3 py-2 text-sm" key={item}>{item}</li>)}
-          </ul>
-        </Panel>
       </div>
+
+      {/* 操作エリア */}
+      <Panel className="mt-6 print-hide">
+        <h2 className="font-semibold">レポート操作</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={createAiReport} disabled={loading}>{loading ? "作成中..." : "AI総評を作成"}</Button>
+          <Button variant="secondary" onClick={() => { setAiSummary("リールは表示数獲得に強く、カルーセルは保存に貢献しています。来月は実演リールで認知を広げ、保存されるチェックリスト投稿で見込み顧客との接点を増やす方針が有効です。"); setSelectedReport(null); }}>サンプル総評</Button>
+          <Button variant="secondary" onClick={saveCurrentReport} disabled={saving}>{saving ? "保存中..." : "月次レポートを保存"}</Button>
+          {selectedReport ? <Button variant="secondary" onClick={resetToCurrentReport}>現在データに戻す</Button> : null}
+          <Button onClick={printReport}>PDF出力</Button>
+        </div>
+        <p className="mt-3 text-sm text-stone-600">PDF出力を押した後、印刷画面で「PDFとして保存」を選んでください。</p>
+        {error ? <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+        {message ? <p className="mt-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{message}</p> : null}
+        {selectedReport ? <p className="mt-4 rounded-md bg-fog px-3 py-2 text-sm text-stone-700">保存日時: {formatDateTime(selectedReport.createdAt)} / 対象: {selectedReport.accountName}</p> : null}
+      </Panel>
+
+      {/* 過去レポート一覧 */}
       <Panel className="mt-6 print-hide">
         <h2 className="font-semibold">過去レポート一覧</h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">同じ月に保存したレポートを履歴として確認できます。</p>
