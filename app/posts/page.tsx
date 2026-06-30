@@ -21,6 +21,7 @@ interface UnifiedEntry {
   normalizedType: UTypeFilter | null;
   permalink: string | null;
   thumbnail: string | null;
+  mediaUrl: string | null;
   views: number; viewsSrc: MetricSource;
   likes: number; likesSrc: MetricSource;
   saves: number; savesSrc: MetricSource;
@@ -62,6 +63,15 @@ function formatWatchTime(ms: number | null): string {
   return `${s.toFixed(1)}秒`;
 }
 
+function formatVideoDuration(seconds: number | null): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return "–";
+  const totalSeconds = Math.round(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  if (minutes === 0) return `${remainingSeconds}秒`;
+  return `${minutes}分${remainingSeconds.toString().padStart(2, "0")}秒`;
+}
+
 // ── UI コンポーネント ────────────────────────────────────────
 
 function SourceBadge({ source }: { source: MetricSource }) {
@@ -96,6 +106,7 @@ export default function PostsPage() {
   const [sortKey, setSortKey] = useState<USort>("date");
   const [typeFilter, setTypeFilter] = useState<UTypeFilter>("");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [videoDurationByUrl, setVideoDurationByUrl] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
     Promise.all([
@@ -132,6 +143,7 @@ export default function PostsPage() {
         normalizedType: normalizeType(matched?.media_type, post.type),
         permalink: post.url ?? matched?.permalink ?? null,
         thumbnail: (post.screenshot || post.thumbnailUrl || post.mediaUrl || matched?.thumbnail_url) ?? null,
+        mediaUrl: post.mediaUrl ?? matched?.media_url ?? null,
         views: m.views, viewsSrc: m.viewsSrc,
         likes: m.likes, likesSrc: m.likesSrc,
         saves: m.saves, savesSrc: m.savesSrc,
@@ -167,6 +179,7 @@ export default function PostsPage() {
           normalizedType: normalizeType(m.media_type, null),
           permalink: m.permalink,
           thumbnail: m.thumbnail_url ?? m.media_url ?? null,
+          mediaUrl: m.media_url ?? null,
           views, viewsSrc: "api" as MetricSource,
           likes, likesSrc: "api" as MetricSource,
           saves, savesSrc: "api" as MetricSource,
@@ -187,6 +200,45 @@ export default function PostsPage() {
 
     return [...manualEntries, ...apiOnlyEntries];
   }, [posts, apiMedia]);
+
+  useEffect(() => {
+    const pendingUrls = unifiedList
+      .filter((entry) => entry.normalizedType === "video" && entry.mediaUrl && !(entry.mediaUrl in videoDurationByUrl))
+      .map((entry) => entry.mediaUrl as string);
+
+    if (pendingUrls.length === 0) return;
+
+    const uniqueUrls = [...new Set(pendingUrls)];
+    const videos: HTMLVideoElement[] = [];
+    let cancelled = false;
+
+    uniqueUrls.forEach((url) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.src = url;
+
+      const finalize = (duration: number | null) => {
+        if (cancelled) return;
+        setVideoDurationByUrl((current) => (url in current ? current : { ...current, [url]: duration }));
+      };
+
+      video.onloadedmetadata = () => {
+        finalize(Number.isFinite(video.duration) ? video.duration : null);
+      };
+      video.onerror = () => finalize(null);
+      videos.push(video);
+    });
+
+    return () => {
+      cancelled = true;
+      videos.forEach((video) => {
+        video.onloadedmetadata = null;
+        video.onerror = null;
+        video.removeAttribute("src");
+        video.load();
+      });
+    };
+  }, [unifiedList, videoDurationByUrl]);
 
   // ── フィルタ＋ソート ──────────────────────────────────────
 
@@ -364,6 +416,7 @@ export default function PostsPage() {
                 <th>フォロー</th>
                 <th>総再生時間</th>
                 <th>平均視聴</th>
+                <th>動画尺</th>
                 <th>ER</th>
                 <th>AIスコア</th>
                 <th>詳細・分析</th>
@@ -417,6 +470,7 @@ export default function PostsPage() {
                   <td>{e.follows > 0 ? e.follows.toLocaleString("ja-JP") : "–"}</td>
                   <td>{formatWatchTime(e.reelTotalViewTimeMs)}</td>
                   <td>{formatWatchTime(e.reelAvgWatchTimeMs)}</td>
+                  <td>{e.normalizedType === "video" ? formatVideoDuration(e.mediaUrl ? videoDurationByUrl[e.mediaUrl] ?? null : null) : "–"}</td>
                   <td>{formatPercent(e.er)}</td>
                   <td>
                     {e.post
@@ -465,6 +519,7 @@ export default function PostsPage() {
               key={e.key}
               entry={e}
               aiScore={e.post ? latestScoreByPostId[e.post.id] : undefined}
+              videoDurationSeconds={e.mediaUrl ? videoDurationByUrl[e.mediaUrl] ?? null : null}
             />
           ))}
           {filteredList.length === 0 && (
@@ -483,9 +538,11 @@ export default function PostsPage() {
 function UnifiedCard({
   entry,
   aiScore,
+  videoDurationSeconds,
 }: {
   entry: UnifiedEntry;
   aiScore?: number;
+  videoDurationSeconds: number | null;
 }) {
   const cls =
     "group overflow-hidden rounded-lg border border-stone-200 bg-white/82 shadow-panel transition hover:border-moss hover:bg-white";
@@ -548,6 +605,14 @@ function UnifiedCard({
             <span className="mt-1 block font-bold text-ink">{formatPercent(entry.er)}</span>
           </div>
         </div>
+        {entry.normalizedType === "video" ? (
+          <div className="mt-3 rounded-md bg-fog px-3 py-2 text-xs text-stone-600">
+            <span className="font-semibold text-stone-500">動画尺</span>
+            <span className="ml-2 font-bold text-ink">
+              {formatVideoDuration(videoDurationSeconds)}
+            </span>
+          </div>
+        ) : null}
         {entry.post ? (
           <span className="mt-3 block rounded-md bg-pink-500 px-3 py-1.5 text-center text-xs font-bold text-white">
             詳細・分析を見る
