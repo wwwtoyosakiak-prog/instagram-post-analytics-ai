@@ -243,7 +243,7 @@ function LatestInsightSection({
             <Stat label="保存数" value={v(insight.saved)} />
             <Stat label="コメント数" value={v(insight.comments)} />
             <Stat label="シェア数" value={v(insight.shares)} />
-            <Stat label="総インタラクション" value={v(insight.totalInteractions)} />
+            <Stat label="総反応数" value={v(insight.totalInteractions)} />
             <Stat label="プロフィールアクセス" value={v(insight.profileVisits)} />
             <Stat label="フォロー数" value={v(insight.follows)} />
           </div>

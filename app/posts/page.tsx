@@ -411,7 +411,7 @@ export default function PostsPage() {
                 <th>保存</th>
                 <th>コメント</th>
                 <th>シェア</th>
-                <th>総IA</th>
+                <th>総反応数</th>
                 <th>PFアクセス</th>
                 <th>フォロー</th>
                 <th>総再生時間</th>
