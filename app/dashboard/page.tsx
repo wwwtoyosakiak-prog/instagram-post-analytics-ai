@@ -197,18 +197,19 @@ function Progress({ label, actual, target, suffix, decimal = false }: {
   );
 }
 
-function ChartPanel({ title, description, accent, children }: {
+function ChartPanel({ title, description, accent, children, className = "", chartHeightClassName = "h-72" }: {
   title: string; description: string; accent: "moss" | "clay" | "sky" | "plum"; children: React.ReactElement;
+  className?: string; chartHeightClassName?: string;
 }) {
   const accentClasses = { moss: "bg-moss", clay: "bg-clay", sky: "bg-teal-700", plum: "bg-plum" };
   return (
-    <Panel className="relative overflow-hidden">
+    <Panel className={`relative overflow-hidden ${className}`}>
       <div className={`absolute left-0 top-0 h-full w-1 ${accentClasses[accent]}`} />
       <div className="pl-3">
         <h2 className="font-semibold">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
       </div>
-      <div className="h-72">
+      <div className={chartHeightClassName}>
         <ResponsiveContainer width="100%" height="100%">
           {children}
         </ResponsiveContainer>
@@ -606,7 +607,12 @@ export default function DashboardPage() {
         ? [...dailyViewsMap.keys()].sort().at(-1) ?? todayKey
         : todayKey;
     const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
-      .map((date) => ({ name: `${date.slice(5)}(${weekdayJa(date)})`, date, views: dailyViewsMap.get(date) ?? 0 }));
+      .map((date) => ({
+        axisLabel: `${date.slice(5).replace("-", "/")}`,
+        tooltipLabel: `${date.slice(5).replace("-", "/")}(${weekdayJa(date)})`,
+        date,
+        views: dailyViewsMap.get(date) ?? 0
+      }));
     const typeData = (["image", "video", "reel", "carousel"] as PostType[]).map((type) => {
       const items = graphPosts.filter((post) => post.type === type);
       return {
@@ -1004,20 +1010,20 @@ export default function DashboardPage() {
         </div>
       </section>
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
-        <ChartPanel title="日別表示数の推移" description="投稿日ごとの表示数の流れです。大きく伸びた日を先に把握できます。" accent="clay">
-          <LineChart data={data.dailyViews} margin={{ top: 8, right: 12, left: 0, bottom: 24 }}>
+        <ChartPanel title="日別表示数の推移" description="投稿日ごとの表示数の流れです。大きく伸びた日を先に把握できます。" accent="clay" className="lg:col-span-2" chartHeightClassName="h-80">
+          <LineChart data={data.dailyViews} margin={{ top: 8, right: 12, left: 0, bottom: 12 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
-              dataKey="name"
-              interval={0}
-              minTickGap={0}
-              tickMargin={12}
-              angle={-35}
-              textAnchor="end"
-              height={56}
+              dataKey="axisLabel"
+              interval="preserveStartEnd"
+              minTickGap={18}
+              tickMargin={10}
+              angle={0}
+              textAnchor="middle"
+              height={36}
             />
             <YAxis />
-            <Tooltip />
+            <Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.tooltipLabel ?? ""} />
             <Line type="monotone" dataKey="views" name="表示数" stroke="#b55d3e" strokeWidth={2} />
           </LineChart>
         </ChartPanel>
