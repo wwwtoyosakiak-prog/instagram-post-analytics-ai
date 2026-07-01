@@ -627,6 +627,13 @@ export default function DashboardPage() {
         averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2))
       };
     });
+    const graphApiCount = graphPosts.reduce((count, post) => {
+      const matched = matchPostToMedia(post, apiMedia);
+      const ins = matched?.latest_insights;
+      const hasApiData = (ins?.views != null && ins.views > 0) || (ins?.reach != null && ins.reach > 0);
+      return hasApiData ? count + 1 : count;
+    }, 0);
+    const graphManualCount = graphPosts.length - graphApiCount;
     const weekdayData = ["日", "月", "火", "水", "木", "金", "土"].map((day) => {
       const items = graphPosts.filter((post) => weekdayJa(post.date) === day);
       return { name: day, averageEngagementRate: Number(average(items.map((post) => getMetrics(post).engagementRate)).toFixed(2)) };
@@ -643,6 +650,10 @@ export default function DashboardPage() {
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
       currentMonthKey, monthlyActual, selectedGoal,
       count: targetPosts.length, graphCount: graphPosts.length,
+      graphApiCount, graphManualCount,
+      graphTotalViews: graphPosts.reduce((sum, post) => sum + post.views, 0),
+      graphAverageEngagementRate: average(graphPosts.map((post) => getMetrics(post).engagementRate)),
+      graphAverageSaves: average(graphPosts.map((post) => post.saves)),
       graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "直近1年",
 
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
@@ -736,28 +747,28 @@ export default function DashboardPage() {
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <HeroStat
           label="対象投稿"
-          value={`${effectivePosts.length}件`}
-          note={mergeStats.total > 0
-            ? `API同期 ${mergeStats.apiCount}件 / 未取得 ${mergeStats.manualCount}件`
-            : "全投稿合計"}
+          value={`${data.graphCount}件`}
+          note={data.graphCount > 0
+            ? `${data.graphPeriodLabel} / API同期 ${data.graphApiCount}件 / 未取得 ${data.graphManualCount}件`
+            : `${data.graphPeriodLabel}の投稿はありません`}
           tone="moss"
         />
         <HeroStat
           label="合計表示数"
-          value={effectivePosts.reduce((s, p) => s + p.views, 0).toLocaleString()}
-          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件 + 未取得 ${mergeStats.manualCount}件` : "未取得データから集計"}
+          value={data.graphTotalViews.toLocaleString()}
+          note={data.graphCount > 0 ? `${data.graphPeriodLabel}の集計` : "対象データなし"}
           tone="clay"
         />
         <HeroStat
           label="平均ER"
-          value={`${average(effectivePosts.map(p => getMetrics(p).engagementRate)).toFixed(2)}%`}
-          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "未取得データから算出"}
+          value={`${data.graphAverageEngagementRate.toFixed(2)}%`}
+          note={data.graphCount > 0 ? `${data.graphPeriodLabel}の平均値` : "対象データなし"}
           tone="sky"
         />
         <HeroStat
           label="平均保存数"
-          value={Math.round(average(effectivePosts.map(p => p.saves))).toLocaleString()}
-          note={mergeStats.apiCount > 0 ? `API ${mergeStats.apiCount}件を含む統合値` : "未取得データから算出"}
+          value={Math.round(data.graphAverageSaves).toLocaleString()}
+          note={data.graphCount > 0 ? `${data.graphPeriodLabel}の平均値` : "対象データなし"}
           tone="plum"
         />
       </div>
