@@ -987,7 +987,21 @@ export default function DashboardPage() {
       </section>
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
         <ChartPanel title="日別表示数の推移" description="投稿日ごとの表示数の流れです。大きく伸びた日を先に把握できます。" accent="clay">
-          <LineChart data={data.dailyViews}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Line type="monotone" dataKey="views" name="表示数" stroke="#b55d3e" strokeWidth={2} /></LineChart>
+          <LineChart data={data.dailyViews} margin={{ top: 8, right: 12, left: 0, bottom: 24 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="name"
+              interval={0}
+              minTickGap={0}
+              tickMargin={12}
+              angle={-35}
+              textAnchor="end"
+              height={56}
+            />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="views" name="表示数" stroke="#b55d3e" strokeWidth={2} />
+          </LineChart>
         </ChartPanel>
         <ChartPanel title="投稿タイプ別の平均表示数" description="動画・画像など、形式ごとの平均表示数を比較します。" accent="moss">
           <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageViews" name="平均表示数" fill="#53624a" /></BarChart>
