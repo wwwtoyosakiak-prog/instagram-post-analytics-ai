@@ -606,7 +606,7 @@ export default function DashboardPage() {
         ? [...dailyViewsMap.keys()].sort().at(-1) ?? todayKey
         : todayKey;
     const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
-      .map((date) => ({ name: date.slice(5), date, views: dailyViewsMap.get(date) ?? 0 }));
+      .map((date) => ({ name: `${date.slice(5)}(${weekdayJa(date)})`, date, views: dailyViewsMap.get(date) ?? 0 }));
     const typeData = (["image", "video", "reel", "carousel"] as PostType[]).map((type) => {
       const items = graphPosts.filter((post) => post.type === type);
       return {
