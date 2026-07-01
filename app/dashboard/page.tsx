@@ -231,6 +231,29 @@ function DateWeekdayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; pa
   );
 }
 
+function GraphPeriodTabs({
+  graphPeriod,
+  setGraphPeriod,
+}: {
+  graphPeriod: "7" | "30" | "90" | "365";
+  setGraphPeriod: (period: "7" | "30" | "90" | "365") => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
+      {(["7", "30", "90", "365"] as const).map((period) => (
+        <button
+          key={period}
+          type="button"
+          onClick={() => setGraphPeriod(period)}
+          className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
+        >
+          {period === "7" ? "一週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── ヘルパー関数 ──────────────────────────────────────────
 
 function videoTitle(post: InstagramPost) {
@@ -796,6 +819,11 @@ export default function DashboardPage() {
         )}
       </Panel>
 
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p className="text-sm text-stone-600">上の要約カードと下のグラフは同じ期間で切り替わります。</p>
+        <GraphPeriodTabs graphPeriod={graphPeriod} setGraphPeriod={setGraphPeriod} />
+      </div>
+
       {/* サマリーカード（統合後の実効値） */}
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <HeroStat
@@ -1099,14 +1127,7 @@ export default function DashboardPage() {
         <SectionLead eyebrow="Charts" title="推移と比較" description="時系列の流れ、投稿タイプ差、カテゴリ差を横断して確認できるグラフ群です。" />
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-stone-600">{data.graphPeriodLabel}の投稿 {data.graphCount}件をもとに集計しています。</p>
-          <div className="grid grid-cols-4 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
-            {(["7", "30", "90", "365"] as const).map((period) => (
-              <button key={period} type="button" onClick={() => setGraphPeriod(period)}
-                className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}>
-                {period === "7" ? "一週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
-              </button>
-            ))}
-          </div>
+          <GraphPeriodTabs graphPeriod={graphPeriod} setGraphPeriod={setGraphPeriod} />
         </div>
       </section>
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
