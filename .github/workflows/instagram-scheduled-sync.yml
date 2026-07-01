@@ -1,0 +1,58 @@
+name: Instagram Scheduled Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3,9,15,21 * * *"
+
+jobs:
+  sync:
+    name: Run scheduled sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: https://instagram-post-analytics-ai.vercel.app
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Check secret presence
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set."
+            exit 1
+          fi
+
+      - name: Call full sync API
+        run: |
+          status=$(curl -sS \
+            --connect-timeout 15 \
+            --max-time 60 \
+            -o /tmp/full-sync.json \
+            -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE_URL/api/instagram/full-sync")
+
+          echo "full-sync status: $status"
+          cat /tmp/full-sync.json
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Full sync failed with HTTP $status"
+            exit 1
+          fi
+
+      - name: Call snapshot sync API
+        run: |
+          status=$(curl -sS \
+            --connect-timeout 15 \
+            --max-time 60 \
+            -o /tmp/snapshot-sync.json \
+            -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE_URL/api/instagram/sync")
+
+          echo "snapshot-sync status: $status"
+          cat /tmp/snapshot-sync.json
+
+          if [ "$status" != "200" ] && [ "$status" != "207" ]; then
+            echo "::error::Snapshot sync failed with HTTP $status"
+            exit 1
+          fi
