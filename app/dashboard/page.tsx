@@ -762,6 +762,8 @@ export default function DashboardPage() {
         const executedAt = formatTimeJst(matchedRun.startedAt);
         return {
           slotLabel,
+          plannedAt: slotLabel,
+          executedAt,
           status: matchedRun.status === "success" ? "success" : matchedRun.status === "partial" ? "partial" : "failed",
           message: matchedRun.status === "success"
             ? `${executedAt} に成功`
@@ -770,10 +772,22 @@ export default function DashboardPage() {
       }
 
       if (nowJst.getTime() < slotAt.getTime()) {
-        return { slotLabel, status: "upcoming", message: "未到来" } as const;
+        return {
+          slotLabel,
+          plannedAt: slotLabel,
+          executedAt: "未到来",
+          status: "upcoming",
+          message: "未到来"
+        } as const;
       }
 
-      return { slotLabel, status: "missing", message: "実行結果未反映" } as const;
+      return {
+        slotLabel,
+        plannedAt: slotLabel,
+        executedAt: "未反映",
+        status: "missing",
+        message: "実行結果未反映"
+      } as const;
     });
   }, [syncRuns]);
   const showLatestSyncFailurePanel = Boolean(latestSyncRun?.status === "failed" && latestSyncError && !syncMonitor.isDelayed);
@@ -920,8 +934,15 @@ export default function DashboardPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">本日の自動同期枠</p>
                     <div className="mt-3 grid gap-2">
                       {scheduledSlotStatuses.map((slot) => (
-                        <div key={slot.slotLabel} className="grid gap-1 rounded-lg border border-stone-200/80 bg-white/80 px-3 py-2 md:grid-cols-[72px_96px_1fr] md:items-center">
-                          <p className="text-sm font-semibold text-ink">{slot.slotLabel}</p>
+                        <div key={slot.slotLabel} className="grid gap-2 rounded-lg border border-stone-200/80 bg-white/80 px-3 py-2 md:grid-cols-[84px_110px_110px_96px_1fr] md:items-center">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">対応</p>
+                            <p className="text-sm font-semibold text-ink">{slot.plannedAt}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">実施</p>
+                            <p className="text-sm font-semibold text-ink">{slot.executedAt}</p>
+                          </div>
                           <p className={`text-sm font-semibold ${
                             slot.status === "success"
                               ? "text-emerald-700"
