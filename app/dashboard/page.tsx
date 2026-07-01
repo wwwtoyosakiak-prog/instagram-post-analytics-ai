@@ -261,8 +261,7 @@ function toTokyoDateKey(date: Date) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function filterPostsByPeriod(posts: InstagramPost[], period: "7" | "30" | "90" | "all", todayKey: string) {
-  if (period === "all") return posts;
+function filterPostsByPeriod(posts: InstagramPost[], period: "7" | "30" | "90" | "365", todayKey: string) {
   const end = new Date(`${todayKey}T00:00:00+09:00`);
   const start = new Date(end);
   start.setDate(start.getDate() - (Number(period) - 1));
@@ -374,7 +373,7 @@ export default function DashboardPage() {
 
   // ── UI state ──
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
-  const [graphPeriod, setGraphPeriod] = useState<"7" | "30" | "90" | "all">("30");
+  const [graphPeriod, setGraphPeriod] = useState<"7" | "30" | "90" | "365">("30");
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
@@ -598,14 +597,8 @@ export default function DashboardPage() {
       daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
       return daily;
     }, new Map<string, number>());
-    const graphRangeStart =
-      graphPeriod === "all"
-        ? [...dailyViewsMap.keys()].sort()[0] ?? todayKey
-        : shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
-    const graphRangeEnd =
-      graphPeriod === "all"
-        ? [...dailyViewsMap.keys()].sort().at(-1) ?? todayKey
-        : todayKey;
+    const graphRangeStart = shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
+    const graphRangeEnd = todayKey;
     const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
       .map((date) => ({
         axisLabel: `${date.slice(5).replace("-", "/")}`,
@@ -637,7 +630,7 @@ export default function DashboardPage() {
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
       currentMonthKey, monthlyActual, selectedGoal,
       count: targetPosts.length, graphCount: graphPosts.length,
-      graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "全期間",
+      graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "直近1年",
 
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
       todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
@@ -1000,10 +993,10 @@ export default function DashboardPage() {
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-stone-600">{data.graphPeriodLabel}の投稿 {data.graphCount}件をもとに集計しています。</p>
           <div className="grid grid-cols-4 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
-            {(["7", "30", "90", "all"] as const).map((period) => (
+            {(["7", "30", "90", "365"] as const).map((period) => (
               <button key={period} type="button" onClick={() => setGraphPeriod(period)}
                 className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}>
-                {period === "all" ? "全期間" : `${period}日`}
+                {period === "365" ? "1年" : `${period}日`}
               </button>
             ))}
           </div>
