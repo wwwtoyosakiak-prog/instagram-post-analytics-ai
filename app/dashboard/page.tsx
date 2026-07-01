@@ -218,6 +218,19 @@ function ChartPanel({ title, description, accent, children, className = "", char
   );
 }
 
+function DateWeekdayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
+  const raw = String(payload?.value ?? "");
+  const [dateLabel, weekdayLabel] = raw.split("|");
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={14} textAnchor="middle" fill="#57534e" fontSize={12}>
+        <tspan x={0}>{dateLabel}</tspan>
+        <tspan x={0} dy={14} fontSize={11} fill="#78716c">{weekdayLabel}</tspan>
+      </text>
+    </g>
+  );
+}
+
 // ── ヘルパー関数 ──────────────────────────────────────────
 
 function videoTitle(post: InstagramPost) {
@@ -601,7 +614,7 @@ export default function DashboardPage() {
     const graphRangeEnd = todayKey;
     const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
       .map((date) => ({
-        axisLabel: `${date.slice(5).replace("-", "/")}`,
+        axisLabel: `${date.slice(5).replace("-", "/")}|${weekdayJa(date)}`,
         tooltipLabel: `${date.slice(5).replace("-", "/")}(${weekdayJa(date)})`,
         date,
         views: dailyViewsMap.get(date) ?? 0
@@ -1011,9 +1024,8 @@ export default function DashboardPage() {
               interval="preserveStartEnd"
               minTickGap={18}
               tickMargin={10}
-              angle={0}
-              textAnchor="middle"
-              height={36}
+              tick={<DateWeekdayTick />}
+              height={52}
             />
             <YAxis />
             <Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.tooltipLabel ?? ""} />
