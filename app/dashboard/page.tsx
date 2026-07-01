@@ -674,7 +674,7 @@ export default function DashboardPage() {
       graphTotalViews: graphPosts.reduce((sum, post) => sum + post.views, 0),
       graphAverageEngagementRate: average(graphPosts.map((post) => getMetrics(post).engagementRate)),
       graphAverageSaves: average(graphPosts.map((post) => post.saves)),
-      graphPeriodLabel: graphPeriod === "7" ? "直近7日" : graphPeriod === "30" ? "直近30日" : graphPeriod === "90" ? "直近90日" : "直近1年",
+      graphPeriodLabel: graphPeriod === "7" ? "一週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
 
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
       todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
@@ -1103,7 +1103,7 @@ export default function DashboardPage() {
             {(["7", "30", "90", "365"] as const).map((period) => (
               <button key={period} type="button" onClick={() => setGraphPeriod(period)}
                 className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}>
-                {period === "365" ? "1年" : `${period}日`}
+                {period === "7" ? "一週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
               </button>
             ))}
           </div>
@@ -1176,8 +1176,8 @@ export default function DashboardPage() {
       <section className="mt-6 border-y border-stone-200 py-6">
         <SectionLead eyebrow="Growth" title="週・月の伸び" description="Instagram API の同期履歴から、期間内にどれだけ増えたかを比較します。" />
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <GrowthSummaryPanel title="直近7日" summary={periodGrowth.week} />
-          <GrowthSummaryPanel title="直近30日" summary={periodGrowth.month} />
+          <GrowthSummaryPanel title="一週間" summary={periodGrowth.week} />
+          <GrowthSummaryPanel title="一ヶ月" summary={periodGrowth.month} />
         </div>
       </section>
     </div>
