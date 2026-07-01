@@ -401,6 +401,19 @@ function formatDateTimeJst(value: string) {
   });
 }
 
+function formatTimeJst(value: string) {
+  return new Date(value).toLocaleTimeString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function getScheduledSlotTime(dateKey: string, hour: number) {
+  return new Date(`${dateKey}T${String(hour).padStart(2, "0")}:17:00+09:00`);
+}
+
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
 const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
@@ -731,23 +744,28 @@ export default function DashboardPage() {
     const scheduledRunsToday = syncRuns.filter((run) => {
       if (run.triggerType !== "scheduled") return false;
       return toTokyoDateTimeParts(run.startedAt).date === todayKey;
-    });
+    }).sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
 
-    return SCHEDULED_SYNC_HOURS.map((hour) => {
-      const matchedRun = scheduledRunsToday.find((run) => {
-        const parts = toTokyoDateTimeParts(run.startedAt);
-        return parts.hour === hour && Math.abs(parts.minute - 17) <= 20;
-      }) ?? null;
-      const slotAt = new Date(`${todayKey}T${String(hour).padStart(2, "0")}:17:00+09:00`);
+    return SCHEDULED_SYNC_HOURS.map((hour, index) => {
+      const slotAt = getScheduledSlotTime(todayKey, hour);
+      const nextHour = SCHEDULED_SYNC_HOURS[index + 1];
+      const nextSlotAt = typeof nextHour === "number"
+        ? getScheduledSlotTime(todayKey, nextHour)
+        : getScheduledSlotTime(shiftTokyoDateKey(todayKey, 1), SCHEDULED_SYNC_HOURS[0]);
       const slotLabel = `${String(hour).padStart(2, "0")}:17`;
+      const matchedRun = scheduledRunsToday.find((run) => {
+        const startedAt = new Date(run.startedAt).getTime();
+        return startedAt >= slotAt.getTime() && startedAt < nextSlotAt.getTime();
+      }) ?? null;
 
       if (matchedRun) {
+        const executedAt = formatTimeJst(matchedRun.startedAt);
         return {
           slotLabel,
           status: matchedRun.status === "success" ? "success" : matchedRun.status === "partial" ? "partial" : "failed",
           message: matchedRun.status === "success"
-            ? "成功"
-            : matchedRun.errorSummary || matchedRun.errors[0]?.message || "同期エラー"
+            ? `${executedAt} に成功`
+            : `${executedAt} に ${matchedRun.errorSummary || matchedRun.errors[0]?.message || "同期エラー"}`
         } as const;
       }
 
