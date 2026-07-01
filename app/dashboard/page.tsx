@@ -111,6 +111,15 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SyncInfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg bg-white/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-xs font-semibold text-stone-500">{label}</span>
+      <span className="text-sm font-semibold text-ink">{value}</span>
+    </div>
+  );
+}
+
 function CompareStat({
   label, currentDay, previousDay, currentWeek, previousWeek, suffix = "", decimal = false
 }: {
@@ -632,6 +641,8 @@ export default function DashboardPage() {
   const latestScheduledErrorMessage = latestScheduledSyncRun?.errorSummary
     || latestScheduledSyncRun?.errors[0]?.message
     || null;
+  const showLatestSyncFailurePanel = Boolean(latestSyncRun?.status === "failed" && latestSyncError && !syncMonitor.isDelayed);
+  const showLatestSyncPartialPanel = Boolean(latestSyncRun?.status === "partial" && latestSyncError && !syncMonitor.isDelayed);
   const showTodayMissingAlert = Boolean(
     latestSyncRun?.status === "partial" &&
     latestSyncFinishedAt &&
@@ -740,13 +751,31 @@ export default function DashboardPage() {
                 <Insight label="同期状態" value={syncStatusValue} />
               </div>
               {syncMonitor.isDelayed ? (
-                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                  <p className="font-semibold">自動同期が未反映です</p>
-                  <p className="mt-1">予定 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の同期がまだ記録されていません。</p>
-                  <p className="mt-2 text-xs text-amber-700">最終自動同期: {latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}</p>
-                  {latestScheduledErrorMessage ? (
-                    <p className="mt-1 text-xs text-amber-700">失敗理由: {latestScheduledErrorMessage}</p>
-                  ) : null}
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-amber-950">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-sm font-bold">自動同期が止まっています</p>
+                      <p className="mt-1 text-sm leading-6 text-amber-900">
+                        {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の定期取得がまだ反映されていません。
+                      </p>
+                    </div>
+                    <span className="inline-flex w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                      要確認
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    <SyncInfoRow
+                      label="最後に反映された自動同期"
+                      value={latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"}
+                    />
+                    <SyncInfoRow
+                      label="次の予定時刻"
+                      value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())}
+                    />
+                    {latestScheduledErrorMessage ? (
+                      <SyncInfoRow label="直近のエラー内容" value={latestScheduledErrorMessage} />
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
               {latestSyncRun ? (
@@ -757,25 +786,25 @@ export default function DashboardPage() {
                   <MiniMetric label="失敗" value={`${latestSyncRun.failedPosts}件`} />
                 </div>
               ) : null}
-              {latestSyncRun?.status === "failed" && latestSyncError ? (
+              {showLatestSyncFailurePanel && latestSyncError ? (
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
                   <p className="font-semibold">自動同期に失敗しました</p>
                   <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "同期でエラーが発生しました。"}</p>
                   <p className="mt-2 text-xs text-red-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
-              {latestSyncRun?.status === "partial" && latestSyncError ? (
+              {showLatestSyncPartialPanel && latestSyncError ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <p className="font-semibold">自動同期で一部失敗しました</p>
                   <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "一部のデータ保存に失敗しました。"}</p>
                   <p className="mt-2 text-xs text-amber-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
-              {latestSyncRun && latestSyncRun.status !== "success" && latestSyncRun.failedPosts > 0 && latestSyncError ? (
+              {pastSyncError ? (
                 <div className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-4 text-sm leading-6 text-stone-700">
                   <p className="font-semibold text-ink">前回の失敗履歴</p>
-                  <p className="mt-1">{latestSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
-                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
+                  <p className="mt-1">{pastSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
+                  <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(pastSyncError.finishedAt)}</p>
                 </div>
               ) : null}
             </Panel>
