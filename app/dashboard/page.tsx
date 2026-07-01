@@ -323,6 +323,16 @@ function shiftTokyoDateKey(dateKey: string, offsetDays: number) {
   return toTokyoDateKey(base);
 }
 
+function getDateRangeKeys(startKey: string, endKey: string) {
+  const keys: string[] = [];
+  let currentKey = startKey;
+  while (currentKey <= endKey) {
+    keys.push(currentKey);
+    currentKey = shiftTokyoDateKey(currentKey, 1);
+  }
+  return keys;
+}
+
 function getPreviousRangeKeys(todayKey: string, days: number) {
   const end = shiftTokyoDateKey(todayKey, -days);
   const start = shiftTokyoDateKey(todayKey, -(days * 2) + 1);
@@ -583,12 +593,20 @@ export default function DashboardPage() {
       engagementRate: average(monthlyPosts.map((post) => getMetrics(post).engagementRate))
     };
     const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && goal.accountId == null) ?? goals.find((goal) => goal.month === currentMonthKey) ?? null;
-    const dailyViews = Array.from(
-      graphPosts.reduce((daily, post) => {
-        daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
-        return daily;
-      }, new Map<string, number>())
-    ).sort(([dateA], [dateB]) => dateA.localeCompare(dateB)).map(([date, views]) => ({ name: date.slice(5), date, views }));
+    const dailyViewsMap = graphPosts.reduce((daily, post) => {
+      daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
+      return daily;
+    }, new Map<string, number>());
+    const graphRangeStart =
+      graphPeriod === "all"
+        ? [...dailyViewsMap.keys()].sort()[0] ?? todayKey
+        : shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
+    const graphRangeEnd =
+      graphPeriod === "all"
+        ? [...dailyViewsMap.keys()].sort().at(-1) ?? todayKey
+        : todayKey;
+    const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
+      .map((date) => ({ name: date.slice(5), date, views: dailyViewsMap.get(date) ?? 0 }));
     const typeData = (["image", "video", "reel", "carousel"] as PostType[]).map((type) => {
       const items = graphPosts.filter((post) => post.type === type);
       return {
