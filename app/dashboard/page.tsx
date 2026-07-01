@@ -260,6 +260,25 @@ function toTokyoDateHour(iso: string) {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: parts.hour };
 }
 
+function toTokyoDateTimeParts(iso: string) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(new Date(iso)).map((part) => [part.type, part.value])
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+    minute: Number(parts.minute)
+  };
+}
+
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
 }
@@ -360,6 +379,7 @@ function formatDateTimeJst(value: string) {
 }
 
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
+const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
 function syncStatusLabel(status: InstagramSyncRun["status"]) {
   if (status === "success") return "成功";
@@ -682,6 +702,39 @@ export default function DashboardPage() {
   const latestScheduledErrorMessage = latestScheduledSyncRun?.errorSummary
     || latestScheduledSyncRun?.errors[0]?.message
     || null;
+  const scheduledSlotStatuses = useMemo(() => {
+    const todayKey = toTokyoDateKey(new Date());
+    const nowJst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    const scheduledRunsToday = syncRuns.filter((run) => {
+      if (run.triggerType !== "scheduled") return false;
+      return toTokyoDateTimeParts(run.startedAt).date === todayKey;
+    });
+
+    return SCHEDULED_SYNC_HOURS.map((hour) => {
+      const matchedRun = scheduledRunsToday.find((run) => {
+        const parts = toTokyoDateTimeParts(run.startedAt);
+        return parts.hour === hour && Math.abs(parts.minute - 17) <= 20;
+      }) ?? null;
+      const slotAt = new Date(`${todayKey}T${String(hour).padStart(2, "0")}:17:00+09:00`);
+      const slotLabel = `${String(hour).padStart(2, "0")}:17`;
+
+      if (matchedRun) {
+        return {
+          slotLabel,
+          status: matchedRun.status === "success" ? "success" : matchedRun.status === "partial" ? "partial" : "failed",
+          message: matchedRun.status === "success"
+            ? "成功"
+            : matchedRun.errorSummary || matchedRun.errors[0]?.message || "同期エラー"
+        } as const;
+      }
+
+      if (nowJst.getTime() < slotAt.getTime()) {
+        return { slotLabel, status: "upcoming", message: "未到来" } as const;
+      }
+
+      return { slotLabel, status: "missing", message: "実行結果未反映" } as const;
+    });
+  }, [syncRuns]);
   const showLatestSyncFailurePanel = Boolean(latestSyncRun?.status === "failed" && latestSyncError && !syncMonitor.isDelayed);
   const showLatestSyncPartialPanel = Boolean(latestSyncRun?.status === "partial" && latestSyncError && !syncMonitor.isDelayed);
   const showTodayMissingAlert = Boolean(
@@ -816,6 +869,36 @@ export default function DashboardPage() {
                     {latestScheduledErrorMessage ? (
                       <SyncInfoRow label="直近のエラー内容" value={latestScheduledErrorMessage} />
                     ) : null}
+                  </div>
+                  <div className="mt-4 rounded-xl border border-amber-200/80 bg-white/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">本日の自動同期枠</p>
+                    <div className="mt-3 grid gap-2">
+                      {scheduledSlotStatuses.map((slot) => (
+                        <div key={slot.slotLabel} className="grid gap-1 rounded-lg border border-stone-200/80 bg-white/80 px-3 py-2 md:grid-cols-[72px_96px_1fr] md:items-center">
+                          <p className="text-sm font-semibold text-ink">{slot.slotLabel}</p>
+                          <p className={`text-sm font-semibold ${
+                            slot.status === "success"
+                              ? "text-emerald-700"
+                              : slot.status === "partial"
+                                ? "text-amber-700"
+                                : slot.status === "failed" || slot.status === "missing"
+                                  ? "text-red-700"
+                                  : "text-stone-500"
+                          }`}>
+                            {slot.status === "success"
+                              ? "成功"
+                              : slot.status === "partial"
+                                ? "一部失敗"
+                                : slot.status === "failed"
+                                  ? "失敗"
+                                  : slot.status === "missing"
+                                    ? "未反映"
+                                    : "未到来"}
+                          </p>
+                          <p className="text-sm text-stone-700">{slot.message}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : null}
