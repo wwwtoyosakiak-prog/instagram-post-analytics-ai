@@ -45,7 +45,7 @@ type SyncTriggerType = "manual" | "scheduled";
 
 async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
   const db = supabase();
-  await db.from('instagram_sync_runs').insert({
+  const { error } = await db.from('instagram_sync_runs').insert({
     trigger_type: run.triggerType,
     status: run.status,
     started_at: run.startedAt,
@@ -61,6 +61,9 @@ async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
     error_summary: run.errorSummary ?? null,
     errors: run.errors,
   });
+  if (error) {
+    throw new Error(`[full-sync-run-save] ${error.message}`);
+  }
 }
 
 async function safeSaveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
@@ -348,25 +351,6 @@ async function handler(triggerType: SyncTriggerType) {
       results.snapshot_saved = !snapErr;
     } catch (e) {
       console.warn('[full-sync] snapshot exception:', e);
-    }
-
-    if (triggerType === "scheduled") {
-      const account = results.account as { username?: string | null; id?: string | null } | null;
-      await safeSaveScheduledSyncRun({
-        triggerType,
-        status: results.errors.length === 0 ? "success" : "partial",
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        fetchedPosts: results.media_fetched,
-        savedPosts: results.media_fetched,
-        savedSnapshots: results.snapshot_saved ? 1 : 0,
-        failedPosts: results.insights_failed,
-        apiMode: "full-sync",
-        accountId: account?.id ?? undefined,
-        accountUsername: account?.username ?? undefined,
-        errorSummary: results.errors[0],
-        errors: results.errors.map((message) => ({ stage: "full-sync", message })),
-      });
     }
 
     return NextResponse.json({ ok: true, ...results });

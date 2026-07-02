@@ -171,7 +171,7 @@ async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">) {
 
 async function getLatestScheduledSyncRun() {
   const rows = await supabaseRequest<Array<{ finished_at: string }>>(
-    "instagram_sync_runs?trigger_type=eq.scheduled&select=finished_at&order=finished_at.desc&limit=1",
+    "instagram_sync_runs?trigger_type=eq.scheduled&api_mode=neq.full-sync&select=finished_at&order=finished_at.desc&limit=1",
     { method: "GET" }
   );
   return rows[0]?.finished_at ?? null;
