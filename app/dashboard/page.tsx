@@ -31,6 +31,34 @@ interface DashboardAccount {
   last_synced_at: string;
 }
 
+type SyncHistoryRow =
+  | {
+      kind: "scheduled";
+      key: string;
+      plannedAt: string;
+      executedAt: string;
+      sortAtMs: number;
+      triggerLabel: "自動";
+      statusLabel: string;
+      fetchedPostsLabel: string;
+      savedPostsLabel: string;
+      savedSnapshotsLabel: string;
+      errorLabel: string;
+    }
+  | {
+      kind: "manual";
+      key: string;
+      plannedAt: "手動実行";
+      executedAt: string;
+      sortAtMs: number;
+      triggerLabel: "手動";
+      statusLabel: string;
+      fetchedPostsLabel: string;
+      savedPostsLabel: string;
+      savedSnapshotsLabel: string;
+      errorLabel: string;
+    };
+
 // ── Manual 型 ──────────────────────────────────────────────
 
 type GrowthAnalysis = {
@@ -799,6 +827,81 @@ export default function DashboardPage() {
       } as const;
     });
   }, [syncRuns]);
+  const syncHistoryRows = useMemo<SyncHistoryRow[]>(() => {
+    const now = new Date();
+    const todayKey = toTokyoDateKey(now);
+    const scheduledRuns = syncRuns
+      .filter((run) => run.triggerType === "scheduled")
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    const manualRuns = syncRuns.filter((run) => run.triggerType === "manual");
+    const scheduledRows: SyncHistoryRow[] = [];
+    const scheduledDateKeys = getDateRangeKeys(shiftTokyoDateKey(todayKey, -3), todayKey);
+
+    for (const dateKey of scheduledDateKeys) {
+      for (let index = 0; index < SCHEDULED_SYNC_HOURS.length; index += 1) {
+        const hour = SCHEDULED_SYNC_HOURS[index];
+        const slotAt = getScheduledSlotTime(dateKey, hour);
+        if (slotAt.getTime() > now.getTime()) continue;
+
+        const nextHour = SCHEDULED_SYNC_HOURS[index + 1];
+        const nextSlotAt = typeof nextHour === "number"
+          ? getScheduledSlotTime(dateKey, nextHour)
+          : getScheduledSlotTime(shiftTokyoDateKey(dateKey, 1), SCHEDULED_SYNC_HOURS[0]);
+        const matchedRun = scheduledRuns.find((run) => {
+          const startedAt = new Date(run.startedAt).getTime();
+          return startedAt >= slotAt.getTime() && startedAt < nextSlotAt.getTime();
+        }) ?? null;
+
+        if (matchedRun) {
+          scheduledRows.push({
+            kind: "scheduled",
+            key: matchedRun.id,
+            plannedAt: `${dateKey} ${String(hour).padStart(2, "0")}:17`,
+            executedAt: formatDateTimeJst(matchedRun.finishedAt),
+            sortAtMs: slotAt.getTime(),
+            triggerLabel: "自動",
+            statusLabel: syncStatusLabel(matchedRun.status),
+            fetchedPostsLabel: `${matchedRun.fetchedPosts.toLocaleString()}件`,
+            savedPostsLabel: `${matchedRun.savedPosts.toLocaleString()}件`,
+            savedSnapshotsLabel: `${matchedRun.savedSnapshots.toLocaleString()}件`,
+            errorLabel: matchedRun.errorSummary || "-",
+          });
+        } else {
+          scheduledRows.push({
+            kind: "scheduled",
+            key: `missing-${dateKey}-${hour}`,
+            plannedAt: `${dateKey} ${String(hour).padStart(2, "0")}:17`,
+            executedAt: "未反映",
+            sortAtMs: slotAt.getTime(),
+            triggerLabel: "自動",
+            statusLabel: "未反映",
+            fetchedPostsLabel: "-",
+            savedPostsLabel: "-",
+            savedSnapshotsLabel: "-",
+            errorLabel: "実行結果未反映",
+          });
+        }
+      }
+    }
+
+    const manualRows: SyncHistoryRow[] = manualRuns.map((run) => ({
+      kind: "manual",
+      key: run.id,
+      plannedAt: "手動実行",
+      executedAt: formatDateTimeJst(run.finishedAt),
+      sortAtMs: new Date(run.finishedAt).getTime(),
+      triggerLabel: "手動",
+      statusLabel: syncStatusLabel(run.status),
+      fetchedPostsLabel: `${run.fetchedPosts.toLocaleString()}件`,
+      savedPostsLabel: `${run.savedPosts.toLocaleString()}件`,
+      savedSnapshotsLabel: `${run.savedSnapshots.toLocaleString()}件`,
+      errorLabel: run.errorSummary || "-",
+    }));
+
+    return [...scheduledRows, ...manualRows]
+      .sort((a, b) => b.sortAtMs - a.sortAtMs)
+      .slice(0, 5);
+  }, [syncRuns]);
   const showLatestSyncFailurePanel = Boolean(latestSyncRun?.status === "failed" && latestSyncError && !syncMonitor.isDelayed);
   const showLatestSyncPartialPanel = Boolean(latestSyncRun?.status === "partial" && latestSyncError && !syncMonitor.isDelayed);
   const showTodayMissingAlert = Boolean(
@@ -1046,19 +1149,19 @@ export default function DashboardPage() {
                   <tr><th>予定時刻</th><th>実施時刻</th><th>種別</th><th>状態</th><th>取得</th><th>投稿保存</th><th>履歴保存</th><th>エラー内容</th></tr>
                 </thead>
                 <tbody>
-                  {syncRuns.slice(0, 5).map((run) => (
-                    <tr key={run.id}>
-                      <td>{run.triggerType === "manual" ? "手動実行" : getScheduledPlannedLabel(run.startedAt)}</td>
-                      <td>{formatDateTimeJst(run.finishedAt)}</td>
-                      <td>{run.triggerType === "manual" ? "手動" : "自動"}</td>
-                      <td>{syncStatusLabel(run.status)}</td>
-                      <td>{run.fetchedPosts.toLocaleString()}件</td>
-                      <td>{run.savedPosts.toLocaleString()}件</td>
-                      <td>{run.savedSnapshots.toLocaleString()}件</td>
-                      <td>{run.errorSummary || "-"}</td>
+                  {syncHistoryRows.map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.plannedAt}</td>
+                      <td>{row.executedAt}</td>
+                      <td>{row.triggerLabel}</td>
+                      <td>{row.statusLabel}</td>
+                      <td>{row.fetchedPostsLabel}</td>
+                      <td>{row.savedPostsLabel}</td>
+                      <td>{row.savedSnapshotsLabel}</td>
+                      <td>{row.errorLabel}</td>
                     </tr>
                   ))}
-                  {!syncRuns.length ? (
+                  {!syncHistoryRows.length ? (
                     <tr><td colSpan={8} className="text-center text-stone-500">同期履歴はまだありません。</td></tr>
                   ) : null}
                 </tbody>
