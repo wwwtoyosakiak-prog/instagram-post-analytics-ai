@@ -9,7 +9,7 @@ jobs:
   sync:
     name: Run scheduled sync
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       BASE_URL: https://instagram-post-analytics-ai.vercel.app
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -22,25 +22,38 @@ jobs:
           fi
 
       - name: Call full sync API
+        id: full_sync
         run: |
+          set +e
           status=$(curl -sS \
             --connect-timeout 15 \
-            --max-time 60 \
+            --max-time 180 \
             -o /tmp/full-sync.json \
             -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$BASE_URL/api/instagram/full-sync")
+          curl_exit=$?
+          set -e
 
+          echo "full-sync curl exit: $curl_exit"
           echo "full-sync status: $status"
-          cat /tmp/full-sync.json
+          [ -f /tmp/full-sync.json ] && cat /tmp/full-sync.json
 
-          if [ "$status" != "200" ]; then
+          if [ "$curl_exit" -ne 0 ]; then
+            echo "::error::Full sync request failed with curl exit $curl_exit"
+            echo "result=failed" >> "$GITHUB_OUTPUT"
+          elif [ "$status" != "200" ]; then
             echo "::error::Full sync failed with HTTP $status"
-            exit 1
+            echo "result=failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=success" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Call snapshot sync API
+        id: snapshot_sync
+        if: always()
         run: |
+          set +e
           status=$(curl -sS \
             --connect-timeout 15 \
             --max-time 60 \
@@ -48,11 +61,33 @@ jobs:
             -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$BASE_URL/api/instagram/sync")
+          curl_exit=$?
+          set -e
 
+          echo "snapshot-sync curl exit: $curl_exit"
           echo "snapshot-sync status: $status"
-          cat /tmp/snapshot-sync.json
+          [ -f /tmp/snapshot-sync.json ] && cat /tmp/snapshot-sync.json
 
-          if [ "$status" != "200" ] && [ "$status" != "207" ]; then
+          if [ "$curl_exit" -ne 0 ]; then
+            echo "::error::Snapshot sync request failed with curl exit $curl_exit"
+            echo "result=failed" >> "$GITHUB_OUTPUT"
+          elif [ "$status" != "200" ] && [ "$status" != "207" ]; then
             echo "::error::Snapshot sync failed with HTTP $status"
+            echo "result=failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=success" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Finalize workflow result
+        if: always()
+        run: |
+          full_sync_result="${{ steps.full_sync.outputs.result }}"
+          snapshot_sync_result="${{ steps.snapshot_sync.outputs.result }}"
+
+          echo "full-sync result: ${full_sync_result:-unknown}"
+          echo "snapshot-sync result: ${snapshot_sync_result:-unknown}"
+
+          if [ "${full_sync_result:-failed}" != "success" ] || [ "${snapshot_sync_result:-failed}" != "success" ]; then
+            echo "::error::Scheduled sync completed with at least one failed step."
             exit 1
           fi

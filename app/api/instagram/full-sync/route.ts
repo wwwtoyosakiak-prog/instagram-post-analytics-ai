@@ -16,6 +16,8 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import type { InstagramSyncRun } from '@/lib/types';
 
+export const maxDuration = 180;
+
 function supabase() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
