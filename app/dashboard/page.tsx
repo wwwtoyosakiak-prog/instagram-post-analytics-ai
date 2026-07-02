@@ -414,6 +414,15 @@ function getScheduledSlotTime(dateKey: string, hour: number) {
   return new Date(`${dateKey}T${String(hour).padStart(2, "0")}:17:00+09:00`);
 }
 
+function getScheduledPlannedLabel(iso: string) {
+  const parts = toTokyoDateTimeParts(iso);
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const plannedHour = [...SCHEDULED_SYNC_HOURS].reverse().find((hour) => currentMinutes >= (hour * 60 + 17));
+  const targetDateKey = typeof plannedHour === "number" ? parts.date : shiftTokyoDateKey(parts.date, -1);
+  const targetHour = typeof plannedHour === "number" ? plannedHour : SCHEDULED_SYNC_HOURS[SCHEDULED_SYNC_HOURS.length - 1];
+  return `${targetDateKey} ${String(targetHour).padStart(2, "0")}:17`;
+}
+
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
 const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
@@ -1028,27 +1037,18 @@ export default function DashboardPage() {
             </Panel>
           </div>
 
-          {/* 前回比 */}
-          <Panel className="mb-6">
-            <SectionLead eyebrow="Compare" title="前回比" description="表示数、保存数、ER の前日比と前週比をひと目で比較できます。" />
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <CompareStat label="表示数" currentDay={data.todayViews} previousDay={data.previousDayViews} currentWeek={data.last7Views} previousWeek={data.previous7Views} />
-              <CompareStat label="保存数" currentDay={data.todaySaves} previousDay={data.previousDaySaves} currentWeek={data.last7Saves} previousWeek={data.previous7Saves} />
-              <CompareStat label="平均ER" currentDay={data.todayEngagementRate} previousDay={data.previousDayEngagementRate} currentWeek={data.last7EngagementRate} previousWeek={data.previous7EngagementRate} suffix="%" decimal />
-            </div>
-          </Panel>
-
           {/* 同期履歴 */}
           <Panel className="mb-6">
             <SectionLead eyebrow="History" title="同期履歴一覧" description="直近5回の実行結果を確認できます。" />
             <div className="mt-4 overflow-auto">
               <table>
                 <thead>
-                  <tr><th>実行時刻</th><th>種別</th><th>状態</th><th>取得</th><th>投稿保存</th><th>履歴保存</th><th>エラー内容</th></tr>
+                  <tr><th>予定時刻</th><th>実施時刻</th><th>種別</th><th>状態</th><th>取得</th><th>投稿保存</th><th>履歴保存</th><th>エラー内容</th></tr>
                 </thead>
                 <tbody>
                   {syncRuns.slice(0, 5).map((run) => (
                     <tr key={run.id}>
+                      <td>{run.triggerType === "manual" ? "手動実行" : getScheduledPlannedLabel(run.startedAt)}</td>
                       <td>{formatDateTimeJst(run.finishedAt)}</td>
                       <td>{run.triggerType === "manual" ? "手動" : "自動"}</td>
                       <td>{syncStatusLabel(run.status)}</td>
@@ -1059,10 +1059,20 @@ export default function DashboardPage() {
                     </tr>
                   ))}
                   {!syncRuns.length ? (
-                    <tr><td colSpan={7} className="text-center text-stone-500">同期履歴はまだありません。</td></tr>
+                    <tr><td colSpan={8} className="text-center text-stone-500">同期履歴はまだありません。</td></tr>
                   ) : null}
                 </tbody>
               </table>
+            </div>
+          </Panel>
+
+          {/* 前回比 */}
+          <Panel className="mb-6">
+            <SectionLead eyebrow="Compare" title="前回比" description="表示数、保存数、ER の前日比と前週比をひと目で比較できます。" />
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <CompareStat label="表示数" currentDay={data.todayViews} previousDay={data.previousDayViews} currentWeek={data.last7Views} previousWeek={data.previous7Views} />
+              <CompareStat label="保存数" currentDay={data.todaySaves} previousDay={data.previousDaySaves} currentWeek={data.last7Saves} previousWeek={data.previous7Saves} />
+              <CompareStat label="平均ER" currentDay={data.todayEngagementRate} previousDay={data.previousDayEngagementRate} currentWeek={data.last7EngagementRate} previousWeek={data.previous7EngagementRate} suffix="%" decimal />
             </div>
           </Panel>
 
