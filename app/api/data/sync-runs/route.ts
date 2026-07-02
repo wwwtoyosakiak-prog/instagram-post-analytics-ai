@@ -93,12 +93,12 @@ async function getGitHubFailureSummary(jobsUrl: string) {
     const data = await fetchJson<GitHubJobsResponse>(jobsUrl);
     const failedJob = data.jobs?.find((job) => job.conclusion === "failure");
     const failedStep = failedJob?.steps?.find((step) => step.conclusion === "failure");
-    if (failedStep?.name) return `${failedStep.name} で失敗`;
-    if (failedJob?.name) return `${failedJob.name} で失敗`;
+    if (failedStep?.name) return `${failedStep.name}に失敗`;
+    if (failedJob?.name) return `${failedJob.name}に失敗`;
   } catch {
     // ignore GitHub detail fetch errors and fall back below
   }
-  return "GitHub Actions 実行失敗";
+  return "GitHub Actionsで失敗";
 }
 
 async function loadGitHubScheduledRuns() {
@@ -117,7 +117,7 @@ async function loadGitHubScheduledRuns() {
 
       const errorSummary = run.conclusion === "failure"
         ? await getGitHubFailureSummary(run.jobs_url)
-        : `GitHub Actions で ${formatDateTimeJst(run.created_at)} に実行`;
+        : `GitHub Actionsで ${formatDateTimeJst(run.created_at)} に実行`;
 
       return {
         id: `github-${run.id}`,
@@ -133,7 +133,7 @@ async function loadGitHubScheduledRuns() {
         errorSummary,
         errors: run.conclusion === "failure"
           ? [{ stage: "github_actions", message: errorSummary }]
-          : [{ stage: "github_actions", message: `GitHub Actions で ${formatDateTimeJst(run.created_at)} に実行` }],
+          : [{ stage: "github_actions", message: `GitHub Actionsで ${formatDateTimeJst(run.created_at)} に実行` }],
       };
     })
   );
