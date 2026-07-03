@@ -24,6 +24,12 @@ type RefreshResult = {
   token: InstagramAccessTokenRecord;
 };
 
+function getGraphApiMode() {
+  return process.env.INSTAGRAM_GRAPH_API_MODE === "instagram_login"
+    ? "instagram_login"
+    : "facebook_login";
+}
+
 function getEnvToken() {
   return process.env.INSTAGRAM_ACCESS_TOKEN || process.env.INSTAGRAM_GRAPH_ACCESS_TOKEN || null;
 }
@@ -72,6 +78,7 @@ function computeWarningLevel(remainingDays: number | null, status: InstagramAcce
 
 function computeStatus(storage: InstagramAccessTokenStorage | null, source: "database" | "environment" | "missing"): InstagramAccessTokenStatus {
   if (source === "missing") return "missing";
+  if (getGraphApiMode() === "facebook_login" && source === "environment") return "environment_only";
   if (!storage?.expiresAt) return "environment_only";
   const expiresAt = new Date(storage.expiresAt).getTime();
   if (expiresAt <= Date.now()) return "expired";
@@ -84,6 +91,9 @@ function computeStatus(storage: InstagramAccessTokenStorage | null, source: "dat
 
 function getRefreshBlockedReason(storage: InstagramAccessTokenStorage | null, token: string | null) {
   if (!token) return "アクセストークンが未設定です。";
+  if (getGraphApiMode() === "facebook_login") {
+    return "facebook_login では保存済みの自動更新を使いません。Vercel の環境変数トークンを更新してください。";
+  }
   if (storage?.expiresAt && new Date(storage.expiresAt).getTime() <= Date.now()) {
     return "トークン期限切れのため、再ログインが必要です。";
   }
@@ -98,6 +108,9 @@ function getRefreshBlockedReason(storage: InstagramAccessTokenStorage | null, to
 
 function getRefreshReason(storage: InstagramAccessTokenStorage | null, token: string | null, status: InstagramAccessTokenStatus, remainingDays: number | null) {
   if (!token) return "アクセストークンが未設定です。";
+  if (getGraphApiMode() === "facebook_login") {
+    return "facebook_login では環境変数のアクセストークンを優先して使用します。";
+  }
   if (status === "expired") return "トークン期限切れのため、再ログインが必要です。";
   if (storage?.lastRefreshedAt) {
     const diff = Date.now() - new Date(storage.lastRefreshedAt).getTime();
@@ -223,15 +236,20 @@ export async function storeInstagramAccessToken(accessToken: string, expiresInSe
 
 export async function getInstagramAccessTokenState(): Promise<TokenStateInternal> {
   const storage = await ensureTokenStorage();
-  const token = storage?.accessToken || getEnvToken();
-  const source: InstagramAccessTokenRecord["source"] = storage?.accessToken
-    ? "database"
-    : token
-      ? "environment"
-      : "missing";
-  const state = await buildTokenState(storage, token, source);
+  const envToken = getEnvToken();
+  const prefersEnvToken = getGraphApiMode() === "facebook_login" && Boolean(envToken);
+  const token = prefersEnvToken ? envToken : (storage?.accessToken || envToken);
+  const source: InstagramAccessTokenRecord["source"] = prefersEnvToken
+    ? "environment"
+    : storage?.accessToken
+      ? "database"
+      : token
+        ? "environment"
+        : "missing";
+  const activeStorage = source === "database" ? storage : null;
+  const state = await buildTokenState(activeStorage, token, source);
 
-  return { storage, token, state };
+  return { storage: activeStorage, token, state };
 }
 
 export async function getInstagramAccessTokenForServer() {
