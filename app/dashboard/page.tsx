@@ -497,6 +497,10 @@ function formatOptionalMetric(value: number | null | undefined) {
   return value == null ? "未取得" : value.toLocaleString("ja-JP");
 }
 
+function formatUnavailableMetric(value: number | null | undefined, fallbackText = "この期間は未取得") {
+  return value == null ? fallbackText : value.toLocaleString("ja-JP");
+}
+
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
 const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
@@ -851,21 +855,31 @@ export default function DashboardPage() {
       return values.reduce((sum, value) => sum + value, 0);
     };
 
+    const impressions = sumField("impressions");
+    const reach = sumField("reach");
+    const profileViews = sumField("profile_views");
+    const websiteClicks = sumField("website_clicks");
+    const primaryValue = impressions ?? reach;
+    const primaryLabel = impressions != null ? "閲覧" : reach != null ? "リーチ" : "閲覧";
+    const primaryDescription = impressions != null
+      ? `${data.graphPeriodLabel}のビュー`
+      : reach != null
+        ? `${data.graphPeriodLabel}は閲覧未取得のため、リーチを表示`
+        : "アカウント全体インサイトはまだ未取得です";
+
     return {
       periodLabel: data.graphPeriodLabel,
-      impressions: sumField("impressions"),
-      reach: sumField("reach"),
-      profileViews: sumField("profile_views"),
-      websiteClicks: sumField("website_clicks"),
+      impressions,
+      reach,
+      profileViews,
+      websiteClicks,
       followerCount: latestRow?.follower_count ?? dashAccount?.followers_count ?? null,
       latestDate: latestRow?.date ?? null,
       hasData: sourceTrend.length > 0,
-      hasInsightMetrics: [
-        sumField("impressions"),
-        sumField("reach"),
-        sumField("profile_views"),
-        sumField("website_clicks"),
-      ].some((value) => value != null),
+      hasInsightMetrics: [impressions, reach, profileViews, websiteClicks].some((value) => value != null),
+      primaryValue,
+      primaryLabel,
+      primaryDescription,
     };
   }, [accountInsightsTrend, dashAccount?.followers_count, data.graphPeriodLabel, graphPeriod]);
 
@@ -1120,14 +1134,12 @@ export default function DashboardPage() {
               {accountInsightSummary.periodLabel}のアカウント全体の反応をまとめています。投稿単位ではなく、期間全体の流れを見るための欄です。
             </p>
             <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
-              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">閲覧</p>
+              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">{accountInsightSummary.primaryLabel}</p>
               <p className="mt-4 text-5xl font-bold leading-none">
-                {formatOptionalMetric(accountInsightSummary.impressions)}
+                {formatOptionalMetric(accountInsightSummary.primaryValue)}
               </p>
               <p className="mt-3 text-sm text-white/72">
-                {accountInsightSummary.hasInsightMetrics
-                  ? `${accountInsightSummary.periodLabel}のビュー`
-                  : "アカウント全体インサイトはまだ未取得です"}
+                {accountInsightSummary.primaryDescription}
                 {accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}
               </p>
             </div>
@@ -1148,11 +1160,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
                   <span className="text-sm text-stone-600">プロフィール閲覧</span>
-                  <span className="text-xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.profileViews)}</span>
+                  <span className="text-xl font-bold text-ink">{formatUnavailableMetric(accountInsightSummary.profileViews)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
                   <span className="text-sm text-stone-600">ウェブサイトクリック</span>
-                  <span className="text-xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.websiteClicks)}</span>
+                  <span className="text-xl font-bold text-ink">{formatUnavailableMetric(accountInsightSummary.websiteClicks)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-sm text-stone-600">現在のフォロワー数</span>
@@ -1166,6 +1178,11 @@ export default function DashboardPage() {
               <p className="mt-1">
                 フォロワー / 非フォロワーの割合は、現在の保存データには入っていないため、この欄ではまだ表示していません。
               </p>
+              {accountInsightSummary.impressions == null && accountInsightSummary.reach != null ? (
+                <p className="mt-2 text-stone-700">
+                  今回は「閲覧」は返らず、「リーチ」は取得できています。大きいカードは自動でリーチ表示に切り替えています。
+                </p>
+              ) : null}
               {!accountInsightSummary.hasInsightMetrics ? (
                 <p className="mt-2 text-red-700">
                   現在の連携設定では、アカウント全体インサイト自体も未取得です。`facebook_login` 連携へ切り替えると取得できる可能性があります。
