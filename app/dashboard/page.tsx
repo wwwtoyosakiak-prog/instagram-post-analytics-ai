@@ -493,6 +493,10 @@ function formatDelayMinutes(totalMinutes: number) {
   return minutes === 0 ? `${hours}時間` : `${hours}時間${minutes}分`;
 }
 
+function formatOptionalMetric(value: number | null | undefined) {
+  return value == null ? "未取得" : value.toLocaleString("ja-JP");
+}
+
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
 const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
@@ -839,8 +843,13 @@ export default function DashboardPage() {
     const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= todayKey);
     const sourceTrend = filteredTrend.length ? filteredTrend : accountInsightsTrend;
     const latestRow = sourceTrend[sourceTrend.length - 1] ?? null;
-    const sumField = (key: keyof DashboardAccountInsightTrendRow) =>
-      sourceTrend.reduce((sum, row) => sum + (typeof row[key] === "number" ? Number(row[key]) : 0), 0);
+    const sumField = (key: keyof DashboardAccountInsightTrendRow) => {
+      const values = sourceTrend
+        .map((row) => row[key])
+        .filter((value): value is number => typeof value === "number");
+      if (!values.length) return null;
+      return values.reduce((sum, value) => sum + value, 0);
+    };
 
     return {
       periodLabel: data.graphPeriodLabel,
@@ -851,10 +860,14 @@ export default function DashboardPage() {
       followerCount: latestRow?.follower_count ?? dashAccount?.followers_count ?? null,
       latestDate: latestRow?.date ?? null,
       hasData: sourceTrend.length > 0,
-      fallbackViews: dashTotals?.impressions ?? 0,
-      fallbackReach: dashTotals?.reach ?? 0,
+      hasInsightMetrics: [
+        sumField("impressions"),
+        sumField("reach"),
+        sumField("profile_views"),
+        sumField("website_clicks"),
+      ].some((value) => value != null),
     };
-  }, [accountInsightsTrend, dashAccount?.followers_count, dashTotals?.impressions, dashTotals?.reach, data.graphPeriodLabel, graphPeriod]);
+  }, [accountInsightsTrend, dashAccount?.followers_count, data.graphPeriodLabel, graphPeriod]);
 
   const latestSyncRun = syncRuns[0] ?? null;
   const latestScheduledSyncRun = syncRuns.find((run) => run.triggerType === "scheduled") ?? null;
@@ -1109,12 +1122,12 @@ export default function DashboardPage() {
             <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
               <p className="text-sm font-semibold tracking-[0.2em] text-white/70">閲覧</p>
               <p className="mt-4 text-5xl font-bold leading-none">
-                {(accountInsightSummary.hasData
-                  ? accountInsightSummary.impressions
-                  : accountInsightSummary.fallbackViews).toLocaleString("ja-JP")}
+                {formatOptionalMetric(accountInsightSummary.impressions)}
               </p>
               <p className="mt-3 text-sm text-white/72">
-                {accountInsightSummary.periodLabel}のビュー
+                {accountInsightSummary.hasInsightMetrics
+                  ? `${accountInsightSummary.periodLabel}のビュー`
+                  : "アカウント全体インサイトはまだ未取得です"}
                 {accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}
               </p>
             </div>
@@ -1131,19 +1144,15 @@ export default function DashboardPage() {
               <div className="mt-4 grid gap-3">
                 <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
                   <span className="text-sm text-stone-600">リーチしたアカウント数</span>
-                  <span className="text-2xl font-bold text-ink">
-                    {(accountInsightSummary.hasData
-                      ? accountInsightSummary.reach
-                      : accountInsightSummary.fallbackReach).toLocaleString("ja-JP")}
-                  </span>
+                  <span className="text-2xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.reach)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
                   <span className="text-sm text-stone-600">プロフィール閲覧</span>
-                  <span className="text-xl font-bold text-ink">{accountInsightSummary.profileViews.toLocaleString("ja-JP")}</span>
+                  <span className="text-xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.profileViews)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
                   <span className="text-sm text-stone-600">ウェブサイトクリック</span>
-                  <span className="text-xl font-bold text-ink">{accountInsightSummary.websiteClicks.toLocaleString("ja-JP")}</span>
+                  <span className="text-xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.websiteClicks)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-sm text-stone-600">現在のフォロワー数</span>
@@ -1157,6 +1166,11 @@ export default function DashboardPage() {
               <p className="mt-1">
                 フォロワー / 非フォロワーの割合は、現在の保存データには入っていないため、この欄ではまだ表示していません。
               </p>
+              {!accountInsightSummary.hasInsightMetrics ? (
+                <p className="mt-2 text-red-700">
+                  現在の連携設定では、アカウント全体インサイト自体も未取得です。`facebook_login` 連携へ切り替えると取得できる可能性があります。
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

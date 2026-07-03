@@ -7,17 +7,22 @@ import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager"
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
-// INSTAGRAM_GRAPH_API_MODE=facebook_business と明示した場合のみ graph.facebook.com を使う。
-// それ以外（未設定・instagram_login など）はすべて graph.instagram.com。
+// INSTAGRAM_GRAPH_API_MODE=facebook_login（旧 facebook_business を含む）の場合のみ
+// graph.facebook.com を使う。それ以外（未設定・instagram_login など）は graph.instagram.com。
 // 関数化することで、モジュール初期化時ではなくリクエストごとに env を読む。
+function isFacebookLoginMode() {
+  const mode = process.env.INSTAGRAM_GRAPH_API_MODE;
+  return mode === 'facebook_login' || mode === 'facebook_business';
+}
+
 function getApiBase(): string {
-  return process.env.INSTAGRAM_GRAPH_API_MODE === 'facebook_business'
+  return isFacebookLoginMode()
     ? `https://graph.facebook.com/${API_VERSION}`
     : `https://graph.instagram.com/${API_VERSION}`;
 }
 function getApiMode(): string {
-  return process.env.INSTAGRAM_GRAPH_API_MODE === 'facebook_business'
-    ? 'facebook_business'
+  return isFacebookLoginMode()
+    ? 'facebook_login'
     : 'instagram_login';
 }
 
@@ -232,6 +237,10 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string, med
 export async function fetchAccountInsights(igUserId?: string): Promise<IgAccountInsights> {
   const token = await getToken();
   const uid = getUid(igUserId);
+
+  if (getApiMode() === 'instagram_login') {
+    throw new Error('現在の連携方式ではアカウント全体インサイトを取得できません。Vercel の INSTAGRAM_GRAPH_API_MODE を facebook_login に変更し、INSTAGRAM_BUSINESS_ACCOUNT_ID を設定してください。');
+  }
 
   const metrics = [
     'reach', 'impressions', 'profile_views', 'website_clicks',
