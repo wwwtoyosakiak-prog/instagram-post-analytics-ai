@@ -263,19 +263,19 @@ function GraphPeriodTabs({
   graphPeriod,
   setGraphPeriod,
 }: {
-  graphPeriod: "7" | "30" | "90" | "365";
-  setGraphPeriod: (period: "7" | "30" | "90" | "365") => void;
+  graphPeriod: "1" | "7" | "30" | "90" | "365";
+  setGraphPeriod: (period: "1" | "7" | "30" | "90" | "365") => void;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
-      {(["7", "30", "90", "365"] as const).map((period) => (
+    <div className="grid grid-cols-5 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
+      {(["1", "7", "30", "90", "365"] as const).map((period) => (
         <button
           key={period}
           type="button"
           onClick={() => setGraphPeriod(period)}
           className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
         >
-          {period === "7" ? "一週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
+          {period === "1" ? "一日" : period === "7" ? "一週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
         </button>
       ))}
     </div>
@@ -344,7 +344,7 @@ function toTokyoDateKey(date: Date) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function filterPostsByPeriod(posts: InstagramPost[], period: "7" | "30" | "90" | "365", todayKey: string) {
+function filterPostsByPeriod(posts: InstagramPost[], period: "1" | "7" | "30" | "90" | "365", todayKey: string) {
   const end = new Date(`${todayKey}T00:00:00+09:00`);
   const start = new Date(end);
   start.setDate(start.getDate() - (Number(period) - 1));
@@ -484,7 +484,7 @@ export default function DashboardPage() {
 
   // ── UI state ──
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
-  const [graphPeriod, setGraphPeriod] = useState<"7" | "30" | "90" | "365">("30");
+  const [graphPeriod, setGraphPeriod] = useState<"1" | "7" | "30" | "90" | "365">("30");
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
@@ -752,7 +752,7 @@ export default function DashboardPage() {
       graphTotalViews: graphPosts.reduce((sum, post) => sum + post.views, 0),
       graphAverageEngagementRate: average(graphPosts.map((post) => getMetrics(post).engagementRate)),
       graphAverageSaves: average(graphPosts.map((post) => post.saves)),
-      graphPeriodLabel: graphPeriod === "7" ? "一週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
+      graphPeriodLabel: graphPeriod === "1" ? "一日" : graphPeriod === "7" ? "一週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
 
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
       todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
