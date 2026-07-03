@@ -451,6 +451,22 @@ function getScheduledPlannedLabel(iso: string) {
   return `${targetDateKey} ${String(targetHour).padStart(2, "0")}:17`;
 }
 
+function getScheduledPlannedAtFromStartedAt(iso: string) {
+  const parts = toTokyoDateTimeParts(iso);
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const plannedHour = [...SCHEDULED_SYNC_HOURS].reverse().find((hour) => currentMinutes >= (hour * 60 + 17));
+  const targetDateKey = typeof plannedHour === "number" ? parts.date : shiftTokyoDateKey(parts.date, -1);
+  const targetHour = typeof plannedHour === "number" ? plannedHour : SCHEDULED_SYNC_HOURS[SCHEDULED_SYNC_HOURS.length - 1];
+  return getScheduledSlotTime(targetDateKey, targetHour);
+}
+
+function formatDelayMinutes(totalMinutes: number) {
+  if (totalMinutes < 60) return `${totalMinutes}分`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours}時間` : `${hours}時間${minutes}分`;
+}
+
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
 const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
@@ -842,6 +858,35 @@ export default function DashboardPage() {
       } as const;
     });
   }, [syncRuns]);
+  const delayedExecutionEstimate = useMemo(() => {
+    const successfulScheduledRuns = syncRuns
+      .filter((run) => run.triggerType === "scheduled" && run.status === "success")
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+      .slice(0, 8);
+
+    if (!successfulScheduledRuns.length) return null;
+
+    const delayMinutesList = successfulScheduledRuns.map((run) => {
+      const plannedAt = getScheduledPlannedAtFromStartedAt(run.startedAt);
+      const startedAtMs = new Date(run.startedAt).getTime();
+      return Math.max(Math.round((startedAtMs - plannedAt.getTime()) / 60000), 0);
+    });
+
+    const averageDelayMinutes = Math.round(
+      delayMinutesList.reduce((sum, minutes) => sum + minutes, 0) / delayMinutesList.length
+    );
+    const estimatedAt = new Date(syncMonitor.expectedScheduledAt.getTime() + averageDelayMinutes * 60000);
+    const elapsedMinutes = Math.max(Math.round((Date.now() - syncMonitor.expectedScheduledAt.getTime()) / 60000), 0);
+
+    return {
+      averageDelayMinutes,
+      averageDelayLabel: formatDelayMinutes(averageDelayMinutes),
+      estimatedAtLabel: formatDateTimeJst(estimatedAt.toISOString()),
+      elapsedLabel: formatDelayMinutes(elapsedMinutes),
+      sampleCount: delayMinutesList.length,
+      isPastEstimate: elapsedMinutes > averageDelayMinutes,
+    };
+  }, [syncMonitor.expectedScheduledAt, syncRuns]);
   const syncHistoryRows = useMemo<SyncHistoryRow[]>(() => {
     const now = new Date();
     const todayKey = toTokyoDateKey(now);
@@ -1053,6 +1098,26 @@ export default function DashboardPage() {
                       label="次の予定時刻"
                       value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())}
                     />
+                    {delayedExecutionEstimate ? (
+                      <SyncInfoRow
+                        label="今回の実行目安"
+                        value={`${delayedExecutionEstimate.estimatedAtLabel} ごろ`}
+                      />
+                    ) : null}
+                    {delayedExecutionEstimate ? (
+                      <SyncInfoRow
+                        label="最近の平均遅延"
+                        value={`${delayedExecutionEstimate.averageDelayLabel}（直近${delayedExecutionEstimate.sampleCount}回）`}
+                      />
+                    ) : null}
+                    {delayedExecutionEstimate ? (
+                      <SyncInfoRow
+                        label="予定からの経過"
+                        value={delayedExecutionEstimate.isPastEstimate
+                          ? `${delayedExecutionEstimate.elapsedLabel}経過 / 目安を超過`
+                          : `${delayedExecutionEstimate.elapsedLabel}経過`}
+                      />
+                    ) : null}
                     {latestScheduledErrorMessage ? (
                       <SyncInfoRow label="直近のエラー内容" value={latestScheduledErrorMessage} />
                     ) : null}
