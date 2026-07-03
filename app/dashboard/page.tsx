@@ -780,6 +780,16 @@ export default function DashboardPage() {
   const latestScheduledErrorMessage = latestScheduledSyncRun?.errorSummary
     || latestScheduledSyncRun?.errors[0]?.message
     || null;
+  const latestSyncErrorPlannedLabel = latestSyncError
+    ? latestSyncError.triggerType === "scheduled"
+      ? getScheduledPlannedLabel(latestSyncError.startedAt)
+      : "手動実行"
+    : null;
+  const pastSyncErrorPlannedLabel = pastSyncError
+    ? pastSyncError.triggerType === "scheduled"
+      ? getScheduledPlannedLabel(pastSyncError.startedAt)
+      : "手動実行"
+    : null;
   const scheduledSlotStatuses = useMemo(() => {
     const todayKey = toTokyoDateKey(new Date());
     const nowJst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
@@ -1098,6 +1108,9 @@ export default function DashboardPage() {
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
                   <p className="font-semibold">自動同期に失敗しました</p>
                   <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "同期でエラーが発生しました。"}</p>
+                  {latestSyncErrorPlannedLabel ? (
+                    <p className="mt-2 text-xs text-red-700">予定時刻: {latestSyncErrorPlannedLabel}</p>
+                  ) : null}
                   <p className="mt-2 text-xs text-red-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
@@ -1105,6 +1118,9 @@ export default function DashboardPage() {
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <p className="font-semibold">自動同期で一部失敗しました</p>
                   <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "一部のデータ保存に失敗しました。"}</p>
+                  {latestSyncErrorPlannedLabel ? (
+                    <p className="mt-2 text-xs text-amber-700">予定時刻: {latestSyncErrorPlannedLabel}</p>
+                  ) : null}
                   <p className="mt-2 text-xs text-amber-700">発生時刻: {formatDateTimeJst(latestSyncError.finishedAt)}</p>
                 </div>
               ) : null}
@@ -1112,6 +1128,9 @@ export default function DashboardPage() {
                 <div className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-4 text-sm leading-6 text-stone-700">
                   <p className="font-semibold text-ink">前回の失敗履歴</p>
                   <p className="mt-1">{pastSyncError.errorSummary || "前回の同期でエラーが発生しました。"}</p>
+                  {pastSyncErrorPlannedLabel ? (
+                    <p className="mt-2 text-xs text-stone-500">予定時刻: {pastSyncErrorPlannedLabel}</p>
+                  ) : null}
                   <p className="mt-2 text-xs text-stone-500">発生時刻: {formatDateTimeJst(pastSyncError.finishedAt)}</p>
                 </div>
               ) : null}
