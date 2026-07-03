@@ -1084,6 +1084,11 @@ export default function DashboardPage() {
                       <p className="mt-1 text-sm leading-6 text-amber-900">
                         予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の定期取得がまだ反映されていません。
                       </p>
+                      {delayedExecutionEstimate ? (
+                        <p className="mt-2 text-sm leading-6 text-amber-900">
+                          最近の傾向では、<span className="font-semibold">{delayedExecutionEstimate.estimatedAtLabel} ごろ</span>に動く見込みです。
+                        </p>
+                      ) : null}
                     </div>
                     <span className="inline-flex w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
                       要確認
@@ -1100,19 +1105,19 @@ export default function DashboardPage() {
                     />
                     {delayedExecutionEstimate ? (
                       <SyncInfoRow
-                        label="今回の実行目安"
+                        label="今回の予測時刻"
                         value={`${delayedExecutionEstimate.estimatedAtLabel} ごろ`}
                       />
                     ) : null}
                     {delayedExecutionEstimate ? (
                       <SyncInfoRow
-                        label="最近の平均遅延"
+                        label="最近の平均遅れ"
                         value={`${delayedExecutionEstimate.averageDelayLabel}（直近${delayedExecutionEstimate.sampleCount}回）`}
                       />
                     ) : null}
                     {delayedExecutionEstimate ? (
                       <SyncInfoRow
-                        label="予定からの経過"
+                        label="いまの遅れ"
                         value={delayedExecutionEstimate.isPastEstimate
                           ? `${delayedExecutionEstimate.elapsedLabel}経過 / 目安を超過`
                           : `${delayedExecutionEstimate.elapsedLabel}経過`}
