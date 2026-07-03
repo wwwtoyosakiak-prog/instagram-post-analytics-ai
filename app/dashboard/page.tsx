@@ -460,6 +460,11 @@ function syncStatusLabel(status: InstagramSyncRun["status"]) {
   return "失敗";
 }
 
+function syncCountLabel(value: number, apiMode: string) {
+  if (apiMode === "github_actions") return "未取得";
+  return `${value.toLocaleString()}件`;
+}
+
 // ── メインページ（統合ダッシュボード） ────────────────────
 
 export default function DashboardPage() {
@@ -861,9 +866,9 @@ export default function DashboardPage() {
             sortAtMs: slotAt.getTime(),
             triggerLabel: "自動",
             statusLabel: syncStatusLabel(matchedRun.status),
-            fetchedPostsLabel: `${matchedRun.fetchedPosts.toLocaleString()}件`,
-            savedPostsLabel: `${matchedRun.savedPosts.toLocaleString()}件`,
-            savedSnapshotsLabel: `${matchedRun.savedSnapshots.toLocaleString()}件`,
+            fetchedPostsLabel: syncCountLabel(matchedRun.fetchedPosts, matchedRun.apiMode),
+            savedPostsLabel: syncCountLabel(matchedRun.savedPosts, matchedRun.apiMode),
+            savedSnapshotsLabel: syncCountLabel(matchedRun.savedSnapshots, matchedRun.apiMode),
             errorLabel: matchedRun.errorSummary || "-",
           });
         } else {
@@ -892,9 +897,9 @@ export default function DashboardPage() {
       sortAtMs: new Date(run.finishedAt).getTime(),
       triggerLabel: "手動",
       statusLabel: syncStatusLabel(run.status),
-      fetchedPostsLabel: `${run.fetchedPosts.toLocaleString()}件`,
-      savedPostsLabel: `${run.savedPosts.toLocaleString()}件`,
-      savedSnapshotsLabel: `${run.savedSnapshots.toLocaleString()}件`,
+      fetchedPostsLabel: syncCountLabel(run.fetchedPosts, run.apiMode),
+      savedPostsLabel: syncCountLabel(run.savedPosts, run.apiMode),
+      savedSnapshotsLabel: syncCountLabel(run.savedSnapshots, run.apiMode),
       errorLabel: run.errorSummary || "-",
     }));
 
