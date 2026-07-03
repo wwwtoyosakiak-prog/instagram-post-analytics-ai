@@ -194,6 +194,13 @@ function getJstParts(date: Date) {
   );
 }
 
+function shiftJstDateKey(dateKey: string, offsetDays: number) {
+  const base = new Date(`${dateKey}T00:00:00+09:00`);
+  base.setUTCDate(base.getUTCDate() + offsetDays);
+  const parts = getJstParts(base);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 function getCurrentScheduledSlotStart(now: Date) {
   const jst = getJstParts(now);
   const hour = Number(jst.hour);
@@ -214,10 +221,10 @@ function getCurrentScheduledSlotStart(now: Date) {
     offsetDays = -1;
   }
 
-  const base = new Date(`${jst.year}-${jst.month}-${jst.day}T00:00:00+09:00`);
-  base.setDate(base.getDate() + offsetDays);
-  base.setHours(slotHour, SCHEDULED_SYNC_MINUTE_JST, 0, 0);
-  return base;
+  const targetDateKey = offsetDays === 0
+    ? `${jst.year}-${jst.month}-${jst.day}`
+    : shiftJstDateKey(`${jst.year}-${jst.month}-${jst.day}`, offsetDays);
+  return new Date(`${targetDateKey}T${String(slotHour).padStart(2, "0")}:${String(SCHEDULED_SYNC_MINUTE_JST).padStart(2, "0")}:00+09:00`);
 }
 
 function hasRunForScheduledSlot(latestScheduledFinishedAt: string | null, slotStart: Date) {
