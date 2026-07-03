@@ -1037,7 +1037,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm font-bold">自動同期が止まっています</p>
                       <p className="mt-1 text-sm leading-6 text-amber-900">
-                        {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の定期取得がまだ反映されていません。
+                        予定時刻 {formatDateTimeJst(syncMonitor.expectedScheduledAt.toISOString())} の定期取得がまだ反映されていません。
                       </p>
                     </div>
                     <span className="inline-flex w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
@@ -1058,16 +1058,16 @@ export default function DashboardPage() {
                     ) : null}
                   </div>
                   <div className="mt-4 rounded-xl border border-amber-200/80 bg-white/70 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">本日の自動同期枠</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">本日の自動同期予定</p>
                     <div className="mt-3 grid gap-2">
                       {scheduledSlotStatuses.map((slot) => (
                         <div key={slot.slotLabel} className="grid gap-2 rounded-lg border border-stone-200/80 bg-white/80 px-3 py-2 md:grid-cols-[84px_110px_110px_96px_1fr] md:items-center">
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">対応</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">予定</p>
                             <p className="text-sm font-semibold text-ink">{slot.plannedAt}</p>
                           </div>
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">実施</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">実行</p>
                             <p className="text-sm font-semibold text-ink">{slot.executedAt}</p>
                           </div>
                           <p className={`text-sm font-semibold ${
