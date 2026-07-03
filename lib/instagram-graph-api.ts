@@ -257,20 +257,36 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
   const until = Math.floor(new Date(`${targetDate}T23:59:59.999+09:00`).getTime() / 1000) + 1;
 
   const result: IgAccountInsights = { date: targetDate };
-
-  try {
-    const url = `${getApiBase()}/${uid}/insights?metric=${metrics.join(',')}&period=day&since=${since}&until=${until}&access_token=${token}`;
-    const raw = await igFetch(url) as { data: InsightItem[] };
-    if (!raw.data?.length) {
-      throw new Error("アカウント全体インサイトの日次データが返ってきませんでした。");
-    }
-    for (const item of raw.data ?? []) {
+  let dailyMetricSuccessCount = 0;
+  const dailyMetricErrors: string[] = [];
+  for (const metric of metrics) {
+    try {
+      const url = `${getApiBase()}/${uid}/insights?metric=${metric}&period=day&since=${since}&until=${until}&access_token=${token}`;
+      const raw = await igFetch(url) as { data: InsightItem[] };
+      const item = raw.data?.[0];
+      if (!item) {
+        dailyMetricErrors.push(`${metric}: データなし`);
+        continue;
+      }
       const val = item.values?.[0]?.value ?? item.value ?? null;
       (result as Record<string, unknown>)[item.name] = val;
+      dailyMetricSuccessCount += 1;
+    } catch (e) {
+      console.warn(`[fetchAccountInsights] ${metric} 取得失敗:`, e);
+      const message = e instanceof Error
+        ? e.message
+        : typeof e === "object" && e && "message" in e && typeof (e as { message?: unknown }).message === "string"
+          ? (e as { message: string }).message
+          : "取得失敗";
+      dailyMetricErrors.push(`${metric}: ${message}`);
+      (result as Record<string, unknown>)[metric] = null;
     }
-  } catch (e) {
-    console.warn('[fetchAccountInsights] スカラー指標取得失敗:', e);
-    throw e;
+  }
+
+  if (dailyMetricSuccessCount === 0) {
+    throw new Error(
+      `アカウント全体インサイトを取得できませんでした。${dailyMetricErrors[0] ?? "日次データが返ってきませんでした。"}`
+    );
   }
 
   const lifetimeMetrics = ['audience_city', 'audience_country', 'audience_gender_age', 'online_followers'];
