@@ -31,6 +31,32 @@ interface DashboardAccount {
   last_synced_at: string;
 }
 
+interface DashboardTotals {
+  posts: number;
+  reach: number;
+  impressions: number;
+  likes: number;
+  comments: number;
+  saved: number;
+  shares: number;
+  views: number;
+}
+
+interface DashboardAccountInsightTrendRow {
+  date: string;
+  reach: number | null;
+  impressions: number | null;
+  profile_views: number | null;
+  website_clicks: number | null;
+  follower_count: number | null;
+}
+
+interface DashboardApiResponse {
+  account?: DashboardAccount | null;
+  totals?: DashboardTotals;
+  account_insights_trend?: DashboardAccountInsightTrendRow[];
+}
+
 type SyncHistoryRow =
   | {
       kind: "scheduled";
@@ -495,6 +521,8 @@ export default function DashboardPage() {
   // ── Graph API state ──
   const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
   const [dashAccount, setDashAccount] = useState<DashboardAccount | null>(null);
+  const [dashTotals, setDashTotals] = useState<DashboardTotals | null>(null);
+  const [accountInsightsTrend, setAccountInsightsTrend] = useState<DashboardAccountInsightTrendRow[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
@@ -530,7 +558,9 @@ export default function DashboardPage() {
         fetch('/api/instagram/dashboard').then(r => r.ok ? r.json() : null),
       ]);
       setApiMedia((mediaRes as { data: ApiMedia[] }).data ?? []);
-      setDashAccount((dashRes as { account?: DashboardAccount })?.account ?? null);
+      setDashAccount((dashRes as DashboardApiResponse | null)?.account ?? null);
+      setDashTotals((dashRes as DashboardApiResponse | null)?.totals ?? null);
+      setAccountInsightsTrend((dashRes as DashboardApiResponse | null)?.account_insights_trend ?? []);
     } catch {
       // 無視
     }
@@ -786,6 +816,29 @@ export default function DashboardPage() {
     };
   }, [effectivePosts, goals, latestScoreByPostId, graphPeriod, posts]);
 
+  const accountInsightSummary = useMemo(() => {
+    const todayKey = toTokyoDateKey(new Date());
+    const graphRangeStart = shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
+    const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= todayKey);
+    const sourceTrend = filteredTrend.length ? filteredTrend : accountInsightsTrend;
+    const latestRow = sourceTrend[sourceTrend.length - 1] ?? null;
+    const sumField = (key: keyof DashboardAccountInsightTrendRow) =>
+      sourceTrend.reduce((sum, row) => sum + (typeof row[key] === "number" ? Number(row[key]) : 0), 0);
+
+    return {
+      periodLabel: data.graphPeriodLabel,
+      impressions: sumField("impressions"),
+      reach: sumField("reach"),
+      profileViews: sumField("profile_views"),
+      websiteClicks: sumField("website_clicks"),
+      followerCount: latestRow?.follower_count ?? dashAccount?.followers_count ?? null,
+      latestDate: latestRow?.date ?? null,
+      hasData: sourceTrend.length > 0,
+      fallbackViews: dashTotals?.impressions ?? 0,
+      fallbackReach: dashTotals?.reach ?? 0,
+    };
+  }, [accountInsightsTrend, dashAccount?.followers_count, dashTotals?.impressions, dashTotals?.reach, data.graphPeriodLabel, graphPeriod]);
+
   const latestSyncRun = syncRuns[0] ?? null;
   const latestScheduledSyncRun = syncRuns.find((run) => run.triggerType === "scheduled") ?? null;
   const latestSyncError = syncRuns.find((run) => run.status !== "success") ?? null;
@@ -1027,6 +1080,70 @@ export default function DashboardPage() {
         <p className="text-sm text-stone-600">上の要約カードと下のグラフは同じ期間で切り替わります。</p>
         <GraphPeriodTabs graphPeriod={graphPeriod} setGraphPeriod={setGraphPeriod} />
       </div>
+
+      <Panel className="mb-6 border-stone-200/80 bg-white/92">
+        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">Account Insights</p>
+            <h2 className="mt-2 text-2xl font-bold text-ink">アカウントのインサイト</h2>
+            <p className="mt-2 text-sm leading-6 text-stone-600">
+              {accountInsightSummary.periodLabel}のアカウント全体の反応をまとめています。投稿単位ではなく、期間全体の流れを見るための欄です。
+            </p>
+            <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
+              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">閲覧</p>
+              <p className="mt-4 text-5xl font-bold leading-none">
+                {(accountInsightSummary.hasData
+                  ? accountInsightSummary.impressions
+                  : accountInsightSummary.fallbackViews).toLocaleString("ja-JP")}
+              </p>
+              <p className="mt-3 text-sm text-white/72">
+                {accountInsightSummary.periodLabel}のビュー
+                {accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <div className="rounded-2xl border border-stone-200/80 bg-fog/72 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-base font-semibold text-ink">内訳サマリー</p>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-stone-600">
+                  {accountInsightSummary.periodLabel}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
+                  <span className="text-sm text-stone-600">リーチしたアカウント数</span>
+                  <span className="text-2xl font-bold text-ink">
+                    {(accountInsightSummary.hasData
+                      ? accountInsightSummary.reach
+                      : accountInsightSummary.fallbackReach).toLocaleString("ja-JP")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
+                  <span className="text-sm text-stone-600">プロフィール閲覧</span>
+                  <span className="text-xl font-bold text-ink">{accountInsightSummary.profileViews.toLocaleString("ja-JP")}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
+                  <span className="text-sm text-stone-600">ウェブサイトクリック</span>
+                  <span className="text-xl font-bold text-ink">{accountInsightSummary.websiteClicks.toLocaleString("ja-JP")}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-stone-600">現在のフォロワー数</span>
+                  <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.followerCount)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-stone-600">
+              <p className="font-semibold text-ink">今はまだ出していない項目</p>
+              <p className="mt-1">
+                フォロワー / 非フォロワーの割合は、現在の保存データには入っていないため、この欄ではまだ表示していません。
+              </p>
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       {/* サマリーカード（統合後の実効値） */}
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
