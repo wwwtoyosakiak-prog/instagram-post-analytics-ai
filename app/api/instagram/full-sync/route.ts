@@ -128,6 +128,7 @@ async function handler(triggerType: SyncTriggerType) {
   const results = {
     account: null as unknown,
     media_fetched: 0,
+    media_saved: 0,
     insights_fetched: 0,
     insights_failed: 0,
     account_insights: null as unknown,
@@ -263,6 +264,8 @@ async function handler(triggerType: SyncTriggerType) {
       if (mediaErr) {
         console.warn(`[full-sync] media upsert error ${media.id}:`, mediaErr.message);
         results.errors.push(`投稿保存エラー ${media.id}: ${mediaErr.message}`);
+      } else {
+        results.media_saved++;
       }
 
       // インサイト保存（fetchMediaList でフィールド展開済み）
@@ -304,12 +307,12 @@ async function handler(triggerType: SyncTriggerType) {
     // 4. アカウント全体インサイト取得
     try {
       const accInsights = await fetchAccountInsights(account.id);
-      const today = new Date().toISOString().slice(0, 10);
+      const targetDate = accInsights.date ?? new Date().toISOString().slice(0, 10);
       const { error: aiErr } = await db
         .from('instagram_account_insights')
         .upsert({
           account_id: accountId,
-          date: today,
+          date: targetDate,
           reach: accInsights.reach ?? null,
           impressions: accInsights.impressions ?? null,
           profile_views: accInsights.profile_views ?? null,
@@ -333,6 +336,7 @@ async function handler(triggerType: SyncTriggerType) {
       }
     } catch (e) {
       console.warn('[full-sync] account insights exception:', e);
+      results.errors.push(e instanceof Error ? `アカウントインサイトエラー: ${e.message}` : 'アカウントインサイトエラーが発生しました。');
       results.account_insights = 'failed';
     }
 
@@ -355,7 +359,38 @@ async function handler(triggerType: SyncTriggerType) {
       console.warn('[full-sync] snapshot exception:', e);
     }
 
-    return NextResponse.json({ ok: true, ...results });
+    const finishedAt = new Date().toISOString();
+    const fullSyncStatus =
+      results.errors.length === 0
+        ? "success"
+        : results.media_saved > 0 || results.insights_fetched > 0 || results.snapshot_saved || results.account_insights === 'ok'
+          ? "partial"
+          : "failed";
+
+    await safeSaveScheduledSyncRun({
+      triggerType,
+      status: fullSyncStatus,
+      startedAt,
+      finishedAt,
+      fetchedPosts: results.media_fetched,
+      savedPosts: results.media_saved,
+      savedSnapshots: results.insights_fetched,
+      failedPosts: results.insights_failed,
+      apiMode: "full-sync",
+      accountId,
+      accountName: account.name,
+      accountUsername: normalizedUsername ?? undefined,
+      errorSummary: results.errors[0] ?? undefined,
+      errors: results.errors.map((message, index) => ({
+        stage: index === 0 && results.account_insights === 'failed' ? "account_insights" : "full_sync",
+        message,
+      })),
+    });
+
+    return NextResponse.json(
+      { ok: fullSyncStatus === "success", status: fullSyncStatus, ...results },
+      { status: fullSyncStatus === "failed" ? 500 : fullSyncStatus === "partial" ? 207 : 200 }
+    );
 
   } catch (e) {
     const err = e as ApiError;

@@ -74,6 +74,7 @@ export interface IgMediaInsights {
 }
 
 export interface IgAccountInsights {
+  date?: string;
   reach?: number | null;
   impressions?: number | null;
   profile_views?: number | null;
@@ -98,6 +99,18 @@ export type ApiError =
 
 async function getToken(): Promise<string> {
   return getInstagramAccessTokenForServer();
+}
+
+function getTokyoDateKey(date: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date).map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function getUid(igUserId?: string): string {
@@ -226,22 +239,29 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
     'get_directions_clicks', 'phone_call_clicks', 'text_message_clicks',
   ];
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const since = Math.floor(yesterday.setHours(0, 0, 0, 0) / 1000);
-  const until = Math.floor(yesterday.setHours(23, 59, 59, 999) / 1000) + 1;
+  const now = new Date();
+  const jstToday = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  jstToday.setHours(0, 0, 0, 0);
+  jstToday.setDate(jstToday.getDate() - 1);
+  const targetDate = getTokyoDateKey(jstToday);
+  const since = Math.floor(new Date(`${targetDate}T00:00:00+09:00`).getTime() / 1000);
+  const until = Math.floor(new Date(`${targetDate}T23:59:59.999+09:00`).getTime() / 1000) + 1;
 
-  const result: IgAccountInsights = {};
+  const result: IgAccountInsights = { date: targetDate };
 
   try {
     const url = `${getApiBase()}/${uid}/insights?metric=${metrics.join(',')}&period=day&since=${since}&until=${until}&access_token=${token}`;
     const raw = await igFetch(url) as { data: InsightItem[] };
+    if (!raw.data?.length) {
+      throw new Error("アカウント全体インサイトの日次データが返ってきませんでした。");
+    }
     for (const item of raw.data ?? []) {
       const val = item.values?.[0]?.value ?? item.value ?? null;
       (result as Record<string, unknown>)[item.name] = val;
     }
   } catch (e) {
     console.warn('[fetchAccountInsights] スカラー指標取得失敗:', e);
+    throw e;
   }
 
   const lifetimeMetrics = ['audience_city', 'audience_country', 'audience_gender_age', 'online_followers'];

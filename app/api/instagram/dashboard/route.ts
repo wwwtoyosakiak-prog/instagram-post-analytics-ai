@@ -131,10 +131,11 @@ export async function GET(req: NextRequest) {
   let aiQuery = db
     .from('instagram_account_insights')
     .select('date, reach, impressions, profile_views, website_clicks, follower_count')
-    .order('date', { ascending: true })
+    .order('date', { ascending: false })
     .limit(90);
   if (activeAccountId) aiQuery = aiQuery.eq('account_id', activeAccountId);
-  const { data: accountInsights } = await aiQuery;
+  const { data: accountInsightsRaw } = await aiQuery;
+  const accountInsights = [...(accountInsightsRaw ?? [])].reverse();
 
   return NextResponse.json({
     account,
