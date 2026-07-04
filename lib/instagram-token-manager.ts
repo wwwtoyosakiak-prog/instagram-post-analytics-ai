@@ -78,7 +78,6 @@ function computeWarningLevel(remainingDays: number | null, status: InstagramAcce
 
 function computeStatus(storage: InstagramAccessTokenStorage | null, source: "database" | "environment" | "missing"): InstagramAccessTokenStatus {
   if (source === "missing") return "missing";
-  if (getGraphApiMode() === "facebook_login" && source === "environment") return "environment_only";
   if (!storage?.expiresAt) return "environment_only";
   const expiresAt = new Date(storage.expiresAt).getTime();
   if (expiresAt <= Date.now()) return "expired";
@@ -91,9 +90,6 @@ function computeStatus(storage: InstagramAccessTokenStorage | null, source: "dat
 
 function getRefreshBlockedReason(storage: InstagramAccessTokenStorage | null, token: string | null) {
   if (!token) return "アクセストークンが未設定です。";
-  if (getGraphApiMode() === "facebook_login") {
-    return "facebook_login では保存済みの自動更新を使いません。Vercel の環境変数トークンを更新してください。";
-  }
   if (storage?.expiresAt && new Date(storage.expiresAt).getTime() <= Date.now()) {
     return "トークン期限切れのため、再ログインが必要です。";
   }
@@ -108,8 +104,8 @@ function getRefreshBlockedReason(storage: InstagramAccessTokenStorage | null, to
 
 function getRefreshReason(storage: InstagramAccessTokenStorage | null, token: string | null, status: InstagramAccessTokenStatus, remainingDays: number | null) {
   if (!token) return "アクセストークンが未設定です。";
-  if (getGraphApiMode() === "facebook_login") {
-    return "facebook_login では環境変数のアクセストークンを優先して使用します。";
+  if (getGraphApiMode() === "facebook_login" && !storage?.expiresAt) {
+    return "facebook_login の環境変数トークンです。初回更新でDB管理へ切り替えます。";
   }
   if (status === "expired") return "トークン期限切れのため、再ログインが必要です。";
   if (storage?.lastRefreshedAt) {
@@ -237,16 +233,13 @@ export async function storeInstagramAccessToken(accessToken: string, expiresInSe
 export async function getInstagramAccessTokenState(): Promise<TokenStateInternal> {
   const storage = await ensureTokenStorage();
   const envToken = getEnvToken();
-  const prefersEnvToken = getGraphApiMode() === "facebook_login" && Boolean(envToken);
-  const token = prefersEnvToken ? envToken : (storage?.accessToken || envToken);
-  const source: InstagramAccessTokenRecord["source"] = prefersEnvToken
-    ? "environment"
-    : storage?.accessToken
-      ? "database"
-      : token
-        ? "environment"
-        : "missing";
-  const activeStorage = source === "database" ? storage : null;
+  const token = storage?.accessToken || envToken;
+  const source: InstagramAccessTokenRecord["source"] = storage?.accessToken
+    ? "database"
+    : token
+      ? "environment"
+      : "missing";
+  const activeStorage = storage ?? null;
   const state = await buildTokenState(activeStorage, token, source);
 
   return { storage: activeStorage, token, state };
