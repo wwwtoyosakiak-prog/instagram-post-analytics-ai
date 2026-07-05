@@ -513,7 +513,7 @@ async function handler(triggerType: SyncTriggerType) {
       account: null,
       capturedAt,
       errors: [detail],
-      error: "Instagram投稿の取得に失敗しました。"
+      error: detail.message
     };
     await safeSaveSyncRun({
       triggerType,
@@ -525,7 +525,7 @@ async function handler(triggerType: SyncTriggerType) {
       savedSnapshots: 0,
       failedPosts: 0,
       apiMode: config.mode,
-      errorSummary: payload.error,
+      errorSummary: detail.message,
       errors: [detail]
     });
     return NextResponse.json(payload, { status: 502 });
@@ -548,7 +548,7 @@ async function handler(triggerType: SyncTriggerType) {
       account: null,
       capturedAt,
       errors: [detail],
-      error: "Instagramアカウントの保存に失敗しました。"
+      error: detail.message
     };
     await safeSaveSyncRun({
       triggerType,
@@ -560,7 +560,7 @@ async function handler(triggerType: SyncTriggerType) {
       savedSnapshots: 0,
       failedPosts: 0,
       apiMode: config.mode,
-      errorSummary: payload.error,
+      errorSummary: detail.message,
       errors: [detail]
     });
     return NextResponse.json(payload, { status: 500 });

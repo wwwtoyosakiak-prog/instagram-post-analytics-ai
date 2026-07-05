@@ -586,56 +586,46 @@ export default function DashboardPage() {
     setSyncMessage("");
     setSyncErrorMessage("");
     try {
-      const [fullSyncResponse, historySyncResponse] = await Promise.all([
-        fetch('/api/instagram/full-sync', { method: 'POST' }),
-        fetch("/api/instagram/sync", { method: "POST" })
-      ]);
-      const fullSyncData = await fullSyncResponse.json() as {
-        ok: boolean;
-        status?: "success" | "partial" | "failed";
-        media_fetched: number;
-        media_saved?: number;
-        insights_fetched: number;
-        account_insights?: string | null;
-        errors?: string[];
-        error?: string;
-        type?: string;
-      };
+      const historySyncResponse = await fetch("/api/instagram/sync", { method: "POST" });
       const historySyncData = await historySyncResponse.json() as {
         success: boolean;
+        fetchedPosts?: number;
         savedPosts: number;
         savedSnapshots: number;
         failedPosts: number;
         error?: string;
+        errors?: Array<{ message?: string }>;
       };
-      const fullSyncStatus = fullSyncData.status ?? (fullSyncData.ok ? "success" : "failed");
-      const fullSyncPrimaryError = fullSyncData.error ?? fullSyncData.errors?.[0] ?? "不明なエラー";
-
-      if (fullSyncStatus === "failed") {
-        if (fullSyncData.type === 'token_expired') setSyncMsg('⚠️ トークンが期限切れです。再連携してください。');
-        else if (fullSyncData.type === 'permission_denied') setSyncMsg('⚠️ 必要なAPI権限がありません。');
-        else setSyncMsg(`❌ API同期エラー: ${fullSyncPrimaryError}`);
-        return;
-      }
 
       if (!historySyncResponse.ok && historySyncResponse.status !== 207) {
-        throw new Error(historySyncData.error ?? "投稿履歴の保存に失敗しました。");
+        throw new Error(
+          historySyncData.error ??
+            historySyncData.errors?.[0]?.message ??
+            "投稿履歴の保存に失敗しました。"
+        );
       }
 
       await Promise.all([refreshApiData(), refreshDashboard()]);
 
-      if (fullSyncStatus === "partial") {
-        setSyncMsg(`⚠️ API同期は一部完了: 投稿${fullSyncData.media_fetched}件 / 保存${fullSyncData.media_saved ?? 0}件 / インサイト${fullSyncData.insights_fetched}件`);
-        setSyncErrorMessage(fullSyncPrimaryError);
+      if (!historySyncData.success || historySyncResponse.status === 207) {
+        setSyncMsg(
+          `⚠️ 一部完了: 投稿保存${historySyncData.savedPosts}件 / 履歴保存${historySyncData.savedSnapshots}件 / 失敗${historySyncData.failedPosts}件`
+        );
+        setSyncErrorMessage(
+          historySyncData.error ??
+            historySyncData.errors?.[0]?.message ??
+            "一部の投稿履歴で保存エラーがありました。"
+        );
       } else {
-        setSyncMsg(`✅ API同期完了: 投稿${fullSyncData.media_fetched}件 / インサイト${fullSyncData.insights_fetched}件`);
+        setSyncMsg(
+          `✅ 同期完了: 取得${historySyncData.fetchedPosts ?? historySyncData.savedPosts}件 / 投稿保存${historySyncData.savedPosts}件 / 履歴保存${historySyncData.savedSnapshots}件`
+        );
       }
-      setSyncMessage(historySyncData.success
-        ? `${historySyncData.savedPosts}件の投稿と${historySyncData.savedSnapshots}件の履歴を保存しました。`
-        : `${historySyncData.savedPosts}件を保存しましたが、${historySyncData.failedPosts}件でエラーが発生しました。`);
-      if (!historySyncData.success && fullSyncStatus !== "partial") {
-        setSyncErrorMessage("一部の投稿履歴で保存エラーがありました。");
-      }
+      setSyncMessage(
+        historySyncData.success
+          ? `${historySyncData.savedPosts}件の投稿と${historySyncData.savedSnapshots}件の履歴を保存しました。`
+          : `${historySyncData.savedPosts}件を保存しましたが、${historySyncData.failedPosts}件でエラーが発生しました。`
+      );
     } catch (error) {
       setSyncMsg('');
       setSyncErrorMessage(error instanceof Error ? error.message : '❌ 通信エラーが発生しました');
