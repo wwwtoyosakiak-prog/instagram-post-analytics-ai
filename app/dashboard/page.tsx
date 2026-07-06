@@ -586,48 +586,48 @@ export default function DashboardPage() {
     setSyncMessage("");
     setSyncErrorMessage("");
     try {
-      const historySyncResponse = await fetch("/api/instagram/sync", { method: "POST" });
+      const historySyncResponse = await fetch("/api/instagram/full-sync", { method: "POST" });
       const historySyncData = await historySyncResponse.json() as {
-        success: boolean;
-        fetchedPosts?: number;
-        savedPosts: number;
-        savedSnapshots: number;
-        failedPosts: number;
+        ok: boolean;
+        status?: "success" | "partial" | "failed";
+        media_fetched?: number;
+        media_saved?: number;
+        insights_fetched?: number;
+        insights_failed?: number;
         error?: string;
-        errors?: Array<{ message?: string }>;
+        errors?: string[];
       };
 
-      if (!historySyncResponse.ok && historySyncResponse.status !== 207) {
-        throw new Error(
-          historySyncData.error ??
-            historySyncData.errors?.[0]?.message ??
-            "投稿履歴の保存に失敗しました。"
-        );
+      const firstError =
+        historySyncData.error ??
+        historySyncData.errors?.[0] ??
+        "同期に失敗しました。";
+
+      if ((!historySyncResponse.ok && historySyncResponse.status !== 207) || historySyncData.ok === false) {
+        throw new Error(firstError);
       }
 
       await Promise.all([refreshApiData(), refreshDashboard()]);
 
-      if (!historySyncData.success || historySyncResponse.status === 207) {
-        setSyncMsg(
-          `⚠️ 一部完了: 投稿保存${historySyncData.savedPosts}件 / 履歴保存${historySyncData.savedSnapshots}件 / 失敗${historySyncData.failedPosts}件`
-        );
-        setSyncErrorMessage(
-          historySyncData.error ??
-            historySyncData.errors?.[0]?.message ??
-            "一部の投稿履歴で保存エラーがありました。"
-        );
-      } else {
-        setSyncMsg(
-          `✅ 同期完了: 取得${historySyncData.fetchedPosts ?? historySyncData.savedPosts}件 / 投稿保存${historySyncData.savedPosts}件 / 履歴保存${historySyncData.savedSnapshots}件`
-        );
-      }
-      setSyncMessage(
-        historySyncData.success
-          ? `${historySyncData.savedPosts}件の投稿と${historySyncData.savedSnapshots}件の履歴を保存しました。`
-          : `${historySyncData.savedPosts}件を保存しましたが、${historySyncData.failedPosts}件でエラーが発生しました。`
+      const fetchedPosts = historySyncData.media_fetched ?? historySyncData.media_saved ?? 0;
+      const savedPosts = historySyncData.media_saved ?? 0;
+      const savedInsights = historySyncData.insights_fetched ?? 0;
+      const failedInsights = historySyncData.insights_failed ?? 0;
+      const isPartial = historySyncData.status === "partial" || failedInsights > 0 || historySyncResponse.status === 207;
+
+      setSyncMsg(
+        `${isPartial ? "⚠️ 一部完了" : "✅ 同期完了"}: 取得${fetchedPosts}件 / 投稿保存${savedPosts}件 / 履歴保存${savedInsights}件 / 失敗${failedInsights}件`
       );
+      setSyncMessage(
+        isPartial
+          ? `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。一部でエラーがありました。`
+          : `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。`
+      );
+      if (isPartial) {
+        setSyncErrorMessage(firstError);
+      }
     } catch (error) {
-      setSyncMsg('');
+      setSyncMsg("");
       setSyncErrorMessage(error instanceof Error ? error.message : '❌ 通信エラーが発生しました');
     } finally {
       setSyncing(false);
