@@ -233,12 +233,28 @@ export async function storeInstagramAccessToken(accessToken: string, expiresInSe
 export async function getInstagramAccessTokenState(): Promise<TokenStateInternal> {
   const storage = await ensureTokenStorage();
   const envToken = getEnvToken();
-  const token = storage?.accessToken || envToken;
-  const source: InstagramAccessTokenRecord["source"] = storage?.accessToken
-    ? "database"
-    : token
-      ? "environment"
-      : "missing";
+  const graphApiMode = getGraphApiMode();
+  let token: string | null = null;
+  let source: InstagramAccessTokenRecord["source"] = "missing";
+
+  if (graphApiMode === "facebook_login") {
+    if (envToken) {
+      token = envToken;
+      source = "environment";
+    } else if (storage?.accessToken) {
+      token = storage.accessToken;
+      source = "database";
+    }
+  } else {
+    if (storage?.accessToken) {
+      token = storage.accessToken;
+      source = "database";
+    } else if (envToken) {
+      token = envToken;
+      source = "environment";
+    }
+  }
+
   const activeStorage = storage ?? null;
   const state = await buildTokenState(activeStorage, token, source);
 
