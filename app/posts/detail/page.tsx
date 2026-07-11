@@ -361,24 +361,53 @@ function AnalysisView({ analysis }: { analysis: AiAnalysis }) {
       )}
 
       {caption ? (
-        <CopySection title="改善済みキャプション" text={caption.improvedCaption}>
-          {caption.hook ? (
-            <div className="mb-3 rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-sm">
-              <span className="font-semibold">冒頭案：</span>{caption.hook}
+        <section className="rounded-lg border border-stone-200 bg-white/80 p-5">
+          <div>
+            <h2 className="font-semibold">キャプション改善AI</h2>
+            <p className="mt-1 text-sm text-stone-600">目的に合わせて複数の完成稿を使い分けられます。</p>
+          </div>
+
+          {caption.strategy ? (
+            <p className="mt-4 rounded-md bg-skyglass px-4 py-3 text-sm leading-6 text-stone-700">
+              <span className="font-semibold">改善戦略：</span>{caption.strategy}
+            </p>
+          ) : null}
+
+          {caption.hookOptions?.length ? (
+            <div className="mt-5">
+              <p className="text-sm font-semibold">冒頭フック3案</p>
+              <div className="mt-2 grid gap-2">
+                {caption.hookOptions.map((item, index) => (
+                  <CopyTextCard key={item} label={`案${index + 1}`} text={item} />
+                ))}
+              </div>
             </div>
+          ) : caption.hook ? (
+            <CopyTextCard label="おすすめ冒頭" text={caption.hook} />
           ) : null}
-          <p className="whitespace-pre-wrap rounded-md bg-fog p-4 text-sm leading-7 text-stone-800">{caption.improvedCaption}</p>
-          {caption.shortVersion ? (
-            <div className="mt-3 rounded-md border border-stone-200 bg-white/80 px-3 py-3 text-sm leading-6">
-              <p className="font-semibold">短文版</p>
-              <p className="mt-1 text-stone-700">{caption.shortVersion}</p>
+
+          <div className="mt-5 grid gap-4">
+            <CaptionVariant title="通常版" text={caption.improvedCaption} />
+            {caption.shortVersion ? <CaptionVariant title="短文版" text={caption.shortVersion} /> : null}
+            {caption.reelVersion ? <CaptionVariant title="リール向け版" text={caption.reelVersion} /> : null}
+            {caption.ctaStrongVersion ? <CaptionVariant title="CTA強化版" text={caption.ctaStrongVersion} /> : null}
+          </div>
+
+          {caption.ctaOptions?.length ? (
+            <div className="mt-5">
+              <p className="text-sm font-semibold">CTA候補</p>
+              <div className="mt-2 grid gap-2">
+                {caption.ctaOptions.map((item, index) => (
+                  <CopyTextCard key={item} label={`CTA ${index + 1}`} text={item} />
+                ))}
+              </div>
             </div>
+          ) : caption.callToAction ? (
+            <CopyTextCard label="おすすめCTA" text={caption.callToAction} />
           ) : null}
-          {caption.callToAction ? (
-            <p className="mt-3 text-sm text-stone-700"><span className="font-semibold">CTA：</span>{caption.callToAction}</p>
-          ) : null}
+
           {caption.changes.length ? <TagList label="主な変更" items={caption.changes} /> : null}
-        </CopySection>
+        </section>
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -496,6 +525,54 @@ function CopySection({ title, text, children }: { title: string; text: string; c
       </div>
       <div className="mt-4">{children}</div>
     </section>
+  );
+}
+
+function CaptionVariant({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white/80 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <CopyButton text={text} />
+      </div>
+      <p className="mt-3 whitespace-pre-wrap rounded-md bg-fog p-3 text-sm leading-7 text-stone-800">{text}</p>
+    </div>
+  );
+}
+
+function CopyTextCard({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-md border border-stone-200 bg-white/80 px-3 py-3">
+      <p className="text-sm leading-6 text-stone-700">
+        <span className="mr-2 text-xs font-semibold text-stone-500">{label}</span>
+        {text}
+      </p>
+      <CopyButton text={text} compact />
+    </div>
+  );
+}
+
+function CopyButton({ text, compact = false }: { text: string; compact?: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => { void copy(); }}
+      className={`shrink-0 rounded-md border border-stone-300 bg-white font-semibold text-stone-700 hover:border-moss ${compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"}`}
+    >
+      {copied ? "コピー済み" : "コピー"}
+    </button>
   );
 }
 
