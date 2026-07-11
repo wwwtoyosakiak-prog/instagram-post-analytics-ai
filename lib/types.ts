@@ -204,10 +204,15 @@ export type AiPostingTimeSuggestion = {
 
 export type AiCaptionSuggestion = {
   hook: string;
+  hookOptions?: string[];
   improvedCaption: string;
   shortVersion: string;
+  reelVersion?: string;
+  ctaStrongVersion?: string;
   callToAction: string;
+  ctaOptions?: string[];
   changes: string[];
+  strategy?: string;
 };
 
 export type AiScoreBreakdown = {

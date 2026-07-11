@@ -145,8 +145,13 @@ ${formatSpecificCriteria(post)}
 - strengths、weaknesses、reasonには、可能な限り実際の数値を含める。
 - improvementsDetailedは3〜5件。categoryの重複を避ける。
 - exampleは、この投稿にそのまま応用できる一文または構成例にする。
-- improvedCaptionは改行を含む完成稿にする。
-- shortVersionはリールや短い投稿向けに80〜160字を目安にする。
+- hookOptionsは、切り口が重ならない冒頭案を3つ作る。
+- improvedCaptionは元の事実だけを使い、改行を含む完成稿にする。
+- shortVersionは80〜160字を目安にする。
+- reelVersionはリール本文向けに、冒頭を強くし、短い段落で構成する。
+- ctaStrongVersionは保存・コメント・共有のうち最も適切な1つを主目的にする。
+- ctaOptionsは、質問型・保存促進型・共有促進型など役割の異なる3案にする。
+- strategyには、なぜこの構成にしたかを2〜4文で説明する。
 - hashtagSuggestion.recommendedは重複なしで10〜20個を目安にする。
 - copyTextはrecommendedを半角スペースで連結する。
 - nextIdeasは現在の投稿から自然につながる案を3件にする。
@@ -191,11 +196,16 @@ ${formatSpecificCriteria(post)}
     "evidence": "account_data | post_history | general_tendency"
   },
   "captionSuggestion": {
-    "hook": "string",
-    "improvedCaption": "string",
-    "shortVersion": "string",
-    "callToAction": "string",
-    "changes": ["string"]
+    "hook": "最もおすすめの冒頭",
+    "hookOptions": ["冒頭案1", "冒頭案2", "冒頭案3"],
+    "improvedCaption": "通常投稿向け完成稿",
+    "shortVersion": "80〜160字の短文版",
+    "reelVersion": "リール向け完成稿",
+    "ctaStrongVersion": "CTAを強化した完成稿",
+    "callToAction": "最もおすすめのCTA",
+    "ctaOptions": ["質問型CTA", "保存促進型CTA", "共有促進型CTA"],
+    "changes": ["変更点"],
+    "strategy": "構成と狙いの説明"
   },
   "scoreBreakdown": {
     "total": 0,

@@ -75,10 +75,15 @@ function normalizeCaption(value: unknown): AiCaptionSuggestion | undefined {
   if (!improvedCaption) return undefined;
   return {
     hook: text(item.hook),
+    hookOptions: textArray(item.hookOptions),
     improvedCaption,
     shortVersion: text(item.shortVersion),
+    reelVersion: text(item.reelVersion),
+    ctaStrongVersion: text(item.ctaStrongVersion),
     callToAction: text(item.callToAction),
+    ctaOptions: textArray(item.ctaOptions),
     changes: textArray(item.changes),
+    strategy: text(item.strategy),
   };
 }
 
