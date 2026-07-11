@@ -284,37 +284,241 @@ function getPostPreview(post: InstagramPost) {
 
 function AnalysisView({ analysis }: { analysis: AiAnalysis }) {
   const scoreDelta = "scoreDelta" in analysis ? analysis.scoreDelta : null;
+  const score = analysis.scoreBreakdown;
+  const detailed = analysis.improvementsDetailed ?? [];
+  const hashtag = analysis.hashtagSuggestion;
+  const postingTime = analysis.postingTimeSuggestion;
+  const caption = analysis.captionSuggestion;
+
   return (
-    <div className="space-y-5">
-      <div className="rounded-lg bg-skyglass p-4">
-        <p className="text-sm font-medium text-stone-600">投稿スコア</p>
-        <div className="mt-1 flex flex-wrap items-end gap-3">
-          <p className="text-4xl font-bold text-ink">{analysis.score}<span className="text-lg"> / 100</span></p>
-          {typeof scoreDelta === "number" ? (
-            <p className={`mb-1 rounded-md px-2 py-1 text-sm font-semibold ${scoreDelta >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
-              前回比 {scoreDelta >= 0 ? "+" : ""}{scoreDelta}
+    <div className="space-y-6">
+      <section className="overflow-hidden rounded-xl border border-stone-200 bg-white/80">
+        <div className="grid gap-5 p-5 lg:grid-cols-[180px_1fr]">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-skyglass p-5 text-center">
+            <p className="text-sm font-semibold text-stone-600">総合投稿スコア</p>
+            <p className="mt-2 text-5xl font-bold text-ink">
+              {analysis.score}
+              <span className="text-lg text-stone-500"> / 100</span>
             </p>
-          ) : null}
+            {typeof scoreDelta === "number" ? (
+              <p className={`mt-3 rounded-full px-3 py-1 text-xs font-semibold ${scoreDelta >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+                前回比 {scoreDelta >= 0 ? "+" : ""}{scoreDelta}
+              </p>
+            ) : null}
+            {score ? <ConfidenceBadge value={score.confidence} /> : null}
+          </div>
+
+          {score ? (
+            <div>
+              <h2 className="font-semibold">スコア内訳</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <ScoreBar label="内容の魅力" value={score.content} />
+                <ScoreBar label="画像・動画" value={score.visual} />
+                <ScoreBar label="キャプション" value={score.caption} />
+                <ScoreBar label="実際の反応" value={score.engagement} />
+                <ScoreBar label="発見されやすさ" value={score.discoverability} />
+              </div>
+              {score.summary ? (
+                <p className="mt-4 rounded-md bg-fog px-4 py-3 text-sm leading-6 text-stone-700">{score.summary}</p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <p className="text-sm leading-6 text-stone-600">
+                この分析は旧形式です。もう一度AI分析を実行すると、5項目のスコア内訳が表示されます。
+              </p>
+            </div>
+          )}
         </div>
-      </div>
-      {[
-        ["投稿の第一印象", analysis.firstImpression],
-        ["画像から伝わる内容", analysis.imageMessage],
-        ["キャプションのわかりやすさ", analysis.captionClarity],
-        ["数値から見た強み", analysis.strengths],
-        ["数値から見た弱み", analysis.weaknesses],
-        ["伸びた / 伸びなかった可能性", analysis.reason]
-      ].map(([title, body]) => (
-        <section key={title}>
-          <h2 className="font-semibold">{title}</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-700">{body}</p>
+      </section>
+
+      {detailed.length ? (
+        <section>
+          <div>
+            <h2 className="font-semibold">優先度付き改善提案</h2>
+            <p className="mt-1 text-sm text-stone-600">上から順に直すと、次回投稿へ反映しやすくなります。</p>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {detailed.map((item, index) => (
+              <div key={`${item.category}-${index}`} className="rounded-lg border border-stone-200 bg-white/80 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <PriorityBadge priority={item.priority} />
+                  <span className="text-xs font-semibold text-stone-500">{item.category}</span>
+                </div>
+                {item.issue ? <p className="mt-3 text-sm font-medium text-stone-700">{item.issue}</p> : null}
+                <p className="mt-2 text-sm leading-6 text-ink">{item.suggestion}</p>
+                {item.example ? (
+                  <div className="mt-3 rounded-md bg-skyglass px-3 py-2 text-sm leading-6 text-stone-700">
+                    <span className="font-semibold">具体例：</span>{item.example}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
         </section>
-      ))}
-      <List title="次回改善案" items={analysis.improvements} />
+      ) : (
+        <List title="次回改善案" items={analysis.improvements} />
+      )}
+
+      {caption ? (
+        <CopySection title="改善済みキャプション" text={caption.improvedCaption}>
+          {caption.hook ? (
+            <div className="mb-3 rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-sm">
+              <span className="font-semibold">冒頭案：</span>{caption.hook}
+            </div>
+          ) : null}
+          <p className="whitespace-pre-wrap rounded-md bg-fog p-4 text-sm leading-7 text-stone-800">{caption.improvedCaption}</p>
+          {caption.shortVersion ? (
+            <div className="mt-3 rounded-md border border-stone-200 bg-white/80 px-3 py-3 text-sm leading-6">
+              <p className="font-semibold">短文版</p>
+              <p className="mt-1 text-stone-700">{caption.shortVersion}</p>
+            </div>
+          ) : null}
+          {caption.callToAction ? (
+            <p className="mt-3 text-sm text-stone-700"><span className="font-semibold">CTA：</span>{caption.callToAction}</p>
+          ) : null}
+          {caption.changes.length ? <TagList label="主な変更" items={caption.changes} /> : null}
+        </CopySection>
+      ) : null}
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {postingTime ? (
+          <section className="rounded-lg border border-stone-200 bg-white/80 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">おすすめ投稿時間</h2>
+                <p className="mt-1 text-sm text-stone-600">次回投稿の候補時間です。</p>
+              </div>
+              <ConfidenceBadge value={postingTime.confidence} />
+            </div>
+            <div className="mt-5 rounded-lg bg-skyglass p-4 text-center">
+              <p className="text-lg font-bold text-ink">{postingTime.bestDay}</p>
+              <p className="mt-1 text-3xl font-bold text-ink">{postingTime.bestTime}</p>
+            </div>
+            {postingTime.alternatives.length ? (
+              <TagList label="代替候補" items={postingTime.alternatives} />
+            ) : null}
+            <p className="mt-4 text-sm leading-6 text-stone-700">{postingTime.reason}</p>
+            <p className="mt-3 text-xs font-semibold text-stone-500">
+              根拠：{postingEvidenceLabel(postingTime.evidence)}
+            </p>
+          </section>
+        ) : null}
+
+        {hashtag ? (
+          <CopySection title="おすすめハッシュタグ" text={hashtag.copyText}>
+            <TagList label="推奨セット" items={hashtag.recommended} />
+            <TagList label="中心タグ" items={hashtag.core} />
+            <TagList label="ニッチタグ" items={hashtag.niche} />
+            <TagList label="地域タグ" items={hashtag.local} />
+            {hashtag.remove.length ? <TagList label="外す候補" items={hashtag.remove} tone="muted" /> : null}
+            {hashtag.reason ? <p className="mt-4 text-sm leading-6 text-stone-700">{hashtag.reason}</p> : null}
+          </CopySection>
+        ) : (
+          <List title="おすすめハッシュタグ" items={analysis.hashtags} />
+        )}
+      </div>
+
+      <section className="rounded-lg border border-stone-200 bg-white/70 p-4">
+        <h2 className="font-semibold">分析メモ</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {[
+            ["投稿の第一印象", analysis.firstImpression],
+            ["画像から伝わる内容", analysis.imageMessage],
+            ["キャプションのわかりやすさ", analysis.captionClarity],
+            ["数値から見た強み", analysis.strengths],
+            ["数値から見た弱み", analysis.weaknesses],
+            ["伸びた / 伸びなかった可能性", analysis.reason]
+          ].map(([title, body]) => (
+            <div key={title} className="rounded-md bg-fog p-3">
+              <h3 className="text-sm font-semibold">{title}</h3>
+              <p className="mt-1 text-sm leading-6 text-stone-700">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <List title="おすすめ投稿案" items={analysis.nextIdeas} />
-      <List title="おすすめハッシュタグ" items={analysis.hashtags} />
     </div>
   );
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const width = Math.max(0, Math.min(100, value * 5));
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-stone-700">{label}</span>
+        <span className="font-bold text-ink">{value}/20</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-200">
+        <div className="h-full rounded-full bg-moss" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function PriorityBadge({ priority }: { priority: "high" | "medium" | "low" }) {
+  const styles = {
+    high: "bg-red-100 text-red-800",
+    medium: "bg-amber-100 text-amber-800",
+    low: "bg-stone-100 text-stone-700"
+  };
+  const labels = { high: "最優先", medium: "優先", low: "余裕があれば" };
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles[priority]}`}>{labels[priority]}</span>;
+}
+
+function ConfidenceBadge({ value }: { value: "high" | "medium" | "low" }) {
+  const labels = { high: "信頼度 高", medium: "信頼度 中", low: "信頼度 低" };
+  return <span className="mt-3 inline-flex rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600">{labels[value]}</span>;
+}
+
+function CopySection({ title, text, children }: { title: string; text: string; children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <section className="rounded-lg border border-stone-200 bg-white/80 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-semibold">{title}</h2>
+        <Button variant="secondary" onClick={() => { void copy(); }}>
+          {copied ? "コピーしました" : "コピー"}
+        </Button>
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function TagList({ label, items, tone = "normal" }: { label: string; items: string[]; tone?: "normal" | "muted" }) {
+  if (!items.length) return null;
+  return (
+    <div className="mt-4">
+      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span key={item} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${tone === "muted" ? "bg-stone-100 text-stone-500 line-through" : "bg-skyglass text-ink"}`}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function postingEvidenceLabel(value: "account_data" | "post_history" | "general_tendency") {
+  if (value === "account_data") return "アカウント固有データ";
+  if (value === "post_history") return "過去投稿の実績";
+  return "一般的な閲覧傾向";
 }
 
 function AnalysisComparison({ analyses, onSelect }: { analyses: AiAnalysisRecord[]; onSelect: (analysis: AiAnalysisRecord) => void }) {
