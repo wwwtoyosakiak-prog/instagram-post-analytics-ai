@@ -1,4 +1,5 @@
 import { AiAnalysis, AiAnalysisRecord, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -62,6 +63,7 @@ type AnalysisRow = {
   hashtags: string[];
   score: number;
   score_delta: number | null;
+  analysis_v2: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -285,9 +287,7 @@ function postToRow(input: InstagramPostInput) {
 }
 
 function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
-  return {
-    id: row.id,
-    postId: row.post_id,
+  const normalized = normalizeAiAnalysis({
     firstImpression: row.first_impression,
     imageMessage: row.image_message,
     captionClarity: row.caption_clarity,
@@ -298,9 +298,9 @@ function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
     nextIdeas: row.next_ideas ?? [],
     hashtags: row.hashtags ?? [],
     score: row.score,
-    scoreDelta: row.score_delta,
-    createdAt: row.created_at
-  };
+    ...(row.analysis_v2 ?? {}),
+  });
+  return { id: row.id, postId: row.post_id, ...normalized, scoreDelta: row.score_delta, createdAt: row.created_at };
 }
 
 function mapInsightSnapshot(row: InsightSnapshotRow): InstagramInsightSnapshot {
@@ -414,7 +414,8 @@ function analysisToRow(postId: string, analysis: AiAnalysis, scoreDelta: number 
     next_ideas: analysis.nextIdeas,
     hashtags: analysis.hashtags,
     score: analysis.score,
-    score_delta: scoreDelta
+    score_delta: scoreDelta,
+    analysis_v2: { analysisVersion: analysis.analysisVersion ?? 2, improvementsDetailed: analysis.improvementsDetailed ?? [], hashtagSuggestion: analysis.hashtagSuggestion ?? null, postingTimeSuggestion: analysis.postingTimeSuggestion ?? null, captionSuggestion: analysis.captionSuggestion ?? null, scoreBreakdown: analysis.scoreBreakdown ?? null }
   };
 }
 

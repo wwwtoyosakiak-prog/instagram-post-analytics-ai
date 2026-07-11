@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMetrics, postTypeLabels } from "@/lib/metrics";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
+import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 
 export async function POST(request: Request) {
   const { post, account } = (await request.json()) as { post?: InstagramPost; account?: InstagramAccount | null };
@@ -51,16 +52,22 @@ export async function POST(request: Request) {
 
 返却形式:
 {
+  "analysisVersion": 2,
   "firstImpression": "string",
   "imageMessage": "string",
   "captionClarity": "string",
   "strengths": "string",
   "weaknesses": "string",
   "reason": "string",
-  "improvements": ["string"],
+  "improvements": ["旧画面互換用の短い改善案"],
   "nextIdeas": ["string"],
-  "hashtags": ["string"],
-  "score": 0
+  "hashtags": ["旧画面互換用タグ"],
+  "score": 0,
+  "improvementsDetailed": [{"priority":"high","category":"string","issue":"string","suggestion":"string","example":"string"}],
+  "hashtagSuggestion": {"recommended":["#string"],"core":["#string"],"niche":["#string"],"local":["#string"],"remove":["#string"],"reason":"string","copyText":"#tag1 #tag2"},
+  "postingTimeSuggestion": {"bestDay":"string","bestTime":"HH:mm","alternatives":["曜日 HH:mm"],"reason":"string","confidence":"medium","evidence":"general_tendency"},
+  "captionSuggestion": {"hook":"string","improvedCaption":"string","shortVersion":"string","callToAction":"string","changes":["string"]},
+  "scoreBreakdown": {"total":0,"content":0,"visual":0,"caption":0,"engagement":0,"discoverability":0,"summary":"string","confidence":"medium"}
 }`;
 
   const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }];
@@ -87,5 +94,11 @@ export async function POST(request: Request) {
   }
 
   const raw = data.output_text ?? data.output?.flatMap((item: { content?: { text?: string }[] }) => item.content ?? []).map((item: { text?: string }) => item.text).join("");
-  return NextResponse.json({ analysis: JSON.parse(raw), model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
+  try {
+    const analysis = normalizeAiAnalysis(JSON.parse(raw));
+    return NextResponse.json({ analysis, model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
+  } catch (error) {
+    console.error("[analyze-response-parse]", error);
+    return NextResponse.json({ error: "AI分析結果の形式が不正でした。もう一度分析してください。" }, { status: 502 });
+  }
 }
