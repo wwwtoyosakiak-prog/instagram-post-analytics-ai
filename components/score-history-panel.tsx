@@ -263,21 +263,20 @@ export function calculateScoreHistorySummary(history: AiScoreHistory[]) {
   const best = Math.max(...history.map((item) => item.score));
   const totalDelta = latest.score - first.score;
 
-  const dimensions = Object.entries(scoreLabels)
-    .map(([key, label]) => {
-      const firstValue = first[key as keyof typeof scoreLabels];
-      const latestValue = latest[key as keyof typeof scoreLabels];
+  const dimensions = Object.entries(scoreLabels).flatMap(([key, label]) => {
+    const scoreKey = key as keyof typeof scoreLabels;
+    const firstValue = first[scoreKey];
+    const latestValue = latest[scoreKey];
 
-      if (typeof firstValue !== "number" || typeof latestValue !== "number") {
-        return null;
-      }
+    if (typeof firstValue !== "number" || typeof latestValue !== "number") {
+      return [];
+    }
 
-      return {
-        label,
-        delta: latestValue - firstValue,
-      };
-    })
-    .filter((item): item is { label: string; delta: number } => Boolean(item));
+    return [{
+      label,
+      delta: latestValue - firstValue,
+    }];
+  });
 
   const strongest = [...dimensions].sort((a, b) => b.delta - a.delta)[0];
   const weakest = [...dimensions].sort((a, b) => a.delta - b.delta)[0];
