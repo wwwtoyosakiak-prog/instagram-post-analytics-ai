@@ -179,6 +179,23 @@ export default function ReportsPage() {
     <div>
       <PageHeader title="月次レポート" description="登録済み投稿を月別に集計し、伸びた投稿と改善が必要な投稿を確認します。" />
 
+      <Panel className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">新しいAIパフォーマンスレポート</h2>
+            <p className="mt-1 text-sm leading-6 text-stone-600">
+              期間比較、AIスコア平均、ベスト投稿、AI総評と次期戦略をまとめて確認できます。
+            </p>
+          </div>
+          <Link
+            href="/performance-report"
+            className="inline-flex h-10 items-center rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            AIレポートを開く
+          </Link>
+        </div>
+      </Panel>
+
       {/* 設定エリア */}
       <Panel className="mb-6">
         <div className="grid gap-3 md:grid-cols-1">

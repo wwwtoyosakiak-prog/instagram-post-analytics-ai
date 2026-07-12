@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, CalendarDays, FileText, Home, KeyRound, ListChecks, Target, User } from "lucide-react";
+import { BarChart3, CalendarDays, FileText, Home, KeyRound, ListChecks, Sparkles, Target, User } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +16,8 @@ const nav = [
   { href: "/goals", label: "目標", icon: Target },
   { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 },
   { href: "/token-management", label: "トークン管理", icon: KeyRound },
-  { href: "/reports", label: "レポート", icon: FileText }
+  { href: "/reports", label: "月次レポート", icon: FileText },
+  { href: "/performance-report", label: "AIレポート", icon: Sparkles }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
