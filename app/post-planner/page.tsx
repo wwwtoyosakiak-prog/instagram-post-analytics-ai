@@ -25,6 +25,8 @@ export default function PostPlannerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   async function generate() {
     setLoading(true);
@@ -61,6 +63,42 @@ export default function PostPlannerPage() {
     await navigator.clipboard.writeText(value);
     setCopied(label);
     window.setTimeout(() => setCopied(""), 1800);
+  }
+
+  async function savePlan() {
+    if (!result) return;
+
+    setSaving(true);
+    setSaveMessage("");
+    setError("");
+
+    try {
+      const response = await fetch("/api/post-plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: form,
+          result,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "投稿企画を保存できませんでした。",
+        );
+      }
+
+      setSaveMessage("投稿企画を下書きとして保存しました。");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "投稿企画を保存できませんでした。",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -212,6 +250,19 @@ export default function PostPlannerPage() {
                 <p className="mt-3 leading-7 text-stone-700">
                   {result.concept}
                 </p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={() => void savePlan()}
+                    disabled={saving}
+                  >
+                    {saving ? "保存中..." : "この企画を保存"}
+                  </Button>
+                  {saveMessage ? (
+                    <p className="text-sm font-semibold text-emerald-700">
+                      {saveMessage}
+                    </p>
+                  ) : null}
+                </div>
                 <div className="mt-4 rounded-lg bg-skyglass p-4">
                   <p className="text-xs font-semibold text-stone-500">
                     冒頭フック
