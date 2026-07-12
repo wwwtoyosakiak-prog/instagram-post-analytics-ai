@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import { compareBenchmarks } from "@/lib/competitor-comparison";
+import { CompetitorAiPanel } from "@/components/competitor-ai-panel";
 import type { InstagramPost } from "@/lib/types";
 
 type Competitor = {
@@ -361,6 +362,23 @@ export default function CompetitorsPage() {
                     </p>
                   </div>
                 ) : null}
+
+                <CompetitorAiPanel
+                  own={ownSummary}
+                  competitor={{
+                    name:
+                      competitors.find((item) => item.id === selectedId)?.name ??
+                      "競合",
+                    username:
+                      competitors.find((item) => item.id === selectedId)?.username ??
+                      "",
+                    posts: summary.posts,
+                    averageViews: summary.averageViews,
+                    engagementRate: summary.engagementRate,
+                    topPostType: summary.topPostType,
+                    topHashtags: summary.topHashtags,
+                  }}
+                />
               </>
             )}
           </Panel>
