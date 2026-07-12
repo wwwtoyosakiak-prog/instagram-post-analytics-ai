@@ -13,6 +13,8 @@ export default function GrowthStrategyPage() {
     useState<GrowthStrategyResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   async function loadStrategy() {
     setLoading(true);
@@ -63,6 +65,41 @@ export default function GrowthStrategyPage() {
     void loadStrategy();
   }, []);
 
+  async function saveSnapshot() {
+    if (!strategy) return;
+
+    setSaving(true);
+    setSaveMessage("");
+    setError("");
+
+    try {
+      const response = await fetch("/api/growth-history", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ strategy }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "成長戦略を保存できませんでした。",
+        );
+      }
+
+      setSaveMessage("成長戦略を履歴へ保存しました。");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "成長戦略を保存できませんでした。",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -83,6 +120,20 @@ export default function GrowthStrategyPage() {
             >
               再分析
             </button>
+            <button
+              type="button"
+              onClick={() => void saveSnapshot()}
+              disabled={saving || !strategy}
+              className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold disabled:opacity-50"
+            >
+              {saving ? "保存中..." : "分析結果を保存"}
+            </button>
+            <Link
+              href="/growth-history"
+              className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
+            >
+              成長推移
+            </Link>
             <Link
               href="/post-retrospectives"
               className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
@@ -96,6 +147,14 @@ export default function GrowthStrategyPage() {
       {error ? (
         <Panel className="mb-6 border-red-200 bg-red-50">
           <p className="text-sm text-red-700">{error}</p>
+        </Panel>
+      ) : null}
+
+      {saveMessage ? (
+        <Panel className="mb-6 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-800">
+            {saveMessage}
+          </p>
         </Panel>
       ) : null}
 
