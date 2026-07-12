@@ -1,5 +1,6 @@
-import { AiAnalysis, AiAnalysisRecord, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, AiScoreHistory, AiScoreHistoryInput, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
 import { normalizeAiAnalysis } from "@/lib/ai-analysis";
+import { scoreHistoryFromAnalysis } from "@/lib/score-history";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -64,6 +65,19 @@ type AnalysisRow = {
   score: number;
   score_delta: number | null;
   analysis_v2: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type ScoreHistoryRow = {
+  id: number;
+  post_id: string;
+  analysis_id: string | null;
+  score: number;
+  content_score: number | null;
+  visual_score: number | null;
+  caption_score: number | null;
+  engagement_score: number | null;
+  discoverability_score: number | null;
   created_at: string;
 };
 
@@ -301,6 +315,34 @@ function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
     ...(row.analysis_v2 ?? {}),
   });
   return { id: row.id, postId: row.post_id, ...normalized, scoreDelta: row.score_delta, createdAt: row.created_at };
+}
+
+function mapScoreHistory(row: ScoreHistoryRow): AiScoreHistory {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    analysisId: row.analysis_id,
+    score: Number(row.score),
+    contentScore: row.content_score == null ? null : Number(row.content_score),
+    visualScore: row.visual_score == null ? null : Number(row.visual_score),
+    captionScore: row.caption_score == null ? null : Number(row.caption_score),
+    engagementScore: row.engagement_score == null ? null : Number(row.engagement_score),
+    discoverabilityScore: row.discoverability_score == null ? null : Number(row.discoverability_score),
+    createdAt: row.created_at,
+  };
+}
+
+function scoreHistoryToRow(input: AiScoreHistoryInput) {
+  return {
+    post_id: input.postId,
+    analysis_id: input.analysisId,
+    score: input.score,
+    content_score: input.contentScore,
+    visual_score: input.visualScore,
+    caption_score: input.captionScore,
+    engagement_score: input.engagementScore,
+    discoverability_score: input.discoverabilityScore,
+  };
 }
 
 function mapInsightSnapshot(row: InsightSnapshotRow): InstagramInsightSnapshot {
@@ -589,6 +631,21 @@ export async function listAnalysesFromSupabase(postId: string) {
   return rows.map(mapAnalysis);
 }
 
+export async function createScoreHistoryInSupabase(input: AiScoreHistoryInput) {
+  const rows = await supabaseRequest<ScoreHistoryRow[]>("ai_score_history", {
+    method: "POST",
+    body: JSON.stringify(scoreHistoryToRow(input))
+  });
+  return mapScoreHistory(rows[0]);
+}
+
+export async function listScoreHistoryFromSupabase(postId?: string, limit = 100) {
+  const filters = ["select=*", "order=created_at.asc", `limit=${limit}`];
+  if (postId) filters.push(`post_id=eq.${encodeURIComponent(postId)}`);
+  const rows = await supabaseRequest<ScoreHistoryRow[]>(`ai_score_history?${filters.join("&")}`);
+  return rows.map(mapScoreHistory);
+}
+
 export async function createAnalysisInSupabase(postId: string, analysis: AiAnalysis) {
   const previous = await listAnalysesFromSupabase(postId);
   const scoreDelta = previous[0] ? analysis.score - previous[0].score : null;
@@ -596,7 +653,11 @@ export async function createAnalysisInSupabase(postId: string, analysis: AiAnaly
     method: "POST",
     body: JSON.stringify(analysisToRow(postId, analysis, scoreDelta))
   });
-  return mapAnalysis(rows[0]);
+  const saved = mapAnalysis(rows[0]);
+  await createScoreHistoryInSupabase(
+    scoreHistoryFromAnalysis(postId, saved.id, analysis)
+  );
+  return saved;
 }
 
 export async function listInsightSnapshotsFromSupabase(postId: string) {

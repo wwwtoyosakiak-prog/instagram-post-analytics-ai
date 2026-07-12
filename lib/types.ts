@@ -252,6 +252,22 @@ export type AiAnalysisRecord = AiAnalysis & {
   createdAt: string;
 };
 
+export type AiScoreHistoryInput = {
+  postId: string;
+  analysisId: string | null;
+  score: number;
+  contentScore: number | null;
+  visualScore: number | null;
+  captionScore: number | null;
+  engagementScore: number | null;
+  discoverabilityScore: number | null;
+};
+
+export type AiScoreHistory = AiScoreHistoryInput & {
+  id: number;
+  createdAt: string;
+};
+
 export type MonthlyReport = {
   month: string;
   totalViews: number;
