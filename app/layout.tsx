@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Archive, BarChart3, BriefcaseBusiness, Bot, CalendarDays, Clock3, Columns3, FileText, Gauge, Home, KeyRound, ListChecks, Sparkles, Swords, Target, User, WandSparkles } from "lucide-react";
+import { Archive, BarChart3, Bell, BriefcaseBusiness, Bot, CalendarDays, Clock3, Columns3, FileText, Gauge, Home, KeyRound, ListChecks, Sparkles, Swords, Target, User, WandSparkles } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,7 +25,8 @@ const nav = [
   { href: "/post-planner", label: "AI投稿企画", icon: WandSparkles },
   { href: "/post-plan-history", label: "企画履歴", icon: Archive },
   { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 },
-  { href: "/post-schedules", label: "投稿予約", icon: Clock3 }
+  { href: "/post-schedules", label: "投稿予約", icon: Clock3 },
+  { href: "/notifications", label: "通知", icon: Bell }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
