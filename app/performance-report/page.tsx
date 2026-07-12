@@ -190,7 +190,25 @@ export default function PerformanceReportPage() {
           </Link>
         </Panel>
       ) : (
-        <div className="space-y-6">
+        <div className="print-area space-y-6">
+          <section className="hidden print:block">
+            <p className="text-xs font-semibold uppercase text-stone-500">
+              Instagram Analytics Report
+            </p>
+            <h1 className="mt-2 text-2xl font-bold text-ink">
+              AIパフォーマンスレポート
+            </h1>
+            <p className="mt-2 text-sm text-stone-600">
+              対象期間: {report.period.from} 〜 {report.period.to}
+            </p>
+            <p className="mt-1 text-xs text-stone-500">
+              出力日時: {new Intl.DateTimeFormat("ja-JP", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }).format(new Date())}
+            </p>
+          </section>
+
           <Panel>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -202,12 +220,17 @@ export default function PerformanceReportPage() {
                 </h2>
               </div>
 
-              <Button
-                onClick={() => void createAiSummary()}
-                disabled={aiLoading}
-              >
-                {aiLoading ? "AI分析中..." : "AI総評を作成"}
-              </Button>
+              <div className="print-hide flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void createAiSummary()}
+                  disabled={aiLoading}
+                >
+                  {aiLoading ? "AI分析中..." : "AI総評を作成"}
+                </Button>
+                <Button onClick={() => window.print()}>
+                  PDF保存
+                </Button>
+              </div>
             </div>
           </Panel>
 
