@@ -25,6 +25,21 @@ async function request<T>(path: string, init: RequestInit = {}) {
   return response.json() as Promise<T>;
 }
 
+type CompetitorPostRow = {
+  id: string;
+  competitor_id: string;
+  posted_at: string;
+  post_type: "image" | "video" | "reel" | "carousel";
+  caption: string | null;
+  hashtags: string | null;
+  likes: number;
+  comments: number;
+  views: number;
+  saves: number | null;
+  shares: number | null;
+  source_url: string | null;
+};
+
 export async function GET(requestObject: NextRequest) {
   const competitorId = requestObject.nextUrl.searchParams.get("competitorId");
 
@@ -36,7 +51,7 @@ export async function GET(requestObject: NextRequest) {
   }
 
   try {
-    const rows = await request<any[]>(
+    const rows = await request<CompetitorPostRow[]>(
       `competitor_posts?select=*&competitor_id=eq.${encodeURIComponent(competitorId)}&order=posted_at.desc`,
     );
 
