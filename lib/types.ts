@@ -318,6 +318,17 @@ export type PerformanceReport = {
   comparison: PerformanceReportComparison;
 };
 
+export type PerformanceReportAiSummary = {
+  overallSummary: string;
+  strengths: string[];
+  weaknesses: string[];
+  nextActions: string[];
+  contentIdeas: string[];
+  recommendedCtas: string[];
+  risks: string[];
+  evidence: string[];
+};
+
 export type MonthlyReport = {
   month: string;
   totalViews: number;
