@@ -162,15 +162,17 @@ export function normalizeOperationConsultantResult(
       ? (value as Record<string, unknown>)
       : {};
 
-  const priorities = Array.isArray(source.priorities)
+  const priorities: ConsultantPriority[] = Array.isArray(
+    source.priorities,
+  )
     ? source.priorities
-        .map((item) => {
+        .map((item): ConsultantPriority => {
           const row =
             item && typeof item === "object"
               ? (item as Record<string, unknown>)
               : {};
 
-          const priority =
+          const priority: ConsultantPriority["priority"] =
             row.priority === "high" ||
             row.priority === "medium" ||
             row.priority === "low"
@@ -184,7 +186,11 @@ export function normalizeOperationConsultantResult(
             action: text(row.action),
           };
         })
-        .filter((item) => item.title && item.action)
+        .filter(
+          (item) =>
+            item.title.length > 0 &&
+            item.action.length > 0,
+        )
         .slice(0, 8)
     : [];
 
