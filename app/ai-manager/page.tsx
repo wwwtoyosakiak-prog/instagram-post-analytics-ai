@@ -1,22 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import type {
   ManagerPriority,
   ManagerResult,
 } from "@/lib/ai-manager";
+import {
+  buildDailySnapshotPayload,
+  calculateTaskCompletion,
+  type ManagerTaskState,
+} from "@/lib/ai-manager-history";
 
 export default function AiManagerPage() {
   const [manager, setManager] =
     useState<ManagerResult | null>(null);
+  const [states, setStates] = useState<ManagerTaskState[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingSnapshot, setSavingSnapshot] =
+    useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function loadTaskStates(date: string) {
+    const response = await fetch(
+      `/api/ai-manager/tasks?date=${encodeURIComponent(date)}`,
+      { cache: "no-store" },
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ?? "タスク状態を取得できませんでした。",
+      );
+    }
+
+    setStates(data.states ?? []);
+  }
 
   async function loadManager() {
     setLoading(true);
     setError("");
+    setMessage("");
 
     try {
       const [
@@ -93,6 +119,7 @@ export default function AiManagerPage() {
       }
 
       setManager(managerData.manager);
+      await loadTaskStates(managerData.manager.today);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -108,18 +135,140 @@ export default function AiManagerPage() {
     void loadManager();
   }, []);
 
+  const completion = useMemo(
+    () =>
+      calculateTaskCompletion(
+        manager?.tasks.map((task) => task.id) ?? [],
+        states,
+      ),
+    [manager, states],
+  );
+
+  function stateFor(taskKey: string) {
+    return states.find(
+      (state) => state.taskKey === taskKey,
+    );
+  }
+
+  async function updateTask(
+    task: ManagerResult["tasks"][number],
+    patch: {
+      isCompleted: boolean;
+      note?: string;
+    },
+  ) {
+    if (!manager) return;
+
+    setError("");
+
+    const response = await fetch(
+      "/api/ai-manager/tasks",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          taskDate: manager.today,
+          taskKey: task.id,
+          title: task.title,
+          isCompleted: patch.isCompleted,
+          note:
+            patch.note ??
+            stateFor(task.id)?.note ??
+            "",
+        }),
+      },
+    );
+    const data = await response.json();
+
+    if (!response.ok || !data.state) {
+      setError(
+        data.error ?? "タスク状態を更新できませんでした。",
+      );
+      return;
+    }
+
+    setStates((current) => {
+      const exists = current.some(
+        (state) => state.taskKey === task.id,
+      );
+
+      return exists
+        ? current.map((state) =>
+            state.taskKey === task.id
+              ? data.state
+              : state,
+          )
+        : [...current, data.state];
+    });
+  }
+
+  async function saveSnapshot() {
+    if (!manager) return;
+
+    setSavingSnapshot(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const payload = buildDailySnapshotPayload(
+        manager,
+        states,
+      );
+      const response = await fetch(
+        "/api/ai-manager/history",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "日次記録を保存できませんでした。",
+        );
+      }
+
+      setMessage("今日の運用記録を保存しました。");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "日次記録を保存できませんでした。",
+      );
+    } finally {
+      setSavingSnapshot(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="AI運用マネージャー"
-        description="今日やること、投稿準備、期限、成長状況を一画面で確認します。"
+        description="今日やることを実行し、完了状況と運用スコアを記録します。"
       />
 
       <Panel className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm leading-6 text-stone-600">
-            投稿予約・通知・制作工程・成長戦略を統合し、優先順位を自動整理します。
-          </p>
+          <div>
+            <p className="text-sm leading-6 text-stone-600">
+              タスクを完了すると達成率へ反映されます。1日の終わりに運用記録を保存してください。
+            </p>
+            {manager ? (
+              <p className="mt-2 text-sm font-semibold">
+                本日の達成率：
+                {completion.completedTasks}/
+                {completion.totalTasks}件（
+                {completion.completionRate}%）
+              </p>
+            ) : null}
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <Button
               onClick={() => void loadManager()}
@@ -127,11 +276,19 @@ export default function AiManagerPage() {
             >
               {loading ? "更新中..." : "最新状態に更新"}
             </Button>
+            <Button
+              onClick={() => void saveSnapshot()}
+              disabled={savingSnapshot || !manager}
+            >
+              {savingSnapshot
+                ? "保存中..."
+                : "今日の記録を保存"}
+            </Button>
             <Link
-              href="/operation-consultant"
+              href="/ai-manager-history"
               className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
             >
-              AI運用コンサル
+              運用履歴
             </Link>
           </div>
         </div>
@@ -140,6 +297,14 @@ export default function AiManagerPage() {
       {error ? (
         <Panel className="mb-6 border-red-200 bg-red-50">
           <p className="text-sm text-red-700">{error}</p>
+        </Panel>
+      ) : null}
+
+      {message ? (
+        <Panel className="mb-6 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-800">
+            {message}
+          </p>
         </Panel>
       ) : null}
 
@@ -157,53 +322,108 @@ export default function AiManagerPage() {
         </Panel>
       ) : (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <ScoreCard label="総合" value={manager.score.total} />
-            <ScoreCard label="予定管理" value={manager.score.schedule} />
-            <ScoreCard label="投稿準備" value={manager.score.preparation} />
-            <ScoreCard label="継続性" value={manager.score.consistency} />
-            <ScoreCard label="成長" value={manager.score.growth} />
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-            <Metric label="本日投稿" value={`${manager.summary.todayPosts}件`} />
-            <Metric label="明日投稿" value={`${manager.summary.tomorrowPosts}件`} />
-            <Metric label="期限超過" value={`${manager.summary.overduePosts}件`} />
-            <Metric label="未読通知" value={`${manager.summary.unreadNotifications}件`} />
-            <Metric label="準備不足" value={`${manager.summary.incompletePosts}件`} />
-            <Metric label="今週の残り" value={`${manager.summary.remainingPosts}投稿`} />
+            <Score label="総合" value={manager.score.total} />
+            <Score label="予定" value={manager.score.schedule} />
+            <Score label="準備" value={manager.score.preparation} />
+            <Score label="継続" value={manager.score.consistency} />
+            <Score label="成長" value={manager.score.growth} />
+            <Score
+              label="達成率"
+              value={completion.completionRate}
+            />
           </div>
 
           <Panel>
-            <h2 className="font-semibold">今日やること</h2>
+            <h2 className="font-semibold">
+              今日やること
+            </h2>
             <div className="mt-4 space-y-3">
               {manager.tasks.length ? (
-                manager.tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-stone-200 bg-white p-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold ${priorityClass(
-                          task.priority,
-                        )}`}
-                      >
-                        {priorityLabel(task.priority)}
-                      </span>
-                      <h3 className="mt-3 font-bold">{task.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-stone-600">
-                        {task.detail}
-                      </p>
-                    </div>
-                    <Link
-                      href={task.actionUrl}
-                      className="inline-flex h-10 items-center rounded-md bg-ink px-4 text-sm font-semibold text-white"
+                manager.tasks.map((task) => {
+                  const state = stateFor(task.id);
+                  const completed =
+                    state?.isCompleted ?? false;
+
+                  return (
+                    <div
+                      key={task.id}
+                      className={`rounded-lg border p-4 ${
+                        completed
+                          ? "border-emerald-200 bg-emerald-50"
+                          : "border-stone-200 bg-white"
+                      }`}
                     >
-                      対応する
-                    </Link>
-                  </div>
-                ))
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-semibold ${priorityClass(
+                                task.priority,
+                              )}`}
+                            >
+                              {priorityLabel(task.priority)}
+                            </span>
+                            {completed ? (
+                              <span className="text-xs font-semibold text-emerald-700">
+                                完了
+                              </span>
+                            ) : null}
+                          </div>
+                          <h3
+                            className={`mt-3 font-bold ${
+                              completed
+                                ? "line-through opacity-70"
+                                : ""
+                            }`}
+                          >
+                            {task.title}
+                          </h3>
+                          <p className="mt-2 text-sm leading-6 text-stone-600">
+                            {task.detail}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            onClick={() =>
+                              void updateTask(task, {
+                                isCompleted: !completed,
+                              })
+                            }
+                          >
+                            {completed
+                              ? "未完了に戻す"
+                              : "完了にする"}
+                          </Button>
+                          <Link
+                            href={task.actionUrl}
+                            className="inline-flex h-10 items-center rounded-md bg-ink px-4 text-sm font-semibold text-white"
+                          >
+                            対応画面
+                          </Link>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="text-xs">
+                          作業メモ
+                        </label>
+                        <input
+                          className="mt-1"
+                          defaultValue={state?.note ?? ""}
+                          placeholder="対応内容や次回へのメモ"
+                          onBlur={(event) =>
+                            void updateTask(task, {
+                              isCompleted: completed,
+                              note: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                })
               ) : (
                 <p className="text-sm text-stone-500">
                   緊急のタスクはありません。
@@ -249,7 +469,7 @@ export default function AiManagerPage() {
   );
 }
 
-function ScoreCard({
+function Score({
   label,
   value,
 }: {
@@ -258,7 +478,9 @@ function ScoreCard({
 }) {
   return (
     <div className="rounded-xl border border-stone-200 bg-white/80 p-5">
-      <p className="text-xs font-semibold text-stone-500">{label}</p>
+      <p className="text-xs font-semibold text-stone-500">
+        {label}
+      </p>
       <p className="mt-2 text-3xl font-bold">{value}</p>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
         <div
@@ -266,21 +488,6 @@ function ScoreCard({
           style={{ width: `${value}%` }}
         />
       </div>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-stone-200 bg-white/80 p-4">
-      <p className="text-xs font-semibold text-stone-500">{label}</p>
-      <p className="mt-2 text-xl font-bold">{value}</p>
     </div>
   );
 }
@@ -293,8 +500,14 @@ function priorityLabel(priority: ManagerPriority) {
 }
 
 function priorityClass(priority: ManagerPriority) {
-  if (priority === "critical") return "bg-red-100 text-red-800";
-  if (priority === "high") return "bg-amber-100 text-amber-800";
-  if (priority === "medium") return "bg-sky-100 text-sky-800";
+  if (priority === "critical") {
+    return "bg-red-100 text-red-800";
+  }
+  if (priority === "high") {
+    return "bg-amber-100 text-amber-800";
+  }
+  if (priority === "medium") {
+    return "bg-sky-100 text-sky-800";
+  }
   return "bg-stone-100 text-stone-700";
 }
