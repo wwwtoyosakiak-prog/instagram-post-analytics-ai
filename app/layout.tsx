@@ -35,7 +35,8 @@ const nav = [
   { href: "/growth-advisor", label: "AI成長戦略", icon: BrainCircuit },
   { href: "/ai-manager", label: "AI運用管理", icon: PanelTop },
   { href: "/ai-manager-history", label: "運用履歴", icon: ClipboardCheck },
-  { href: "/weekly-operation-review", label: "週次レビュー", icon: CalendarCheck2 }
+  { href: "/weekly-operation-review", label: "週次レビュー", icon: CalendarCheck2 },
+  { href: "/weekly-operation-review-ai", label: "AI週次レビュー", icon: Sparkles }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
