@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlarmClockCheck, Archive, BarChart3, Bell, BriefcaseBusiness, BookOpenCheck, Bot, BrainCircuit, CalendarCheck2, CalendarDays, ClipboardCheck, Clock3, Columns3, FileText, Gauge, History, Home, KeyRound, ListChecks, PanelTop, Rocket, RotateCcw, Sparkles, Swords, Target, TrendingUp, User, WandSparkles, Workflow } from "lucide-react";
+import { AlarmClockCheck, Archive, BarChart3, Bell, BriefcaseBusiness, BookOpenCheck, Bot, BrainCircuit, CalendarCheck2, CalendarDays, ClipboardCheck, Clock3, Columns3, FileText, Gauge, History, Home, KeyRound, ListChecks, PanelTop, Rocket, RotateCcw, Settings2, Sparkles, Swords, Target, TrendingUp, User, WandSparkles, Workflow } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,7 +38,8 @@ const nav = [
   { href: "/weekly-operation-review", label: "週次レビュー", icon: CalendarCheck2 },
   { href: "/weekly-operation-review-ai", label: "AI週次レビュー", icon: Sparkles },
   { href: "/weekly-operation-review-ai-history", label: "AI週次履歴", icon: BookOpenCheck },
-  { href: "/weekly-review-automation", label: "週次自動化", icon: AlarmClockCheck }
+  { href: "/weekly-review-automation", label: "週次自動化", icon: AlarmClockCheck },
+  { href: "/weekly-review-automation-settings", label: "週次自動化設定", icon: Settings2 }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
