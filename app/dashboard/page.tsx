@@ -1582,7 +1582,12 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={hourlyInsightData}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" /><YAxis />
-                <Tooltip formatter={(value: number, name: string) => [Number(value).toLocaleString(), name]} />
+                <Tooltip
+  formatter={(value, name) => [
+    Number(value ?? 0).toLocaleString(),
+    String(name),
+  ]}
+/>
                 <Legend />
                 <Line type="monotone" dataKey="views" name="合計閲覧数" stroke="#b55d3e" strokeWidth={2} />
                 <Line type="monotone" dataKey="growth" name="前回からの増加" stroke="#2f766d" strokeWidth={2} />
