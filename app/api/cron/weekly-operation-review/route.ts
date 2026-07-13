@@ -8,9 +8,16 @@ import {
 } from "@/lib/ai-weekly-review";
 import {
   previousWeekReferenceDate,
-  shouldSkipWeeklyReview,
   type AutomationTrigger,
 } from "@/lib/weekly-review-automation";
+import {
+  defaultWeeklyReviewAutomationSettings,
+  normalizeWeeklyReviewAutomationSettings,
+  type WeeklyReviewAutomationSettings,
+} from "@/lib/weekly-review-automation-settings";
+import {
+  decideWeeklyReviewAutomation,
+} from "@/lib/weekly-review-automation-runner";
 import type {
   ManagerDailySnapshot,
 } from "@/lib/ai-manager-history";
@@ -20,8 +27,6 @@ const serviceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 const cronSecret = process.env.CRON_SECRET;
 const openAiKey = process.env.OPENAI_API_KEY;
-const model =
-  process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
 type SnapshotRow = {
   id: string;
@@ -35,6 +40,15 @@ type SnapshotRow = {
   completed_tasks: number;
   completion_rate: number;
   created_at: string;
+  updated_at: string;
+};
+
+type SettingsRow = {
+  enabled: boolean;
+  manual_only: boolean;
+  minimum_recorded_days: number;
+  skip_ai_when_insufficient: boolean;
+  ai_model: string;
   updated_at: string;
 };
 
@@ -95,6 +109,31 @@ function mapSnapshot(
   };
 }
 
+function mapSettings(
+  row: SettingsRow,
+): WeeklyReviewAutomationSettings {
+  return normalizeWeeklyReviewAutomationSettings({
+    enabled: row.enabled,
+    manualOnly: row.manual_only,
+    minimumRecordedDays:
+      row.minimum_recorded_days,
+    skipAiWhenInsufficient:
+      row.skip_ai_when_insufficient,
+    aiModel: row.ai_model,
+    updatedAt: row.updated_at,
+  });
+}
+
+async function loadSettings() {
+  const rows = await supabaseRequest<SettingsRow[]>(
+    "ai_weekly_review_settings?select=*&id=eq.1&limit=1",
+  );
+
+  return rows[0]
+    ? mapSettings(rows[0])
+    : defaultWeeklyReviewAutomationSettings();
+}
+
 function todayInTokyo() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
@@ -123,6 +162,7 @@ function authorized(request: NextRequest) {
 
 async function createRun(
   trigger: AutomationTrigger,
+  model: string,
 ) {
   const rows = await supabaseRequest<RunRow[]>(
     "ai_weekly_review_runs",
@@ -164,6 +204,7 @@ async function generateAiReview(
   review: ReturnType<
     typeof buildWeeklyOperationReview
   >,
+  model: string,
 ) {
   if (!openAiKey) {
     throw new Error(
@@ -251,9 +292,15 @@ export async function GET(request: NextRequest) {
   }
 
   let runId: string | undefined;
+  let settings =
+    defaultWeeklyReviewAutomationSettings();
 
   try {
-    runId = await createRun(trigger);
+    settings = await loadSettings();
+    runId = await createRun(
+      trigger,
+      settings.aiModel,
+    );
 
     const snapshots = await supabaseRequest<
       SnapshotRow[]
@@ -269,22 +316,30 @@ export async function GET(request: NextRequest) {
       referenceDate,
     );
 
-    if (
-      shouldSkipWeeklyReview(review.daysRecorded)
-    ) {
+    const decision =
+      decideWeeklyReviewAutomation(
+        settings,
+        trigger,
+        review.daysRecorded,
+      );
+
+    if (!decision.shouldRun) {
       await finishRun(runId, {
         status: "skipped",
         target_week_start: review.weekStart,
         target_week_end: review.weekEnd,
-        message:
-          "対象週の日次記録がないためスキップしました。",
+        ai_model: settings.aiModel,
+        message: decision.reason,
         details: {
+          settings,
           daysRecorded: review.daysRecorded,
         },
       });
 
       return NextResponse.json({
         status: "skipped",
+        reason: decision.reason,
+        settings,
         review,
       });
     }
@@ -316,7 +371,33 @@ export async function GET(request: NextRequest) {
       },
     );
 
-    const aiReview = await generateAiReview(review);
+    if (!decision.shouldGenerateAi) {
+      await finishRun(runId, {
+        status: "success",
+        target_week_start: review.weekStart,
+        target_week_end: review.weekEnd,
+        ai_model: settings.aiModel,
+        message: decision.reason,
+        details: {
+          settings,
+          daysRecorded: review.daysRecorded,
+          aiGenerated: false,
+        },
+      });
+
+      return NextResponse.json({
+        status: "success",
+        aiGenerated: false,
+        reason: decision.reason,
+        settings,
+        review,
+      });
+    }
+
+    const aiReview = await generateAiReview(
+      review,
+      settings.aiModel,
+    );
     const generatedAt = new Date().toISOString();
 
     await supabaseRequest(
@@ -327,7 +408,7 @@ export async function GET(request: NextRequest) {
         method: "PATCH",
         body: JSON.stringify({
           ai_review: aiReview,
-          ai_model: model,
+          ai_model: settings.aiModel,
           ai_generated_at: generatedAt,
           updated_at: generatedAt,
         }),
@@ -338,7 +419,7 @@ export async function GET(request: NextRequest) {
       status: "success",
       target_week_start: review.weekStart,
       target_week_end: review.weekEnd,
-      ai_model: model,
+      ai_model: settings.aiModel,
       message:
         "数値版とAI版の週次レビューを保存しました。",
       details: {
@@ -353,7 +434,7 @@ export async function GET(request: NextRequest) {
       status: "success",
       review,
       aiReview,
-      model,
+      model: settings.aiModel,
     });
   } catch (error) {
     const message =
@@ -363,6 +444,7 @@ export async function GET(request: NextRequest) {
 
     await finishRun(runId, {
       status: "failed",
+      ai_model: settings.aiModel,
       message,
       details: {},
     });
