@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlarmClockCheck, Archive, BarChart3, Bell, BriefcaseBusiness, BookOpenCheck, Bot, BrainCircuit, CalendarCheck2, CalendarDays, ClipboardCheck, Clock3, Columns3, FileText, Gauge, History, Home, KeyRound, ListChecks, PanelTop, Rocket, RefreshCcwDot, RotateCcw, Settings2, Sparkles, Swords, Target, TrendingUp, User, WandSparkles, Workflow } from "lucide-react";
+import { AlarmClockCheck, Archive, BarChart3, Bell, BriefcaseBusiness, BookOpenCheck, Bot, BrainCircuit, CalendarCheck2, CalendarDays, ClipboardCheck, Clock3, Columns3, FileText, Gauge, History, Home, KeyRound, Lightbulb, ListChecks, PanelTop, Rocket, RefreshCcwDot, RotateCcw, Settings2, Sparkles, Swords, Target, TrendingUp, User, WandSparkles, Workflow } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -40,7 +40,8 @@ const nav = [
   { href: "/weekly-operation-review-ai-history", label: "AI週次履歴", icon: BookOpenCheck },
   { href: "/weekly-review-automation", label: "週次自動化", icon: AlarmClockCheck },
   { href: "/weekly-review-automation-settings", label: "週次自動化設定", icon: Settings2 },
-  { href: "/ai-improvement-cycle", label: "AI改善サイクル", icon: RefreshCcwDot }
+  { href: "/ai-improvement-cycle", label: "AI改善サイクル", icon: RefreshCcwDot },
+  { href: "/ai-improvement-suggestions", label: "AI改善案", icon: Lightbulb }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
