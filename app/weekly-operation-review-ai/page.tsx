@@ -13,6 +13,52 @@ export default function WeeklyOperationReviewAiPage() {
     useState<AiWeeklyReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [model, setModel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function saveAiReview() {
+    if (!review || !aiReview) return;
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        "/api/ai-manager/weekly-review/ai-history",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            weekStart: review.weekStart,
+            aiReview,
+            aiModel: model,
+          }),
+        },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ??
+            "AI週次レビューを保存できませんでした。",
+        );
+      }
+
+      setMessage("AI週次レビューを保存しました。");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "AI週次レビューを保存できませんでした。",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function generate() {
     setLoading(true);
@@ -57,6 +103,7 @@ export default function WeeklyOperationReviewAiPage() {
       }
 
       setAiReview(aiData.aiReview);
+      setModel(aiData.model ?? "");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -89,6 +136,20 @@ export default function WeeklyOperationReviewAiPage() {
                 ? "AIレビュー作成中..."
                 : "AI週次レビューを作成"}
             </Button>
+            <Button
+              onClick={() => void saveAiReview()}
+              disabled={saving || !aiReview || !review}
+            >
+              {saving
+                ? "保存中..."
+                : "AIレビューを保存"}
+            </Button>
+            <Link
+              href="/weekly-operation-review-ai-history"
+              className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
+            >
+              AI週次履歴
+            </Link>
             <Link
               href="/weekly-operation-review"
               className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
@@ -103,6 +164,14 @@ export default function WeeklyOperationReviewAiPage() {
         <Panel className="mb-6 border-red-200 bg-red-50">
           <p className="text-sm text-red-700">
             {error}
+          </p>
+        </Panel>
+      ) : null}
+
+      {message ? (
+        <Panel className="mb-6 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-800">
+            {message}
           </p>
         </Panel>
       ) : null}
