@@ -217,7 +217,7 @@ function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) 
             <LineChart data={rows} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" minTickGap={28} />
-              <YAxis allowDecimals={false} />
+              <YAxis allowDecimals={false} domain={[0, "auto"]} />
               <Tooltip />
               <Legend />
               <Line type="monotone" dataKey="閲覧数" stroke="#53624a" strokeWidth={3} dot={{ r: 3 }} />
