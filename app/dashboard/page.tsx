@@ -370,7 +370,7 @@ function toTokyoDateKey(date: Date) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function filterPostsByPeriod(posts: InstagramPost[], period: "1" | "7" | "30" | "90" | "365", todayKey: string) {
+function filterPostsByPeriod(posts: InstagramPost[], period: "1" | "7" | "14" | "30" | "90" | "365", todayKey: string) {
   const end = new Date(`${todayKey}T00:00:00+09:00`);
   const start = new Date(end);
   start.setDate(start.getDate() - (Number(period) - 1));
