@@ -1389,6 +1389,11 @@ export default function DashboardPage() {
             </Panel>
           </div>
 
+          <details className="rounded-lg border border-stone-200 bg-white">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">
+              詳しい分析を開く
+            </summary>
+            <div className="border-t border-stone-200 px-4 py-5">
           {/* 同期履歴 */}
           <Panel className="mb-6">
             <SectionLead eyebrow="History" title="同期履歴一覧" description="直近5回の実行結果を確認できます。" />
@@ -1520,6 +1525,8 @@ export default function DashboardPage() {
               <p className="mt-3 text-sm text-stone-600">{data.currentMonthKey} の目標は未設定です。目標管理ページで設定できます。</p>
             )}
           </Panel>
+            </div>
+          </details>
         </>
       ) : null}
 

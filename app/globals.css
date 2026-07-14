@@ -4,22 +4,19 @@
 
 :root {
   color-scheme: light;
-  background: #f6f0e7;
+  background: #f8f8f6;
 }
 
 body {
   color: #17201c;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(246, 240, 231, 0) 320px),
-    radial-gradient(circle at 18% 0%, rgba(216, 239, 234, 0.78), transparent 340px),
-    linear-gradient(135deg, #f6f0e7 0%, #eef3ef 48%, #f7eadf 100%);
+  background: #f8f8f6;
   min-height: 100vh;
 }
 
 input,
 textarea,
 select {
-  @apply w-full rounded-md border border-stone-200 bg-white/90 px-3 py-2 text-sm outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/20;
+  @apply w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-stone-400 focus:ring-2 focus:ring-stone-200;
 }
 
 label {
@@ -31,7 +28,7 @@ table {
 }
 
 th {
-  @apply bg-fog px-3 py-3 text-left text-xs font-semibold uppercase text-stone-600;
+  @apply bg-stone-50 px-3 py-3 text-left text-xs font-semibold uppercase text-stone-600;
 }
 
 td {
@@ -39,7 +36,7 @@ td {
 }
 
 tbody tr {
-  @apply transition hover:bg-oat/60;
+  @apply transition hover:bg-stone-50;
 }
 
 @media print {

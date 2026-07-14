@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlarmClockCheck, Archive, BarChart3, Bell, BriefcaseBusiness, BookOpenCheck, Bot, BrainCircuit, BrainCog, CalendarCheck2, CalendarDays, ClipboardCheck, Clock3, Columns3, Cpu, FileText, Gauge, History, Home, KeyRound, Lightbulb, ListChecks, PanelTop, Rocket, RefreshCcwDot, RotateCcw, Settings2, Sparkles, Swords, Target, TrendingUp, User, WandSparkles, Workflow } from "lucide-react";
+import { Archive, BarChart3, Bot, CalendarDays, Columns3, FileText, Home, KeyRound, ListChecks, Sparkles, Swords, Target, User, WandSparkles } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,73 +8,107 @@ export const metadata: Metadata = {
   description: "Instagram Graph APIで同期した投稿を分析する運用改善ツール"
 };
 
-const nav = [
+const primaryNav = [
   { href: "/", label: "トップ", icon: Home },
-  { href: "/accounts", label: "プロフィール", icon: User },
-  { href: "/posts", label: "一覧", icon: ListChecks },
-  { href: "/calendar", label: "カレンダー", icon: CalendarDays },
-  { href: "/goals", label: "目標", icon: Target },
-  { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 },
-  { href: "/token-management", label: "トークン管理", icon: KeyRound },
-  { href: "/reports", label: "月次レポート", icon: FileText },
-  { href: "/performance-report", label: "AIレポート", icon: Sparkles },
-  { href: "/ai-chat", label: "AIチャット", icon: Bot },
-  { href: "/competitors", label: "競合分析", icon: Swords },
-  { href: "/competitor-dashboard", label: "競合ダッシュボード", icon: Gauge },
-  { href: "/operation-consultant", label: "AI運用コンサル", icon: BriefcaseBusiness },
-  { href: "/post-planner", label: "AI投稿企画", icon: WandSparkles },
-  { href: "/post-plan-history", label: "企画履歴", icon: Archive },
-  { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 },
-  { href: "/post-schedules", label: "投稿予約", icon: Clock3 },
-  { href: "/notifications", label: "通知", icon: Bell },
-  { href: "/notification-automation", label: "通知自動化", icon: Workflow },
-  { href: "/post-kpis", label: "投稿KPI", icon: TrendingUp },
-  { href: "/post-retrospectives", label: "投稿振り返り", icon: RotateCcw },
-  { href: "/growth-strategy", label: "成長戦略", icon: Rocket },
-  { href: "/growth-history", label: "成長推移", icon: History },
-  { href: "/growth-advisor", label: "AI成長戦略", icon: BrainCircuit },
-  { href: "/ai-manager", label: "AI運用管理", icon: PanelTop },
-  { href: "/ai-manager-history", label: "運用履歴", icon: ClipboardCheck },
-  { href: "/weekly-operation-review", label: "週次レビュー", icon: CalendarCheck2 },
-  { href: "/weekly-operation-review-ai", label: "AI週次レビュー", icon: Sparkles },
-  { href: "/weekly-operation-review-ai-history", label: "AI週次履歴", icon: BookOpenCheck },
-  { href: "/weekly-review-automation", label: "週次自動化", icon: AlarmClockCheck },
-  { href: "/weekly-review-automation-settings", label: "週次自動化設定", icon: Settings2 },
-  { href: "/ai-improvement-cycle", label: "AI改善サイクル", icon: RefreshCcwDot },
-  { href: "/ai-improvement-suggestions", label: "AI改善案", icon: Lightbulb },
-  { href: "/ai-learning", label: "AI改善学習", icon: BrainCog },
-  { href: "/ai-agent", label: "AIエージェント", icon: Cpu }
+  { href: "/posts", label: "投稿", icon: ListChecks },
+  { href: "/analysis", label: "分析", icon: BarChart3 },
+  { href: "/settings", label: "設定", icon: KeyRound }
+];
+
+const secondaryNavGroups = [
+  {
+    label: "設定",
+    items: [
+      { href: "/accounts", label: "プロフィール", icon: User },
+      { href: "/token-management", label: "トークン管理", icon: KeyRound }
+    ]
+  },
+  {
+    label: "投稿管理",
+    items: [
+      { href: "/calendar", label: "カレンダー", icon: CalendarDays },
+      { href: "/goals", label: "目標", icon: Target }
+    ]
+  },
+  {
+    label: "AI・運用",
+    items: [
+      { href: "/performance-report", label: "AIレポート", icon: Sparkles },
+      { href: "/ai-chat", label: "AIチャット", icon: Bot },
+      { href: "/post-planner", label: "AI投稿企画", icon: WandSparkles },
+      { href: "/post-plan-history", label: "企画履歴", icon: Archive },
+      { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 }
+    ]
+  },
+  {
+    label: "分析",
+    items: [
+      { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 },
+      { href: "/reports", label: "レポート", icon: FileText },
+      { href: "/competitors", label: "競合分析", icon: Swords },
+      { href: "/competitor-dashboard", label: "競合ダッシュボード", icon: BarChart3 }
+    ]
+  }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
       <body>
-        <div className="min-h-screen">
-          <header className="sticky top-0 z-30 border-b border-white/60 bg-oat/82 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
-              <Link href="/" className="flex items-center gap-3 text-lg font-bold tracking-normal text-ink">
-                <span className="flex h-9 w-9 items-center justify-center rounded-md bg-ink text-sm text-white shadow-soft">IA</span>
-                <span>Instagram投稿分析AI</span>
-              </Link>
-              <nav className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0">
-                {nav.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-white/70 bg-white/72 px-3 text-sm font-semibold text-stone-700 shadow-panel transition hover:border-moss hover:bg-white hover:text-ink"
-                    >
-                      <Icon size={16} aria-hidden />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
+        <div className="min-h-screen bg-base">
+          <header className="sticky top-0 z-30 border-b border-stone-200 bg-base/95 backdrop-blur">
+            <div className="mx-auto max-w-6xl px-4 py-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <Link href="/" className="flex items-center gap-3 text-lg font-semibold text-ink">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-ink text-sm text-white">IA</span>
+                  <span>Instagram投稿分析AI</span>
+                </Link>
+                <nav className="flex gap-2 overflow-x-auto pb-1">
+                  {primaryNav.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink"
+                      >
+                        <Icon size={16} aria-hidden />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </div>
+              <details className="mt-3 rounded-md border border-stone-200 bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">
+                  その他の機能
+                </summary>
+                <div className="grid gap-4 border-t border-stone-200 px-4 py-4 md:grid-cols-4">
+                  {secondaryNavGroups.map((group) => (
+                    <div key={group.label}>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">{group.label}</p>
+                      <div className="grid gap-2">
+                        {group.items.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              className="inline-flex items-center gap-2 rounded-md px-2 py-2 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ink"
+                            >
+                              <Icon size={16} aria-hidden />
+                              {item.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
             </div>
           </header>
-          <main className="mx-auto max-w-7xl px-4 py-8 md:py-10">{children}</main>
+          <main className="mx-auto max-w-6xl px-4 py-8 md:py-10">{children}</main>
         </div>
       </body>
     </html>

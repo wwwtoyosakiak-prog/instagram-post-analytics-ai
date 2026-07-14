@@ -117,11 +117,10 @@ function PostDetailContent() {
   return (
     <div>
       <PageHeader title="投稿詳細・AI分析" description="投稿内容、画像、数値をもとに改善案を確認します。" />
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Stat label="エンゲージメント数" value={metrics.engagement.toLocaleString()} />
-        <Stat label="反応率（エンゲージメント率）" value={formatPercent(metrics.engagementRate)} note="いいね等の反応 ÷ 表示数" />
+        <Stat label="反応率" value={formatPercent(metrics.engagementRate)} note="いいね等の反応 ÷ 表示数" />
         <Stat label="保存率" value={formatPercent(metrics.saveRate)} />
-        <Stat label="コメント率" value={formatPercent(metrics.commentRate)} />
       </div>
       <LatestInsightSection
         insight={latestInsight}
@@ -129,7 +128,6 @@ function PostDetailContent() {
         isReel={post.type === "reel"}
         apiInsights={matchedMedia?.latest_insights ?? null}
       />
-      <InsightTrend snapshots={insightHistory} />
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <Panel>
           {getPostPreview(post) ? <img src={getPostPreview(post)} alt="投稿画像・動画サムネイル" className="mb-4 max-h-[520px] w-full rounded-md object-contain" /> : <div className="mb-4 rounded-md bg-stone-100 p-8 text-center text-sm text-stone-500">投稿画像未取得</div>}
@@ -137,14 +135,19 @@ function PostDetailContent() {
             <div><dt className="font-semibold">投稿日</dt><dd>{toJSTDate(post.date)}</dd></div>
             <div><dt className="font-semibold">データ登録日</dt><dd>{toJSTDate(post.recordedDate ?? post.date)}</dd></div>
             <div><dt className="font-semibold">投稿タイプ</dt><dd>{postTypeLabels[post.type]}</dd></div>
-            <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>
             <div><dt className="font-semibold">投稿URL</dt><dd className="break-all">{post.url || "未登録"}</dd></div>
             <div><dt className="font-semibold">投稿コメント</dt><dd className="leading-6">{post.caption}</dd></div>
             <div><dt className="font-semibold">ハッシュタグ</dt><dd className="leading-6">{post.hashtags || "なし"}</dd></div>
             <div><dt className="font-semibold">メモ</dt><dd className="leading-6">{post.memo || "なし"}</dd></div>
-            <div><dt className="font-semibold">登録日時</dt><dd>{formatDateTime(post.createdAt)}</dd></div>
-            <div><dt className="font-semibold">編集日時</dt><dd>{formatDateTime(post.updatedAt ?? post.createdAt)}</dd></div>
           </dl>
+          <details className="mt-4 rounded-md border border-stone-200 bg-stone-50">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">詳細情報を開く</summary>
+            <dl className="grid gap-3 border-t border-stone-200 px-4 py-4 text-sm">
+              <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>
+              <div><dt className="font-semibold">登録日時</dt><dd>{formatDateTime(post.createdAt)}</dd></div>
+              <div><dt className="font-semibold">編集日時</dt><dd>{formatDateTime(post.updatedAt ?? post.createdAt)}</dd></div>
+            </dl>
+          </details>
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href={`/posts/edit?id=${post.id}`} className="inline-flex h-10 items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-ink hover:border-moss">
               編集
@@ -162,7 +165,22 @@ function PostDetailContent() {
           {analysis ? (
             <AnalysisView analysis={analysis} />
           ) : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
-          <AnalysisComparison analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
+          {insightHistory.length > 0 ? (
+            <details className="mt-6 rounded-md border border-stone-200 bg-white">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">インサイト推移を開く</summary>
+              <div className="border-t border-stone-200 px-4 py-4">
+                <InsightTrend snapshots={insightHistory} />
+              </div>
+            </details>
+          ) : null}
+          {analysisHistory.length > 0 ? (
+            <details className="mt-6 rounded-md border border-stone-200 bg-white">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">分析履歴を開く</summary>
+              <div className="border-t border-stone-200 px-4 py-4">
+                <AnalysisComparison analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
+              </div>
+            </details>
+          ) : null}
         </Panel>
       </div>
     </div>

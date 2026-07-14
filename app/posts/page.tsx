@@ -2,16 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button, PageHeader, Panel } from "@/components/ui";
-import { loadAnalysesData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
-import { AiAnalysis, InstagramPost } from "@/lib/types";
+import { PageHeader, Stat } from "@/components/ui";
+import { loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
+import { InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics } from "@/lib/metrics";
 import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia } from "@/lib/post-merge";
 
 // ── 型 ──────────────────────────────────────────────────────
 
 type USort = "date" | "views" | "reach" | "likes" | "saves" | "engagementRate";
-type ViewMode = "table" | "cards";
 type UTypeFilter = "" | "video" | "image" | "carousel";
 
 interface UnifiedEntry {
@@ -56,13 +55,6 @@ function toJSTDate(value?: string) {
   return new Date(value).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
-function formatWatchTime(ms: number | null): string {
-  if (ms == null) return "–";
-  const s = ms / 1000;
-  if (s >= 60) return `${Math.floor(s / 60)}分${Math.round(s % 60)}秒`;
-  return `${s.toFixed(1)}秒`;
-}
-
 function formatVideoDuration(seconds: number | null): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return "–";
   const totalSeconds = Math.round(seconds);
@@ -73,12 +65,6 @@ function formatVideoDuration(seconds: number | null): string {
 }
 
 // ── UI コンポーネント ────────────────────────────────────────
-
-function SourceBadge({ source }: { source: MetricSource }) {
-  return source === "api"
-    ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">未取得</span>;
-}
 
 function TypeBadge({ type }: { type: UTypeFilter | null }) {
   if (!type) return null;
@@ -100,12 +86,8 @@ export default function PostsPage() {
   const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiMessage, setAiMessage] = useState("");
-
   const [sortKey, setSortKey] = useState<USort>("date");
   const [typeFilter, setTypeFilter] = useState<UTypeFilter>("");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [videoDurationByUrl, setVideoDurationByUrl] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
@@ -256,56 +238,6 @@ export default function PostsPage() {
       });
   }, [unifiedList, typeFilter, sortKey]);
 
-  // ── AI評価（保存済み投稿が対象） ────────────────────────────
-
-  const manualFilteredPosts = useMemo(
-    () => filteredList.filter((e) => e.post !== null).map((e) => e.post!),
-    [filteredList]
-  );
-
-  const analyzeFilteredPosts = async (onlyMissing: boolean) => {
-    const targets = manualFilteredPosts.filter(
-      (p) => !onlyMissing || typeof latestScoreByPostId[p.id] !== "number"
-    );
-    if (!targets.length) {
-      setAiMessage(onlyMissing ? "未分析の投稿はありません。" : "評価できる投稿がありません。");
-      return;
-    }
-    const limited = targets.slice(0, 10);
-    const confirmText = onlyMissing
-      ? `表示中の未分析投稿 ${limited.length}件をOpenAI APIで評価します。API料金が発生します。実行しますか？`
-      : `表示中の投稿 ${limited.length}件をOpenAI APIで再評価します。API料金が発生します。実行しますか？`;
-    if (!window.confirm(confirmText)) return;
-    setAiLoading(true);
-    setAiMessage(`AI評価を開始しました。0/${limited.length}件`);
-    let success = 0;
-    try {
-      for (const post of limited) {
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ post, account: null }),
-        });
-        const d = await res.json() as { error?: string; analysis: AiAnalysis };
-        if (!res.ok) throw new Error(d.error ?? "AI評価に失敗しました。");
-        const saved = await saveAnalysisData(post.id, d.analysis);
-        const score = (saved as { score?: number } | null)?.score ?? d.analysis?.score as number | undefined;
-        if (typeof score === "number") setLatestScoreByPostId((cur) => ({ ...cur, [post.id]: score }));
-        success += 1;
-        setAiMessage(`AI評価中です。${success}/${limited.length}件完了`);
-      }
-      setAiMessage(`AI評価が完了しました。${success}件を評価・保存しました。`);
-    } catch (err) {
-      setAiMessage(
-        err instanceof Error
-          ? `AI評価が途中で止まりました。${success}件完了。理由: ${err.message}`
-          : `AI評価が途中で止まりました。${success}件完了。`
-      );
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
   if (loading) return <div><PageHeader title="投稿一覧" description="読み込み中..." /></div>;
 
   const apiMatchCount = unifiedList.filter((e) => e.post && e.hasApi).length;
@@ -318,30 +250,12 @@ export default function PostsPage() {
         title="投稿一覧"
         description={`API同期 ${apiMatchCount}件 / 未取得 ${supplementOnlyCount}件 / API履歴のみ ${apiOnlyCount}件`}
       />
-
-      {/* AI評価 */}
-      <Panel className="mb-5 bg-fog/80">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="font-semibold">実投稿のAI評価</h2>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              保存済み投稿をOpenAI APIで評価し、スコア・改善案を保存します。絞り込み結果に連動します。
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => analyzeFilteredPosts(true)} disabled={aiLoading}>
-              {aiLoading ? "評価中..." : "未分析をAI評価"}
-            </Button>
-            <Button variant="secondary" onClick={() => analyzeFilteredPosts(false)} disabled={aiLoading}>
-              表示中を再評価
-            </Button>
-          </div>
-        </div>
-        {aiMessage && (
-          <p className="mt-3 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{aiMessage}</p>
-        )}
-        <p className="mt-2 text-xs text-stone-500">一度に評価する投稿は最大10件。</p>
-      </Panel>
+      <div className="mb-5 grid gap-4 md:grid-cols-4">
+        <Stat label="表示中の件数" value={`${filteredList.length}件`} />
+        <Stat label="平均表示数" value={Math.round(filteredList.reduce((sum, entry) => sum + entry.views, 0) / Math.max(filteredList.length, 1)).toLocaleString("ja-JP")} />
+        <Stat label="平均保存数" value={Math.round(filteredList.reduce((sum, entry) => sum + entry.saves, 0) / Math.max(filteredList.length, 1)).toLocaleString("ja-JP")} />
+        <Stat label="平均ER" value={formatPercent(filteredList.reduce((sum, entry) => sum + entry.er, 0) / Math.max(filteredList.length, 1))} />
+      </div>
 
       {/* フィルターバー */}
       <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -373,162 +287,23 @@ export default function PostsPage() {
             <option value="carousel">カルーセル</option>
           </select>
         </div>
-        <div>
-          <label className="block text-xs text-stone-500 mb-1">表示形式</label>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`h-8 px-3 rounded-md border text-sm font-semibold ${viewMode === "table" ? "border-ink bg-ink text-white" : "border-stone-200 bg-white text-stone-700"}`}
-            >
-              表
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`h-8 px-3 rounded-md border text-sm font-semibold ${viewMode === "cards" ? "border-ink bg-ink text-white" : "border-stone-200 bg-white text-stone-700"}`}
-            >
-              カード
-            </button>
-          </div>
-        </div>
         <span className="text-sm text-stone-500 self-end pb-1.5">{filteredList.length} 件</span>
       </div>
-
-      {/* テーブルビュー */}
-      {viewMode === "table" && (
-        <div className="overflow-auto rounded-xl border border-stone-200 bg-white shadow-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>投稿</th>
-                <th>投稿日</th>
-                <th>タイプ</th>
-                <th>キャプション</th>
-                <th>表示数</th>
-                <th>リーチ</th>
-                <th>いいね</th>
-                <th>保存</th>
-                <th>コメント</th>
-                <th>シェア</th>
-                <th>総反応数</th>
-                <th>PFアクセス</th>
-                <th>フォロー</th>
-                <th>総再生時間</th>
-                <th>平均視聴</th>
-                <th>動画尺</th>
-                <th>反応率</th>
-                <th>AIスコア</th>
-                <th>詳細・分析</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredList.map((e) => (
-                <tr key={e.key}>
-                  <td>
-                    {e.thumbnail ? (
-                      <img src={e.thumbnail} alt="" className="h-14 w-14 rounded-md object-cover" />
-                    ) : (
-                      <span className="flex h-14 w-14 items-center justify-center rounded-md bg-fog text-[10px] text-stone-500">
-                        なし
-                      </span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap">{toJSTDate(e.date)}</td>
-                  <td><TypeBadge type={e.normalizedType} /></td>
-                  <td className="max-w-xs">
-                    <p className="line-clamp-2 text-sm">{e.caption || "（なし）"}</p>
-                  </td>
-                  <td>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span>{e.views.toLocaleString("ja-JP")}</span>
-                      <SourceBadge source={e.viewsSrc} />
-                    </div>
-                  </td>
-                  <td>{e.reach != null ? e.reach.toLocaleString("ja-JP") : "–"}</td>
-                  <td>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span>{e.likes.toLocaleString("ja-JP")}</span>
-                      <SourceBadge source={e.likesSrc} />
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span>{e.saves.toLocaleString("ja-JP")}</span>
-                      <SourceBadge source={e.savesSrc} />
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span>{e.comments.toLocaleString("ja-JP")}</span>
-                      <SourceBadge source={e.commentsSrc} />
-                    </div>
-                  </td>
-                  <td>{e.shares.toLocaleString("ja-JP")}</td>
-                  <td>{e.totalInteractions > 0 ? e.totalInteractions.toLocaleString("ja-JP") : "–"}</td>
-                  <td>{e.profileVisits > 0 ? e.profileVisits.toLocaleString("ja-JP") : "–"}</td>
-                  <td>{e.follows > 0 ? e.follows.toLocaleString("ja-JP") : "–"}</td>
-                  <td>{formatWatchTime(e.reelTotalViewTimeMs)}</td>
-                  <td>{formatWatchTime(e.reelAvgWatchTimeMs)}</td>
-                  <td>{e.normalizedType === "video" ? formatVideoDuration(e.mediaUrl ? videoDurationByUrl[e.mediaUrl] ?? null : null) : "–"}</td>
-                  <td>{formatPercent(e.er)}</td>
-                  <td>
-                    {e.post
-                      ? typeof latestScoreByPostId[e.post.id] === "number"
-                        ? `${latestScoreByPostId[e.post.id]}点`
-                        : "未分析"
-                      : "–"}
-                  </td>
-                  <td>
-                    <div className="flex flex-col gap-1">
-                      {e.post && (
-                        <Link
-                          className="text-xs font-semibold text-clay hover:underline"
-                          href={`/posts/detail?id=${e.post.id}`}
-                        >
-                          詳細・分析
-                        </Link>
-                      )}
-                      {!e.post && e.permalink && (
-                        <a
-                          className="text-xs font-semibold text-stone-500 hover:underline"
-                          href={e.permalink}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          IG
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredList.length === 0 && (
-            <p className="py-8 text-center text-sm text-stone-500">投稿がありません。</p>
-          )}
-        </div>
-      )}
-
-      {/* カードビュー */}
-      {viewMode === "cards" && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredList.map((e) => (
-            <UnifiedCard
-              key={e.key}
-              entry={e}
-              aiScore={e.post ? latestScoreByPostId[e.post.id] : undefined}
-              videoDurationSeconds={e.mediaUrl ? videoDurationByUrl[e.mediaUrl] ?? null : null}
-            />
-          ))}
-          {filteredList.length === 0 && (
-            <p className="py-8 text-center text-sm text-stone-500 md:col-span-2 xl:col-span-3">
-              投稿がありません。
-            </p>
-          )}
-        </div>
-      )}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {filteredList.map((e) => (
+          <UnifiedCard
+            key={e.key}
+            entry={e}
+            aiScore={e.post ? latestScoreByPostId[e.post.id] : undefined}
+            videoDurationSeconds={e.mediaUrl ? videoDurationByUrl[e.mediaUrl] ?? null : null}
+          />
+        ))}
+        {filteredList.length === 0 && (
+          <p className="py-8 text-center text-sm text-stone-500 md:col-span-2 xl:col-span-3">
+            投稿がありません。
+          </p>
+        )}
+      </div>
     </div>
   );
 }
