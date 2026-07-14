@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, CalendarDays, ChevronDown, Columns3, Home, KeyRound, ListChecks, Sparkles, User } from "lucide-react";
+import { BarChart3, CalendarDays, Columns3, Home, KeyRound, ListChecks, Sparkles, User } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -72,15 +72,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   })}
                 </nav>
               </div>
-              <details className="group mt-3 rounded-md border border-stone-200 bg-white">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-stone-700">
-                  <span>その他の機能を開く</span>
-                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500">
-                    タップして表示
-                    <ChevronDown size={16} aria-hidden className="transition group-open:rotate-180" />
-                  </span>
-                </summary>
-                <div className="grid gap-4 border-t border-stone-200 px-4 py-4 md:grid-cols-4">
+              <div className="mt-3 rounded-md border border-stone-200 bg-white px-4 py-4">
+                <div className="grid gap-4 md:grid-cols-4">
                   {secondaryNavGroups.map((group) => (
                     <div key={group.label}>
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">{group.label}</p>
@@ -102,7 +95,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     </div>
                   ))}
                 </div>
-              </details>
+              </div>
             </div>
           </header>
           <main className="mx-auto max-w-6xl px-4 py-8 md:py-10">{children}</main>
