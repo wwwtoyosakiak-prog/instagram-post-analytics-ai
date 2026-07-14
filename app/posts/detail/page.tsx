@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { deletePostData, loadAccountsData, loadAnalysesData, loadInsightData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
@@ -171,37 +171,85 @@ function PostDetailContent() {
 }
 
 function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) {
+  const [range, setRange] = useState<"1d" | "7d" | "14d" | "30d">("7d");
+
+  const rows = useMemo(() => {
+    const sorted = [...snapshots].sort((a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime());
+    const latestAt = new Date(sorted[sorted.length - 1]?.capturedAt ?? Date.now()).getTime();
+    const rangeDays = { "1d": 1, "7d": 7, "14d": 14, "30d": 30 }[range];
+    const startAt = latestAt - rangeDays * 24 * 60 * 60 * 1000;
+
+    return sorted
+      .filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= startAt)
+      .map((snapshot) => ({
+        date: new Date(snapshot.capturedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+        capturedAt: snapshot.capturedAt,
+        閲覧数: snapshot.views
+      }));
+  }, [range, snapshots]);
+
   if (!snapshots.length) return null;
-  const rows = [...snapshots].reverse().map((snapshot) => ({
-    date: new Date(snapshot.capturedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-    閲覧数: snapshot.views,
-    リーチ: snapshot.reach,
-    保存数: snapshot.saved,
-    シェア数: snapshot.shares
-  }));
+
+  const latestViews = rows[rows.length - 1]?.閲覧数 ?? null;
+  const firstViews = rows[0]?.閲覧数 ?? null;
+  const viewsDelta = latestViews != null && firstViews != null ? latestViews - firstViews : null;
 
   return (
     <section className="mt-7">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <h2 className="text-lg font-bold text-ink">インサイト推移</h2>
-        <p className="mt-1 text-sm text-stone-600">同期ごとの数値変化を確認できます。現在 {snapshots.length} 回分です。</p>
+        <div className="flex flex-wrap gap-2">
+          <RangeButton active={range === "1d"} onClick={() => setRange("1d")}>1日</RangeButton>
+          <RangeButton active={range === "7d"} onClick={() => setRange("7d")}>1週間</RangeButton>
+          <RangeButton active={range === "14d"} onClick={() => setRange("14d")}>2週間</RangeButton>
+          <RangeButton active={range === "30d"} onClick={() => setRange("30d")}>1ヶ月</RangeButton>
+        </div>
       </div>
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" minTickGap={28} />
-            <YAxis allowDecimals={false} />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="閲覧数" stroke="#53624a" strokeWidth={3} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="リーチ" stroke="#b55d3e" strokeWidth={3} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="保存数" stroke="#266b65" strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="シェア数" stroke="#8b6f47" strokeWidth={2} dot={{ r: 3 }} />
-          </LineChart>
-        </ResponsiveContainer>
+      <p className="mb-4 text-sm text-stone-600">選んだ期間のビュー数の変化を確認できます。現在 {rows.length} 回分です。</p>
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <Stat label="期間の最初" value={firstViews != null ? firstViews.toLocaleString() : "–"} />
+        <Stat label="最新ビュー数" value={latestViews != null ? latestViews.toLocaleString() : "–"} />
+        <Stat label="増減" value={viewsDelta != null ? `${viewsDelta >= 0 ? "+" : ""}${viewsDelta.toLocaleString()}` : "–"} />
       </div>
+      {rows.length > 0 ? (
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={rows} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" minTickGap={28} />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="閲覧数" stroke="#53624a" strokeWidth={3} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">
+          この期間のビュー履歴はまだありません。
+        </div>
+      )}
     </section>
+  );
+}
+
+function RangeButton({
+  active,
+  onClick,
+  children
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md border px-3 py-2 text-sm font-medium transition ${active ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50"}`}
+    >
+      {children}
+    </button>
   );
 }
 
