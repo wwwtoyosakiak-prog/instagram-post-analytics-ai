@@ -849,12 +849,13 @@ export default function DashboardPage() {
     const reach = sumField("reach");
     const profileViews = sumField("profile_views");
     const websiteClicks = sumField("website_clicks");
+    const periodScopeLabel = `${data.graphPeriodLabel}分`;
     const primaryValue = impressions ?? reach;
     const primaryLabel = impressions != null ? "閲覧" : reach != null ? "リーチ" : "閲覧";
     const primaryDescription = impressions != null
-      ? `${data.graphPeriodLabel}のビュー`
+      ? `${periodScopeLabel}の閲覧数です`
       : reach != null
-        ? `${data.graphPeriodLabel}は閲覧未取得のため、リーチを表示`
+        ? `${periodScopeLabel}の閲覧データが未取得のため、リーチを表示しています`
         : "アカウント全体インサイトはまだ未取得です";
 
     return {
@@ -1121,7 +1122,7 @@ export default function DashboardPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">Account Insights</p>
             <h2 className="mt-2 text-2xl font-bold text-ink">アカウントのインサイト</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              {accountInsightSummary.periodLabel}のアカウント全体の反応をまとめています。投稿単位ではなく、期間全体の流れを見るための欄です。
+              {accountInsightSummary.periodLabel}分のアカウント全体の反応をまとめています。投稿単位ではなく、期間全体の流れを見るための欄です。
             </p>
             <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
               <p className="text-sm font-semibold tracking-[0.2em] text-white/70">{accountInsightSummary.primaryLabel}</p>
@@ -1130,7 +1131,7 @@ export default function DashboardPage() {
               </p>
               <p className="mt-3 text-sm text-white/72">
                 {accountInsightSummary.primaryDescription}
-                {accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}
+                {accountInsightSummary.latestDate ? `。最新日: ${accountInsightSummary.latestDate}` : ""}
               </p>
             </div>
           </div>
