@@ -54,12 +54,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <div className="min-h-screen bg-base">
           <header className="sticky top-0 z-30 border-b border-stone-200 bg-base/95 backdrop-blur">
             <div className="mx-auto max-w-6xl px-4 py-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <Link href="/" className="flex items-center gap-3 text-lg font-semibold text-ink">
                   <span className="flex h-9 w-9 items-center justify-center rounded-md bg-ink text-sm text-white">IA</span>
                   <span>Instagram投稿分析AI</span>
                 </Link>
-                <nav className="flex gap-2 overflow-x-auto pb-1">
+                <nav className="flex flex-wrap items-center justify-end gap-2">
                   {primaryNav.map((item) => {
                     const Icon = item.icon;
                     return (
