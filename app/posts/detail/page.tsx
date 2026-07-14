@@ -178,13 +178,16 @@ function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) 
     const latestAt = new Date(sorted[sorted.length - 1]?.capturedAt ?? Date.now()).getTime();
     const rangeDays = { "1d": 1, "7d": 7, "14d": 14, "30d": 30 }[range];
     const startAt = latestAt - rangeDays * 24 * 60 * 60 * 1000;
-
-    return sorted
+    const filtered = sorted
       .filter((snapshot) => new Date(snapshot.capturedAt).getTime() >= startAt)
+    const baseViews = filtered[0]?.views ?? 0;
+
+    return filtered
       .map((snapshot) => ({
         date: new Date(snapshot.capturedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }),
         capturedAt: snapshot.capturedAt,
-        閲覧数: snapshot.views
+        閲覧数: snapshot.views,
+        増加ビュー数: snapshot.views - baseViews
       }));
   }, [range, snapshots]);
 
@@ -205,7 +208,7 @@ function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) 
           <RangeButton active={range === "30d"} onClick={() => setRange("30d")}>1ヶ月</RangeButton>
         </div>
       </div>
-      <p className="mb-4 text-sm text-stone-600">選んだ期間のビュー数の変化を確認できます。現在 {rows.length} 回分です。</p>
+      <p className="mb-4 text-sm text-stone-600">選んだ期間の最初を0として、ビュー数の増え方を確認できます。現在 {rows.length} 回分です。</p>
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Stat label="期間の最初" value={firstViews != null ? firstViews.toLocaleString() : "–"} />
         <Stat label="最新ビュー数" value={latestViews != null ? latestViews.toLocaleString() : "–"} />
@@ -220,7 +223,7 @@ function InsightTrend({ snapshots }: { snapshots: InstagramInsightSnapshot[] }) 
               <YAxis allowDecimals={false} domain={[0, "auto"]} />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="閲覧数" stroke="#53624a" strokeWidth={3} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="増加ビュー数" stroke="#53624a" strokeWidth={3} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
