@@ -15,6 +15,9 @@ const primaryNav = [
   { href: "/settings", label: "設定", icon: KeyRound }
 ];
 
+const navLinkClass =
+  "inline-flex h-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink";
+
 const secondaryNavGroups = [
   {
     label: "設定",
@@ -63,7 +66,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                       <Link
                         key={item.href}
                         href={item.href}
-                        className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink"
+                        className={`${navLinkClass} shrink-0`}
                       >
                         <Icon size={16} aria-hidden />
                         {item.label}
@@ -84,7 +87,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                             <Link
                               key={item.href}
                               href={item.href}
-                              className="inline-flex min-h-12 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink"
+                              className={`${navLinkClass} w-full justify-start`}
                             >
                               <Icon size={16} aria-hidden />
                               {item.label}
