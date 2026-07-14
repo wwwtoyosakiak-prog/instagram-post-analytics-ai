@@ -851,7 +851,7 @@ export default function DashboardPage() {
     const primaryDescription = impressions != null
       ? `${periodScopeLabel}の閲覧数です`
       : reach != null
-        ? `${periodScopeLabel}の閲覧データが未取得のため、リーチを表示しています`
+        ? `${periodScopeLabel}のリーチ数です`
         : "アカウント全体インサイトはまだ未取得です";
 
     return {
@@ -1122,7 +1122,7 @@ export default function DashboardPage() {
           <HeroStat
             label="届いたアカウント数"
             value={formatOptionalMetric(accountInsightSummary.primaryValue)}
-            note={`${accountInsightSummary.periodLabel}のアカウント全体${accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}`}
+            note={`${accountInsightSummary.primaryDescription}${accountInsightSummary.latestDate ? ` / 最新取得日 ${accountInsightSummary.latestDate}` : ""}`}
             tone="moss"
           />
           <HeroStat
