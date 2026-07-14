@@ -124,14 +124,14 @@ function PostDetailContent() {
             <div><dt className="font-semibold">ハッシュタグ</dt><dd className="leading-6">{post.hashtags || "なし"}</dd></div>
             <div><dt className="font-semibold">メモ</dt><dd className="leading-6">{post.memo || "なし"}</dd></div>
           </dl>
-          <details open className="mt-4 rounded-md border border-stone-200 bg-stone-50">
-            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">詳細情報を開く</summary>
+          <section className="mt-4 rounded-md border border-stone-200 bg-stone-50">
+            <h2 className="px-4 py-3 text-sm font-medium text-stone-700">詳細情報</h2>
             <dl className="grid gap-3 border-t border-stone-200 px-4 py-4 text-sm">
               <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>
               <div><dt className="font-semibold">登録日時</dt><dd>{formatDateTime(post.createdAt)}</dd></div>
               <div><dt className="font-semibold">編集日時</dt><dd>{formatDateTime(post.updatedAt ?? post.createdAt)}</dd></div>
             </dl>
-          </details>
+          </section>
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href={`/posts/edit?id=${post.id}`} className="inline-flex h-10 items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-ink hover:border-moss">
               編集
@@ -149,20 +149,20 @@ function PostDetailContent() {
             <AnalysisView analysis={analysis} />
           ) : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
           {insightHistory.length > 0 ? (
-            <details open className="mt-6 rounded-md border border-stone-200 bg-white">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">インサイト推移を開く</summary>
+            <section className="mt-6 rounded-md border border-stone-200 bg-white">
+              <h2 className="px-4 py-3 text-sm font-medium text-stone-700">インサイト推移</h2>
               <div className="border-t border-stone-200 px-4 py-4">
                 <InsightTrend snapshots={insightHistory} />
               </div>
-            </details>
+            </section>
           ) : null}
           {analysisHistory.length > 0 ? (
-            <details open className="mt-6 rounded-md border border-stone-200 bg-white">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">分析履歴を開く</summary>
+            <section className="mt-6 rounded-md border border-stone-200 bg-white">
+              <h2 className="px-4 py-3 text-sm font-medium text-stone-700">分析履歴</h2>
               <div className="border-t border-stone-200 px-4 py-4">
                 <AnalysisComparison analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
               </div>
-            </details>
+            </section>
           ) : null}
         </Panel>
       </div>
