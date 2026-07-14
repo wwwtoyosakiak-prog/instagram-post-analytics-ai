@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Archive, BarChart3, Bot, CalendarDays, Columns3, FileText, Home, KeyRound, ListChecks, Sparkles, Swords, Target, User, WandSparkles } from "lucide-react";
+import { Archive, BarChart3, Bot, CalendarDays, ChevronDown, Columns3, FileText, Home, KeyRound, ListChecks, Sparkles, Swords, Target, User, WandSparkles } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -79,9 +79,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   })}
                 </nav>
               </div>
-              <details className="mt-3 rounded-md border border-stone-200 bg-white">
-                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">
-                  その他の機能
+              <details className="group mt-3 rounded-md border border-stone-200 bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-stone-700">
+                  <span>その他の機能を開く</span>
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500">
+                    タップして表示
+                    <ChevronDown size={16} aria-hidden className="transition group-open:rotate-180" />
+                  </span>
                 </summary>
                 <div className="grid gap-4 border-t border-stone-200 px-4 py-4 md:grid-cols-4">
                   {secondaryNavGroups.map((group) => (
