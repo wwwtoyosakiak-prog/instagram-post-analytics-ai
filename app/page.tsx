@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CheckCircle2, ClipboardList, KeyRound, ListChecks } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
@@ -29,11 +29,6 @@ export default function Home() {
     const currentMonth = todayKey.slice(0, 7);
     const latest = [...posts].sort((a, b) => new Date(b.recordedDate ?? b.date).getTime() - new Date(a.recordedDate ?? a.date).getTime())[0];
     const monthlyPosts = posts.filter((post) => post.date.startsWith(currentMonth));
-    const highScorePosts = posts
-      .map((post) => ({ post, analysis: latestAnalysisByPostId[post.id] }))
-      .filter((item): item is { post: InstagramPost; analysis: AiAnalysisRecord } => Boolean(item.analysis))
-      .sort((a, b) => b.analysis.score - a.analysis.score)
-      .slice(0, 3);
     const nextPostToCheck = posts
       .filter((post) => !latestAnalysisByPostId[post.id])
       .sort((a, b) => new Date(b.recordedDate ?? b.date).getTime() - new Date(a.recordedDate ?? a.date).getTime())[0]
@@ -45,7 +40,6 @@ export default function Home() {
       monthlyPostCount: monthlyPosts.length,
       monthlyAverageSaveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
       screenshotCount: posts.filter((post) => Boolean(post.screenshot)).length,
-      highScorePosts,
       nextPostToCheck,
       latest
     };
@@ -108,30 +102,16 @@ export default function Home() {
           </div>
         </Panel>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel>
-          <h2 className="text-lg font-semibold text-ink">最近スコアが高かった投稿</h2>
-          <div className="mt-4 grid gap-2">
-            {summary.highScorePosts.map(({ post, analysis }) => (
-              <Link key={post.id} href={`/posts/detail?id=${post.id}`} className="rounded-md border border-stone-200 bg-white p-3 text-sm transition hover:bg-stone-50">
-                <span className="font-semibold text-ink">{analysis.score}点 / {post.date}</span>
-                <span className="mt-1 block truncate text-xs text-stone-600">{post.caption}</span>
-              </Link>
-            ))}
-            {!summary.highScorePosts.length ? <p className="rounded-md border border-dashed border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">AI分析済みの投稿がありません。</p> : null}
-          </div>
-        </Panel>
-        <Panel>
-          <h2 className="text-lg font-semibold text-ink">運用メモ</h2>
-          <div className="mt-4 grid gap-3 text-sm">
-            <StatusRow label="今月の投稿" value={`${summary.monthlyPostCount}件`} active={summary.monthlyPostCount > 0} />
-            <StatusRow label="平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} active={summary.monthlyAverageSaveRate > 0} />
-            <StatusRow label="全体平均ER" value={formatPercent(summary.averageEngagementRate)} active={posts.length > 0} />
-            <StatusRow label="合計表示数" value={summary.totalViews.toLocaleString()} active={posts.length > 0} />
-            <StatusRow label="最新投稿" value={summary.latest ? summary.latest.date : "未登録"} active={Boolean(summary.latest)} />
-          </div>
-        </Panel>
-      </div>
+      <Panel>
+        <h2 className="text-lg font-semibold text-ink">運用メモ</h2>
+        <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+          <StatusRow label="今月の投稿" value={`${summary.monthlyPostCount}件`} active={summary.monthlyPostCount > 0} />
+          <StatusRow label="平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} active={summary.monthlyAverageSaveRate > 0} />
+          <StatusRow label="全体平均ER" value={formatPercent(summary.averageEngagementRate)} active={posts.length > 0} />
+          <StatusRow label="合計表示数" value={summary.totalViews.toLocaleString()} active={posts.length > 0} />
+          <StatusRow label="最新投稿" value={summary.latest ? summary.latest.date : "未登録"} active={Boolean(summary.latest)} />
+        </div>
+      </Panel>
     </div>
   );
 }
