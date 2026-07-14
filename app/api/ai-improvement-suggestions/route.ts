@@ -4,6 +4,10 @@ import {
   normalizeAiImprovementSuggestions,
 } from "@/lib/ai-improvement-suggestion";
 import type { AiWeeklyReviewResult } from "@/lib/ai-weekly-review";
+import {
+  buildLearningContext,
+  type AiLearningMemory,
+} from "@/lib/ai-learning";
 
 const openAiKey = process.env.OPENAI_API_KEY;
 const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
@@ -40,6 +44,29 @@ export async function POST(request: Request) {
     );
   }
 
+  let learningContext =
+    "過去の改善学習データはありません。";
+
+  try {
+    const baseUrl = new URL(request.url).origin;
+    const learningResponse = await fetch(
+      `${baseUrl}/api/ai-learning`,
+      { cache: "no-store" },
+    );
+
+    if (learningResponse.ok) {
+      const learningData =
+        await learningResponse.json();
+      learningContext = buildLearningContext(
+        (learningData.memories ??
+          []) as AiLearningMemory[],
+      );
+    }
+  } catch {
+    learningContext =
+      "過去の改善学習データを取得できませんでした。";
+  }
+
   const response = await fetch(
     "https://api.openai.com/v1/responses",
     {
@@ -56,11 +83,19 @@ export async function POST(request: Request) {
             content: [
               {
                 type: "input_text",
-                text: buildAiImprovementSuggestionPrompt(
+                text: `${buildAiImprovementSuggestionPrompt(
                   body.weekStart,
                   body.weekEnd,
                   body.aiReview,
-                ),
+                )}
+
+過去の改善学習データ:
+${learningContext}
+
+追加ルール:
+- 過去に成功した類似施策は、その成功条件を考慮する。
+- 過去に失敗した施策と同じ案を出す場合は、失敗原因を修正する。
+- 過去データが少ない場合は、確実な学習済み知識のように扱わない。`,
               },
             ],
           },
