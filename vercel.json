@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/weekly-operation-review",
       "schedule": "10 0 * * 1"
+    },
+    {
+      "path": "/api/ai-agent/run?cron=1",
+      "schedule": "30 0 * * 1"
     }
   ]
 }
