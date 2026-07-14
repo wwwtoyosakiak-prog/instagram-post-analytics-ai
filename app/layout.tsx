@@ -84,7 +84,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                             <Link
                               key={item.href}
                               href={item.href}
-                              className="inline-flex items-center gap-2 rounded-md px-2 py-2 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ink"
+                              className="inline-flex min-h-12 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink"
                             >
                               <Icon size={16} aria-hidden />
                               {item.label}
