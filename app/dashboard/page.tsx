@@ -1113,67 +1113,47 @@ export default function DashboardPage() {
       </div>
 
       <Panel className="mb-6 border-stone-200/80 bg-white/92">
-        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">Account Insights</p>
-            <h2 className="mt-2 text-2xl font-bold text-ink">アカウント全体の数字</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              投稿ごとの数字ではなく、{accountInsightSummary.periodLabel}でアカウント全体がどれだけ届いたかを見ます。
-            </p>
-            <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
-              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">この期間に届いた人数</p>
-              <p className="mt-4 text-5xl font-bold leading-none">
-                {formatOptionalMetric(accountInsightSummary.primaryValue)}
-              </p>
-              <p className="mt-3 text-sm text-white/72">
-                {accountInsightSummary.impressions == null ? "閲覧数は未取得のため、リーチを表示しています" : accountInsightSummary.primaryDescription}
-                {accountInsightSummary.latestDate ? `。最新日: ${accountInsightSummary.latestDate}` : ""}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            <div className="rounded-2xl border border-stone-200/80 bg-fog/72 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-base font-semibold text-ink">この期間の数字</p>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-stone-600">
-                  {accountInsightSummary.periodLabel}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3">
-                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">届いたアカウント数</span>
-                  <span className="text-2xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.reach)}</span>
-                </div>
-                {accountInsightSummary.profileViews != null ? (
-                  <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                    <span className="text-sm text-stone-600">プロフィール閲覧</span>
-                    <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.profileViews)}</span>
-                  </div>
-                ) : null}
-                {accountInsightSummary.websiteClicks != null ? (
-                  <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                    <span className="text-sm text-stone-600">ウェブサイトクリック</span>
-                    <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.websiteClicks)}</span>
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-stone-600">現在のフォロワー数</span>
-                  <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.followerCount)}</span>
-                </div>
-              </div>
-            </div>
-            {!accountInsightSummary.hasInsightMetrics ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-red-700">
-                アカウント全体の数字はまだ取得できていません。
-              </div>
-            ) : null}
-          </div>
+        <SectionLead
+          eyebrow="Overview"
+          title="この期間の要点"
+          description={`${accountInsightSummary.periodLabel}のアカウント全体の数字と、同じ期間の投稿集計をまとめて見られます。`}
+        />
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <HeroStat
+            label="届いたアカウント数"
+            value={formatOptionalMetric(accountInsightSummary.primaryValue)}
+            note={`${accountInsightSummary.periodLabel}のアカウント全体${accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}`}
+            tone="moss"
+          />
+          <HeroStat
+            label="現在のフォロワー数"
+            value={fmt(accountInsightSummary.followerCount)}
+            note="アカウント全体の現在値"
+            tone="clay"
+          />
+          {accountInsightSummary.profileViews != null ? (
+            <HeroStat
+              label="プロフィール閲覧"
+              value={fmt(accountInsightSummary.profileViews)}
+              note={`${accountInsightSummary.periodLabel}のアカウント全体`}
+              tone="sky"
+            />
+          ) : null}
+          {accountInsightSummary.websiteClicks != null ? (
+            <HeroStat
+              label="サイトクリック"
+              value={fmt(accountInsightSummary.websiteClicks)}
+              note={`${accountInsightSummary.periodLabel}のアカウント全体`}
+              tone="plum"
+            />
+          ) : null}
         </div>
-      </Panel>
-
-      {/* サマリーカード（統合後の実効値） */}
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {!accountInsightSummary.hasInsightMetrics ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-red-700">
+            アカウント全体の数字はまだ取得できていません。
+          </div>
+        ) : null}
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <HeroStat
           label="対象投稿"
           value={`${data.graphCount}件`}
@@ -1200,7 +1180,8 @@ export default function DashboardPage() {
           note={data.graphCount > 0 ? `${data.graphPeriodLabel}の平均値` : "対象データなし"}
           tone="plum"
         />
-      </div>
+        </div>
+      </Panel>
 
       {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。</p></Panel> : null}
 
