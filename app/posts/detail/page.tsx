@@ -124,7 +124,7 @@ function PostDetailContent() {
             <div><dt className="font-semibold">ハッシュタグ</dt><dd className="leading-6">{post.hashtags || "なし"}</dd></div>
             <div><dt className="font-semibold">メモ</dt><dd className="leading-6">{post.memo || "なし"}</dd></div>
           </dl>
-          <details className="mt-4 rounded-md border border-stone-200 bg-stone-50">
+          <details open className="mt-4 rounded-md border border-stone-200 bg-stone-50">
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">詳細情報を開く</summary>
             <dl className="grid gap-3 border-t border-stone-200 px-4 py-4 text-sm">
               <div><dt className="font-semibold">投稿画像・動画の枚数</dt><dd>{post.mediaCount ?? 1}</dd></div>
@@ -149,7 +149,7 @@ function PostDetailContent() {
             <AnalysisView analysis={analysis} />
           ) : <p className="text-sm text-stone-600">分析を実行すると、投稿スコア・改善案・投稿案・ハッシュタグが保存されます。</p>}
           {insightHistory.length > 0 ? (
-            <details className="mt-6 rounded-md border border-stone-200 bg-white">
+            <details open className="mt-6 rounded-md border border-stone-200 bg-white">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">インサイト推移を開く</summary>
               <div className="border-t border-stone-200 px-4 py-4">
                 <InsightTrend snapshots={insightHistory} />
@@ -157,7 +157,7 @@ function PostDetailContent() {
             </details>
           ) : null}
           {analysisHistory.length > 0 ? (
-            <details className="mt-6 rounded-md border border-stone-200 bg-white">
+            <details open className="mt-6 rounded-md border border-stone-200 bg-white">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">分析履歴を開く</summary>
               <div className="border-t border-stone-200 px-4 py-4">
                 <AnalysisComparison analyses={analysisHistory} onSelect={(item) => setAnalysis(item)} />
