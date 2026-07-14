@@ -9,7 +9,6 @@ import { deletePostData, loadAccountsData, loadAnalysesData, loadInsightData, lo
 import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
 import { matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
-import { createSampleAnalysis } from "@/lib/sample-analysis";
 
 export default function PostDetailPage() {
   return (
@@ -86,26 +85,11 @@ function PostDetailContent() {
         setAnalysisMessage("AI分析結果を表示しました。サーバー保存は未設定です。");
       }
     } catch {
-      setError("GitHub Pages公開版ではOpenAI API Routeは動きません。サンプル分析を使うか、Vercelで公開してください。");
+      setError("GitHub Pages公開版ではOpenAI分析は動きません。利用する場合はVercelなどのAPIが動く環境で公開してください。");
     } finally {
       setLoading(false);
       setSavingAnalysis(false);
     }
-  };
-
-  const useSampleAnalysis = async () => {
-    const sample = createSampleAnalysis(post);
-    setAnalysis(sample);
-    setSavingAnalysis(true);
-    const saved = await saveAnalysisData(post.id, sample);
-    if (saved) {
-      setAnalysisHistory((current) => [saved, ...current]);
-      setAnalysis(saved);
-      setAnalysisMessage("サンプル分析結果を保存しました。");
-    } else {
-      setAnalysisMessage("サンプル分析を表示しました。サーバー保存は未設定です。");
-    }
-    setSavingAnalysis(false);
   };
 
   const removePost = async () => {
@@ -158,7 +142,6 @@ function PostDetailContent() {
         <Panel>
           <div className="mb-4 flex flex-wrap gap-2">
             <Button onClick={analyze} disabled={loading || savingAnalysis}>{loading ? "分析中..." : savingAnalysis ? "保存中..." : "OpenAIで分析・保存"}</Button>
-            <Button variant="secondary" onClick={useSampleAnalysis} disabled={savingAnalysis}>サンプル分析を保存</Button>
           </div>
           {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           {analysisMessage ? <p className="mb-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{analysisMessage}</p> : null}
