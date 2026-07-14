@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CheckCircle2, ClipboardList, KeyRound, ListChecks } from "lucide-react";
+import { BarChart3, ClipboardList, KeyRound, ListChecks } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
@@ -51,9 +51,8 @@ export default function Home() {
         title="今日の運用確認"
         description="まず投稿を見るか、分析を見るか、設定を整えるかの3つから始めます。"
       />
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Stat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} />
-        <Stat label="今月の平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} />
         <Stat label="全体平均ER" value={formatPercent(summary.averageEngagementRate)} />
       </div>
       <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -83,33 +82,30 @@ export default function Home() {
             <WorkItem
               icon={<ClipboardList size={16} />}
               title="次に確認する投稿"
-              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
+              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date}の投稿を確認` : "まだ投稿がありません。"}
               href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/posts"}
             />
           </div>
         </Panel>
         <Panel>
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-ink"><CheckCircle2 size={18} />現在の状態</h2>
+          <h2 className="text-lg font-semibold text-ink">いまの状態</h2>
           <div className="mt-4 grid gap-3 text-sm">
             <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件同期済み` : "未同期"} active={posts.length > 0} />
-            <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
-            <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー保存" : "ブラウザ保存"} active={serverStorageEnabled} />
-            <StatusRow label="AI接続" value="分析・提案に利用可能" active />
+            <StatusRow label="画像" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
+            <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー" : "ブラウザ"} active={serverStorageEnabled} />
+            <StatusRow label="最新投稿" value={summary.latest ? summary.latest.date : "未登録"} active={Boolean(summary.latest)} />
           </div>
           <div className="mt-5 rounded-md border border-stone-200 bg-stone-50 p-4">
             <p className="text-sm font-medium text-ink">迷ったら</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認してから、ダッシュボードとレポートを見る流れが基本です。</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認して、必要なら分析を見るだけで十分です。</p>
           </div>
         </Panel>
       </div>
       <Panel>
-        <h2 className="text-lg font-semibold text-ink">運用メモ</h2>
+        <h2 className="text-lg font-semibold text-ink">今月の要点</h2>
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-          <StatusRow label="今月の投稿" value={`${summary.monthlyPostCount}件`} active={summary.monthlyPostCount > 0} />
           <StatusRow label="平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} active={summary.monthlyAverageSaveRate > 0} />
-          <StatusRow label="全体平均ER" value={formatPercent(summary.averageEngagementRate)} active={posts.length > 0} />
           <StatusRow label="合計表示数" value={summary.totalViews.toLocaleString()} active={posts.length > 0} />
-          <StatusRow label="最新投稿" value={summary.latest ? summary.latest.date : "未登録"} active={Boolean(summary.latest)} />
         </div>
       </Panel>
     </div>
