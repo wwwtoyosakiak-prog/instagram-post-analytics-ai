@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
@@ -38,42 +38,42 @@ export default function PostRetrospectivesPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function loadPlans() {
-    setLoading(true);
-    setError("");
+  const loadPlans = useEffectEvent(async () => {
+      setLoading(true);
+      setError("");
 
-    try {
-      const response = await fetch("/api/post-kpis", {
-        cache: "no-store",
-      });
-      const data = await response.json();
+      try {
+        const response = await fetch("/api/post-kpis", {
+          cache: "no-store",
+        });
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          data.error ?? "投稿企画を取得できませんでした。",
+        if (!response.ok) {
+          throw new Error(
+            data.error ?? "投稿企画を取得できませんでした。",
+          );
+        }
+
+        const loadedPlans = data.plans ?? [];
+        setPlans(loadedPlans);
+
+        if (!selectedId && loadedPlans[0]?.id) {
+          setSelectedId(loadedPlans[0].id);
+        }
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "投稿企画を取得できませんでした。",
         );
+      } finally {
+        setLoading(false);
       }
-
-      const loadedPlans = data.plans ?? [];
-      setPlans(loadedPlans);
-
-      if (!selectedId && loadedPlans[0]?.id) {
-        setSelectedId(loadedPlans[0].id);
-      }
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "投稿企画を取得できませんでした。",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    });
 
   useEffect(() => {
     void loadPlans();
-  }, []);
+  }, [loadPlans]);
 
   useEffect(() => {
     async function loadRetrospective() {

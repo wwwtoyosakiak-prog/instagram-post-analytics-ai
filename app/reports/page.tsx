@@ -41,7 +41,7 @@ export default function ReportsPage() {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
       });
     });
-  }, []);
+  }, [fiscalStartMonth]);
 
   useEffect(() => {
     if (!month) return;
@@ -399,15 +399,6 @@ function AnnualRanking({ title, posts }: { title: string; posts: InstagramPost[]
         ))}
         {!posts.length ? <p className="text-sm text-stone-500">対象年度の投稿がありません。</p> : null}
       </div>
-    </div>
-  );
-}
-
-function ProgressCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-stone-200 bg-white/80 p-3">
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-ink">{value}</p>
     </div>
   );
 }

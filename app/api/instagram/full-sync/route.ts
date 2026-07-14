@@ -10,7 +10,6 @@ import {
   fetchAccountInsights,
   fetchFollowerSnapshot,
   getMetric,
-  isReel,
   type ApiError,
 } from '@/lib/instagram-graph-api';
 import { createClient } from '@supabase/supabase-js';

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { PageHeader } from "@/components/ui";
@@ -72,9 +73,12 @@ export default function AccountPage() {
           {/* プロフィール画像 */}
           <div className="shrink-0 flex justify-center md:justify-start">
             {graphAccount?.profile_picture_url ? (
-              <img
+              <Image
                 src={graphAccount.profile_picture_url}
                 alt="プロフィール画像"
+                width={144}
+                height={144}
+                unoptimized
                 className="h-28 w-28 rounded-full border-2 border-stone-200 object-cover md:h-36 md:w-36"
               />
             ) : (

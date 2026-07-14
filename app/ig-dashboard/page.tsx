@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -142,8 +143,14 @@ export default function IgDashboardPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           {account?.profile_picture_url && (
-            <img src={account.profile_picture_url} alt="profile"
-              className="w-14 h-14 rounded-full object-cover border border-gray-200" />
+            <Image
+              src={account.profile_picture_url}
+              alt="profile"
+              width={56}
+              height={56}
+              unoptimized
+              className="h-14 w-14 rounded-full border border-gray-200 object-cover"
+            />
           )}
           <div>
             <h1 className="text-2xl font-bold text-gray-800">

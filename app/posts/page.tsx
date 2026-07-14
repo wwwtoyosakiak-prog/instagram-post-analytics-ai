@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Stat } from "@/components/ui";
@@ -331,10 +332,12 @@ function UnifiedCard({
     <>
       <div className="aspect-[4/3] bg-fog">
         {entry.thumbnail ? (
-          <img
+          <Image
             src={entry.thumbnail}
             alt="投稿サムネイル"
-            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            fill
+            unoptimized
+            className="object-cover transition group-hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-stone-500">

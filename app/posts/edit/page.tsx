@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, PageHeader, Panel } from "@/components/ui";
@@ -130,7 +131,16 @@ function EditPostContent() {
           <div className="md:col-span-2">
             <label>投稿画像スクショ</label>
             <input type="file" accept="image/*" onChange={handleImage} />
-            {form.screenshot ? <img src={form.screenshot} alt="投稿画像プレビュー" className="mt-3 max-h-72 rounded-md border border-stone-200 object-contain" /> : null}
+            {form.screenshot ? (
+              <Image
+                src={form.screenshot}
+                alt="投稿画像プレビュー"
+                width={960}
+                height={720}
+                unoptimized
+                className="mt-3 max-h-72 rounded-md border border-stone-200 object-contain"
+              />
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button type="submit">変更を保存</Button>

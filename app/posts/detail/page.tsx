@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -114,7 +115,16 @@ function PostDetailContent() {
       />
       <div className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
         <Panel>
-          {getPostPreview(post) ? <img src={getPostPreview(post)} alt="投稿画像・動画サムネイル" className="mb-4 max-h-[520px] w-full rounded-md object-contain" /> : <div className="mb-4 rounded-md bg-stone-100 p-8 text-center text-sm text-stone-500">投稿画像未取得</div>}
+          {getPostPreview(post) ? (
+            <Image
+              src={getPostPreview(post)}
+              alt="投稿画像・動画サムネイル"
+              width={1200}
+              height={900}
+              unoptimized
+              className="mb-4 max-h-[520px] w-full rounded-md object-contain"
+            />
+          ) : <div className="mb-4 rounded-md bg-stone-100 p-8 text-center text-sm text-stone-500">投稿画像未取得</div>}
           <dl className="space-y-3 text-sm">
             <div><dt className="font-semibold">投稿日</dt><dd>{toJSTDate(post.date)}</dd></div>
             <div><dt className="font-semibold">データ登録日</dt><dd>{toJSTDate(post.recordedDate ?? post.date)}</dd></div>

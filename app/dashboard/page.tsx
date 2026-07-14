@@ -1,5 +1,6 @@
 'use client';
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -19,7 +20,7 @@ import {
 } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
-import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia, type ApiMediaInsights } from "@/lib/post-merge";
+import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia } from "@/lib/post-merge";
 
 // ── Graph API 型 ──────────────────────────────────────────
 
@@ -319,13 +320,6 @@ function getPostPreview(post: InstagramPost) {
   return post.screenshot || post.thumbnailUrl || post.mediaUrl || "";
 }
 
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function toTokyoDateHour(iso: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
@@ -519,13 +513,11 @@ export default function DashboardPage() {
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [insightDate, setInsightDate] = useState("");
-  const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [syncRuns, setSyncRuns] = useState<InstagramSyncRun[]>([]);
 
   // ── Graph API state ──
   const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
   const [dashAccount, setDashAccount] = useState<DashboardAccount | null>(null);
-  const [dashTotals, setDashTotals] = useState<DashboardTotals | null>(null);
   const [accountInsightsTrend, setAccountInsightsTrend] = useState<DashboardAccountInsightTrendRow[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
@@ -550,9 +542,7 @@ export default function DashboardPage() {
     setSyncRuns(loadedSyncRuns);
     const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
     if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
-    Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
-      setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
-    });
+    Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then(() => undefined);
   };
 
   const refreshApiData = async () => {
@@ -563,7 +553,6 @@ export default function DashboardPage() {
       ]);
       setApiMedia((mediaRes as { data: ApiMedia[] }).data ?? []);
       setDashAccount((dashRes as DashboardApiResponse | null)?.account ?? null);
-      setDashTotals((dashRes as DashboardApiResponse | null)?.totals ?? null);
       setAccountInsightsTrend((dashRes as DashboardApiResponse | null)?.account_insights_trend ?? []);
     } catch {
       // 無視
@@ -642,19 +631,6 @@ export default function DashboardPage() {
       const m = mergePostMetrics(post, matched?.latest_insights);
       return { ...post, views: m.views, likes: m.likes, saves: m.saves, comments: m.comments, shares: m.shares };
     });
-  }, [posts, apiMedia]);
-
-  // APIマッチ件数のカウント（サマリー表示用）
-  // views > 0（動画）または reach > 0（画像含む全タイプ）があればAPIマッチとみなす
-  const mergeStats = useMemo(() => {
-    let apiCount = 0;
-    for (const post of posts) {
-      const matched = matchPostToMedia(post, apiMedia);
-      const ins = matched?.latest_insights;
-      const hasApiData = (ins?.views != null && ins.views > 0) || (ins?.reach != null && ins.reach > 0);
-      if (hasApiData) apiCount++;
-    }
-    return { apiCount, manualCount: posts.length - apiCount, total: posts.length };
   }, [posts, apiMedia]);
 
   // ── 派生データ ────────────────────────────────────────
@@ -827,7 +803,7 @@ export default function DashboardPage() {
       previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
       previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [effectivePosts, goals, latestScoreByPostId, graphPeriod, posts]);
+  }, [effectivePosts, goals, graphPeriod, apiMedia]);
 
   const accountInsightSummary = useMemo(() => {
     const todayKey = toTokyoDateKey(new Date());
@@ -1077,8 +1053,14 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {dashAccount?.profile_picture_url && (
-              <img src={dashAccount.profile_picture_url} alt="profile"
-                className="w-12 h-12 rounded-full object-cover border border-stone-200 shrink-0" />
+              <Image
+                src={dashAccount.profile_picture_url}
+                alt="profile"
+                width={48}
+                height={48}
+                unoptimized
+                className="h-12 w-12 shrink-0 rounded-full border border-stone-200 object-cover"
+              />
             )}
             <div>
               {dashAccount ? (
@@ -1430,7 +1412,14 @@ export default function DashboardPage() {
                     className="grid gap-3 border-b border-stone-200 px-2 py-4 transition hover:bg-white/60 md:grid-cols-[52px_64px_1fr_auto] md:items-center">
                     <span className="text-2xl font-bold text-clay">{index + 1}</span>
                     {getPostPreview(item.post) ? (
-                      <img src={getPostPreview(item.post)} alt="投稿サムネイル" className="h-16 w-16 rounded-md object-cover" />
+                      <Image
+                        src={getPostPreview(item.post)}
+                        alt="投稿サムネイル"
+                        width={64}
+                        height={64}
+                        unoptimized
+                        className="h-16 w-16 rounded-md object-cover"
+                      />
                     ) : (
                       <span className="flex h-16 w-16 items-center justify-center rounded-md bg-fog text-[10px] text-stone-500">画像なし</span>
                     )}

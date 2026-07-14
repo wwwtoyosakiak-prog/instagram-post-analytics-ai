@@ -1,7 +1,7 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 
 interface Media {
   id: string;
@@ -111,10 +111,13 @@ export default function IgMediaListPage() {
                 {/* サムネイル */}
                 <div className="flex-shrink-0">
                   {(m.thumbnail_url ?? m.media_url) ? (
-                    <img
-                      src={m.thumbnail_url ?? m.media_url}
+                    <Image
+                      src={m.thumbnail_url ?? m.media_url ?? ""}
                       alt=""
-                      className="w-20 h-20 object-cover rounded-lg"
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="h-20 w-20 rounded-lg object-cover"
                     />
                   ) : (
                     <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">

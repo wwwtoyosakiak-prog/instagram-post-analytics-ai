@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
@@ -20,62 +20,62 @@ export default function PostKpisPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function loadData() {
-    setLoading(true);
-    setError("");
+  const loadData = useEffectEvent(async () => {
+      setLoading(true);
+      setError("");
 
-    try {
-      const [plansResponse, postsResponse] = await Promise.all([
-        fetch("/api/post-kpis", { cache: "no-store" }),
-        fetch("/api/data/posts", { cache: "no-store" }),
-      ]);
+      try {
+        const [plansResponse, postsResponse] = await Promise.all([
+          fetch("/api/post-kpis", { cache: "no-store" }),
+          fetch("/api/data/posts", { cache: "no-store" }),
+        ]);
 
-      const plansData = await plansResponse.json();
-      const postsData = await postsResponse.json();
+        const plansData = await plansResponse.json();
+        const postsData = await postsResponse.json();
 
-      if (!plansResponse.ok) {
-        throw new Error(
-          plansData.error ?? "KPI情報を取得できませんでした。",
+        if (!plansResponse.ok) {
+          throw new Error(
+            plansData.error ?? "KPI情報を取得できませんでした。",
+          );
+        }
+
+        setPlans(plansData.plans ?? []);
+
+        if (postsResponse.ok) {
+          setPosts(
+            (postsData.posts ?? []).map(
+              (post: Record<string, unknown>) => ({
+                id: String(post.id ?? ""),
+                type: String(post.type ?? ""),
+                date: String(post.date ?? ""),
+                caption: String(post.caption ?? ""),
+                views: Number(post.views ?? 0),
+                likes: Number(post.likes ?? 0),
+                comments: Number(post.comments ?? 0),
+                saves: Number(post.saves ?? 0),
+                shares: Number(post.shares ?? 0),
+              }),
+            ),
+          );
+        }
+
+        if (!selectedId && plansData.plans?.[0]?.id) {
+          setSelectedId(plansData.plans[0].id);
+        }
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "データを取得できませんでした。",
         );
+      } finally {
+        setLoading(false);
       }
-
-      setPlans(plansData.plans ?? []);
-
-      if (postsResponse.ok) {
-        setPosts(
-          (postsData.posts ?? []).map(
-            (post: Record<string, unknown>) => ({
-              id: String(post.id ?? ""),
-              type: String(post.type ?? ""),
-              date: String(post.date ?? ""),
-              caption: String(post.caption ?? ""),
-              views: Number(post.views ?? 0),
-              likes: Number(post.likes ?? 0),
-              comments: Number(post.comments ?? 0),
-              saves: Number(post.saves ?? 0),
-              shares: Number(post.shares ?? 0),
-            }),
-          ),
-        );
-      }
-
-      if (!selectedId && plansData.plans?.[0]?.id) {
-        setSelectedId(plansData.plans[0].id);
-      }
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "データを取得できませんでした。",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    });
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
 
   const selectedPlan = plans.find(
     (plan) => plan.id === selectedId,

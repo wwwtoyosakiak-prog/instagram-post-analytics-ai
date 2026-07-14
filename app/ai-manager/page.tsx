@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import type {
@@ -23,23 +23,23 @@ export default function AiManagerPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function loadTaskStates(date: string) {
-    const response = await fetch(
-      `/api/ai-manager/tasks?date=${encodeURIComponent(date)}`,
-      { cache: "no-store" },
-    );
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ?? "タスク状態を取得できませんでした。",
+  const loadManager = useEffectEvent(async () => {
+    async function loadTaskStates(date: string) {
+      const response = await fetch(
+        `/api/ai-manager/tasks?date=${encodeURIComponent(date)}`,
+        { cache: "no-store" },
       );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "タスク状態を取得できませんでした。",
+        );
+      }
+
+      setStates(data.states ?? []);
     }
 
-    setStates(data.states ?? []);
-  }
-
-  async function loadManager() {
     setLoading(true);
     setError("");
     setMessage("");
@@ -129,11 +129,11 @@ export default function AiManagerPage() {
     } finally {
       setLoading(false);
     }
-  }
+  });
 
   useEffect(() => {
     void loadManager();
-  }, []);
+  }, [loadManager]);
 
   const completion = useMemo(
     () =>
