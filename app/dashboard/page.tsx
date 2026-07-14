@@ -497,10 +497,6 @@ function formatOptionalMetric(value: number | null | undefined) {
   return value == null ? "未取得" : value.toLocaleString("ja-JP");
 }
 
-function formatUnavailableMetric(value: number | null | undefined, fallbackText = "この期間は未取得") {
-  return value == null ? fallbackText : value.toLocaleString("ja-JP");
-}
-
 const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
 const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
 
@@ -1120,17 +1116,17 @@ export default function DashboardPage() {
         <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">Account Insights</p>
-            <h2 className="mt-2 text-2xl font-bold text-ink">アカウントのインサイト</h2>
+            <h2 className="mt-2 text-2xl font-bold text-ink">アカウント全体の数字</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              {accountInsightSummary.periodLabel}分のアカウント全体の反応をまとめています。投稿単位ではなく、期間全体の流れを見るための欄です。
+              投稿ごとの数字ではなく、{accountInsightSummary.periodLabel}でアカウント全体がどれだけ届いたかを見ます。
             </p>
             <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
-              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">{accountInsightSummary.primaryLabel}</p>
+              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">この期間に届いた人数</p>
               <p className="mt-4 text-5xl font-bold leading-none">
                 {formatOptionalMetric(accountInsightSummary.primaryValue)}
               </p>
               <p className="mt-3 text-sm text-white/72">
-                {accountInsightSummary.primaryDescription}
+                {accountInsightSummary.impressions == null ? "閲覧数は未取得のため、リーチを表示しています" : accountInsightSummary.primaryDescription}
                 {accountInsightSummary.latestDate ? `。最新日: ${accountInsightSummary.latestDate}` : ""}
               </p>
             </div>
@@ -1139,47 +1135,39 @@ export default function DashboardPage() {
           <div className="grid gap-3">
             <div className="rounded-2xl border border-stone-200/80 bg-fog/72 p-5">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-base font-semibold text-ink">内訳サマリー</p>
+                <p className="text-base font-semibold text-ink">この期間の数字</p>
                 <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-stone-600">
                   {accountInsightSummary.periodLabel}
                 </span>
               </div>
               <div className="mt-4 grid gap-3">
                 <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">リーチしたアカウント数</span>
+                  <span className="text-sm text-stone-600">届いたアカウント数</span>
                   <span className="text-2xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.reach)}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">プロフィール閲覧</span>
-                  <span className="text-xl font-bold text-ink">{formatUnavailableMetric(accountInsightSummary.profileViews)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">ウェブサイトクリック</span>
-                  <span className="text-xl font-bold text-ink">{formatUnavailableMetric(accountInsightSummary.websiteClicks)}</span>
-                </div>
+                {accountInsightSummary.profileViews != null ? (
+                  <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
+                    <span className="text-sm text-stone-600">プロフィール閲覧</span>
+                    <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.profileViews)}</span>
+                  </div>
+                ) : null}
+                {accountInsightSummary.websiteClicks != null ? (
+                  <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
+                    <span className="text-sm text-stone-600">ウェブサイトクリック</span>
+                    <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.websiteClicks)}</span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-sm text-stone-600">現在のフォロワー数</span>
                   <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.followerCount)}</span>
                 </div>
               </div>
             </div>
-
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-stone-600">
-              <p className="font-semibold text-ink">今はまだ出していない項目</p>
-              <p className="mt-1">
-                フォロワー / 非フォロワーの割合は、現在の保存データには入っていないため、この欄ではまだ表示していません。
-              </p>
-              {accountInsightSummary.impressions == null && accountInsightSummary.reach != null ? (
-                <p className="mt-2 text-stone-700">
-                  今回は「閲覧」は返らず、「リーチ」は取得できています。大きいカードは自動でリーチ表示に切り替えています。
-                </p>
-              ) : null}
-              {!accountInsightSummary.hasInsightMetrics ? (
-                <p className="mt-2 text-red-700">
-                  現在の連携設定では、アカウント全体インサイト自体も未取得です。`facebook_login` 連携へ切り替えると取得できる可能性があります。
-                </p>
-              ) : null}
-            </div>
+            {!accountInsightSummary.hasInsightMetrics ? (
+              <div className="rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-red-700">
+                アカウント全体の数字はまだ取得できていません。
+              </div>
+            ) : null}
           </div>
         </div>
       </Panel>
