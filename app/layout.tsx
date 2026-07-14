@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Archive, BarChart3, Bot, CalendarDays, ChevronDown, Columns3, FileText, Home, KeyRound, ListChecks, Sparkles, Swords, Target, User, WandSparkles } from "lucide-react";
+import { Archive, BarChart3, Bot, CalendarDays, ChevronDown, Columns3, FileText, Home, KeyRound, ListChecks, Sparkles, Swords, User, WandSparkles } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,8 +26,7 @@ const secondaryNavGroups = [
   {
     label: "投稿管理",
     items: [
-      { href: "/calendar", label: "カレンダー", icon: CalendarDays },
-      { href: "/goals", label: "目標", icon: Target }
+      { href: "/calendar", label: "カレンダー", icon: CalendarDays }
     ]
   },
   {

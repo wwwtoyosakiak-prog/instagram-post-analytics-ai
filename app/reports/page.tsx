@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadGoalsData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
-import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyGoal, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
+import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 import { calculateInsightGrowth, InsightGrowthSummary } from "@/lib/insight-growth";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
-  const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [accountId, setAccountId] = useState("all");
@@ -29,10 +28,9 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setReportGeneratedAt(new Date().toISOString());
-    Promise.all([loadPostsData(), loadAccountsData(), loadGoalsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedGoals, loadedInsights]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedInsights]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
-      setGoals(loadedGoals);
       setInsightHistory(loadedInsights);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
       setMonth(initialMonth);
@@ -64,19 +62,10 @@ export default function ReportsPage() {
     };
   }, [posts, month, accountId, aiSummary]);
 
-  const monthlyPosts = useMemo(() => {
-    return posts.filter((post) => post.date.startsWith(month)).filter((post) => accountId === "all" || post.accountId === accountId);
-  }, [posts, month, accountId]);
-
-  const selectedGoal = useMemo(() => {
-    return goals.find((goal) => goal.month === month && (goal.accountId ?? null) === (accountId === "all" ? null : accountId)) ?? null;
-  }, [goals, month, accountId]);
-
   const annualReport = useMemo(() => {
     const months = fiscalMonths(Number(fiscalYear), fiscalStartMonth);
     const monthSet = new Set(months);
     const annualPosts = posts.filter((post) => monthSet.has(post.date.slice(0, 7))).filter((post) => accountId === "all" || post.accountId === accountId);
-    const annualGoals = goals.filter((goal) => monthSet.has(goal.month) && (goal.accountId ?? null) === (accountId === "all" ? null : accountId));
     const ranked = [...annualPosts].sort((a, b) => getMetrics(b).engagementRate - getMetrics(a).engagementRate);
     const monthlyRows = months.map((targetMonth) => {
       const items = annualPosts.filter((post) => post.date.startsWith(targetMonth));
@@ -89,13 +78,9 @@ export default function ReportsPage() {
         engagementRate: average(items.map((post) => getMetrics(post).engagementRate))
       };
     });
-    const targetPosts = annualGoals.reduce((sum, goal) => sum + goal.targetPosts, 0);
-    const targetViews = annualGoals.reduce((sum, goal) => sum + goal.targetViews, 0);
-    const targetSaves = annualGoals.reduce((sum, goal) => sum + goal.targetSaves, 0);
     return {
       months,
       posts: annualPosts,
-      goals: annualGoals,
       totalPosts: annualPosts.length,
       totalViews: annualPosts.reduce((sum, post) => sum + post.views, 0),
       totalSaves: annualPosts.reduce((sum, post) => sum + post.saves, 0),
@@ -104,12 +89,9 @@ export default function ReportsPage() {
       averageAiScore: average(annualPosts.map((post) => latestAnalysisByPostId[post.id]?.score ?? 0).filter((score) => score > 0)),
       topPosts: ranked.slice(0, 3),
       needsWorkPosts: ranked.slice(-3).reverse(),
-      monthlyRows,
-      targetPosts,
-      targetViews,
-      targetSaves
+      monthlyRows
     };
-  }, [posts, goals, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId]);
+  }, [posts, latestAnalysisByPostId, fiscalYear, fiscalStartMonth, accountId]);
 
   const displayReport = selectedReport ?? report;
 
@@ -275,11 +257,6 @@ export default function ReportsPage() {
             <Stat label="平均保存率" value={formatPercent(annualReport.averageSaveRate)} />
             <Stat label="平均ER" value={formatPercent(annualReport.averageEngagementRate)} />
           </div>
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <GoalProgress label="投稿数 年度目標" actual={annualReport.totalPosts} target={annualReport.targetPosts} suffix="件" />
-            <GoalProgress label="表示数 年度目標" actual={annualReport.totalViews} target={annualReport.targetViews} suffix="" />
-            <GoalProgress label="保存数 年度目標" actual={annualReport.totalSaves} target={annualReport.targetSaves} suffix="" />
-          </div>
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -310,20 +287,6 @@ export default function ReportsPage() {
             <AnnualRanking title="年度で伸びた投稿TOP3" posts={annualReport.topPosts} />
             <AnnualRanking title="年度で改善が必要な投稿TOP3" posts={annualReport.needsWorkPosts} />
           </div>
-        </Panel>
-        <Panel className="mt-6">
-          <h2 className="font-semibold">目標達成率</h2>
-          {selectedGoal ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-5">
-              <GoalProgress label="投稿数" actual={monthlyPosts.length} target={selectedGoal.targetPosts} suffix="件" />
-              <GoalProgress label="表示数" actual={displayReport.totalViews} target={selectedGoal.targetViews} suffix="" />
-              <GoalProgress label="保存数" actual={monthlyPosts.reduce((sum, post) => sum + post.saves, 0)} target={selectedGoal.targetSaves} suffix="" />
-              <GoalProgress label="平均保存率" actual={average(monthlyPosts.map((post) => getMetrics(post).saveRate))} target={selectedGoal.targetSaveRate} suffix="%" decimal />
-              <GoalProgress label="平均ER" actual={displayReport.averageEngagementRate} target={selectedGoal.targetEngagementRate} suffix="%" decimal />
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-stone-600">この月の目標は未設定です。目標管理ページで設定すると、レポートにも達成率が表示されます。</p>
-          )}
         </Panel>
       </div>
 
@@ -424,22 +387,6 @@ function GrowthReportBlock({ title, summary }: { title: string; summary: Insight
           </Link>
         ))}
         {!summary.topPosts.length ? <p className="text-sm text-stone-500">同期履歴がまだありません。</p> : null}
-      </div>
-    </div>
-  );
-}
-
-function GoalProgress({ label, actual, target, suffix, decimal = false }: { label: string; actual: number; target: number; suffix: string; decimal?: boolean }) {
-  const rate = target > 0 ? Math.min((actual / target) * 100, 999) : 0;
-  const actualText = decimal ? actual.toFixed(2) : Math.round(actual).toLocaleString();
-  const targetText = decimal ? target.toFixed(2) : Math.round(target).toLocaleString();
-  return (
-    <div className="rounded-md border border-stone-200 bg-white/80 p-3">
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-ink">{target > 0 ? `${rate.toFixed(0)}%` : "未設定"}</p>
-      <p className="mt-1 text-xs text-stone-600">実績 {actualText}{suffix} / 目標 {targetText}{suffix}</p>
-      <div className="mt-3 h-2 rounded-full bg-stone-100">
-        <div className="h-2 rounded-full bg-moss" style={{ width: `${Math.min(rate, 100)}%` }} />
       </div>
     </div>
   );

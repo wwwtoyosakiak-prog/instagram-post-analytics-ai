@@ -10,12 +10,12 @@ import {
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
   loadAllInsightData, loadAnalysesData,
-  loadGoalsData, loadPostsData,
+  loadPostsData,
   loadSyncRunsData,
 } from "@/lib/cloud-storage";
 import {
   InstagramInsightSnapshot,
-  InstagramPost, InstagramSyncRun, MonthlyGoal,
+  InstagramPost, InstagramSyncRun,
   PostType,
 } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
@@ -230,24 +230,6 @@ function HeroStat({ label, value, note, tone }: {
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">{label}</p>
       <p className="mt-3 text-3xl font-bold text-ink">{value}</p>
       <p className="mt-2 text-sm leading-6 text-stone-600">{note}</p>
-    </div>
-  );
-}
-
-function Progress({ label, actual, target, suffix, decimal = false }: {
-  label: string; actual: number; target: number; suffix: string; decimal?: boolean;
-}) {
-  const rate = target > 0 ? Math.min((actual / target) * 100, 999) : 0;
-  const actualText = decimal ? actual.toFixed(2) : Math.round(actual).toLocaleString();
-  const targetText = decimal ? target.toFixed(2) : Math.round(target).toLocaleString();
-  return (
-    <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-ink">{target > 0 ? `${rate.toFixed(0)}%` : "未設定"}</p>
-      <p className="mt-1 text-xs text-stone-600">実績 {actualText}{suffix} / 目標 {targetText}{suffix}</p>
-      <div className="mt-3 h-2 rounded-full bg-white">
-        <div className="h-2 rounded-full bg-moss" style={{ width: `${Math.min(rate, 100)}%` }} />
-      </div>
     </div>
   );
 }
@@ -510,7 +492,6 @@ function syncCountLabel(value: number, apiMode: string) {
 export default function DashboardPage() {
   // ── 手入力データ state ──
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [insightDate, setInsightDate] = useState("");
   const [syncRuns, setSyncRuns] = useState<InstagramSyncRun[]>([]);
@@ -532,12 +513,11 @@ export default function DashboardPage() {
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
   const refreshDashboard = async () => {
-    const [loadedPosts, loadedGoals, loadedInsights, loadedSyncRuns] = await Promise.all([
-      loadPostsData(), loadGoalsData(),
+    const [loadedPosts, loadedInsights, loadedSyncRuns] = await Promise.all([
+      loadPostsData(),
       loadAllInsightData(), loadSyncRunsData()
     ]);
     setPosts(loadedPosts);
-    setGoals(loadedGoals);
     setInsightHistory(loadedInsights);
     setSyncRuns(loadedSyncRuns);
     const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
@@ -718,7 +698,6 @@ export default function DashboardPage() {
     const graphEndKey = graphPeriod === "1" ? shiftTokyoDateKey(todayKey, -1) : todayKey;
     const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, graphEndKey);
     const currentMonthKey = currentMonth();
-    const monthlyPosts = targetPosts.filter((post) => post.date.startsWith(currentMonthKey));
     const todayPosts = targetPosts.filter((post) => post.date === todayKey);
     const yesterdayKey = shiftTokyoDateKey(todayKey, -1);
     const previousDayPosts = targetPosts.filter((post) => post.date === yesterdayKey);
@@ -730,14 +709,6 @@ export default function DashboardPage() {
       if (byUpdated !== 0) return byUpdated;
       return a.date < b.date ? 1 : -1;
     })[0];
-    const monthlyActual = {
-      posts: monthlyPosts.length,
-      views: monthlyPosts.reduce((sum, post) => sum + post.views, 0),
-      saves: monthlyPosts.reduce((sum, post) => sum + post.saves, 0),
-      saveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
-      engagementRate: average(monthlyPosts.map((post) => getMetrics(post).engagementRate))
-    };
-    const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && goal.accountId == null) ?? goals.find((goal) => goal.month === currentMonthKey) ?? null;
     const dailyViewsMap = graphPosts.reduce((daily, post) => {
       daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
       return daily;
@@ -780,7 +751,7 @@ export default function DashboardPage() {
       bestType: [...typeData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       bestWeekday: [...weekdayData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
-      currentMonthKey, monthlyActual, selectedGoal,
+      currentMonthKey,
       count: targetPosts.length, graphCount: graphPosts.length,
       graphApiCount, graphManualCount,
       graphTotalViews: graphPosts.reduce((sum, post) => sum + post.views, 0),
@@ -803,7 +774,7 @@ export default function DashboardPage() {
       previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
       previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [effectivePosts, goals, graphPeriod, apiMedia]);
+  }, [effectivePosts, graphPeriod, apiMedia]);
 
   const accountInsightSummary = useMemo(() => {
     const todayKey = toTokyoDateKey(new Date());
@@ -1472,21 +1443,6 @@ export default function DashboardPage() {
             </div>
           </Panel>
 
-          {/* 目標達成率 */}
-          <Panel className="mb-6">
-            <SectionLead eyebrow="Goals" title="今月の目標達成率" description="今月の実績と目標値の差を指標ごとに比較します。" />
-            {data.selectedGoal ? (
-              <div className="mt-4 grid gap-3 md:grid-cols-5">
-                <Progress label="投稿数" actual={data.monthlyActual.posts} target={data.selectedGoal.targetPosts} suffix="件" />
-                <Progress label="表示数" actual={data.monthlyActual.views} target={data.selectedGoal.targetViews} suffix="" />
-                <Progress label="保存数" actual={data.monthlyActual.saves} target={data.selectedGoal.targetSaves} suffix="" />
-                <Progress label="平均保存率" actual={data.monthlyActual.saveRate} target={data.selectedGoal.targetSaveRate} suffix="%" decimal />
-                <Progress label="平均ER" actual={data.monthlyActual.engagementRate} target={data.selectedGoal.targetEngagementRate} suffix="%" decimal />
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-stone-600">{data.currentMonthKey} の目標は未設定です。目標管理ページで設定できます。</p>
-            )}
-          </Panel>
             </div>
           </details>
         </>

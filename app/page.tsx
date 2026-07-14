@@ -75,7 +75,7 @@ export default function Home() {
               href="/settings"
               icon={<KeyRound size={18} />}
               title="設定を整える"
-              description="アカウント、トークン、カレンダーや目標設定をまとめています。"
+              description="アカウント、トークン、カレンダー設定をまとめています。"
             />
           </div>
           <div className="mt-5">

@@ -1,4 +1,4 @@
-import { KeyRound, User, CalendarDays, Target, WandSparkles, Columns3, Archive } from "lucide-react";
+import { KeyRound, User, CalendarDays, WandSparkles, Columns3, Archive } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, Panel } from "@/components/ui";
 
@@ -13,8 +13,7 @@ const sections = [
   {
     title: "運用準備",
     items: [
-      { href: "/calendar", label: "カレンダー", description: "投稿予定を整理する", icon: CalendarDays },
-      { href: "/goals", label: "目標", description: "月ごとの目標を管理する", icon: Target }
+      { href: "/calendar", label: "カレンダー", description: "投稿予定を整理する", icon: CalendarDays }
     ]
   },
   {
