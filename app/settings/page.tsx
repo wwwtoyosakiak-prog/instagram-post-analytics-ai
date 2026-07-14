@@ -1,4 +1,4 @@
-import { KeyRound, User, CalendarDays, WandSparkles, Columns3, Archive } from "lucide-react";
+import { KeyRound, User, CalendarDays, Columns3, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, Panel } from "@/components/ui";
 
@@ -19,8 +19,7 @@ const sections = [
   {
     title: "AI・制作",
     items: [
-      { href: "/post-planner", label: "AI投稿企画", description: "投稿案を作る", icon: WandSparkles },
-      { href: "/post-plan-history", label: "企画履歴", description: "過去の企画を見返す", icon: Archive },
+      { href: "/performance-report", label: "AIレポート", description: "全体の要点をまとめて見る", icon: Sparkles },
       { href: "/content-pipeline", label: "制作パイプライン", description: "制作の進行を確認する", icon: Columns3 }
     ]
   }
@@ -31,7 +30,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="設定"
-        description="アカウント設定、運用準備、AI制作まわりをまとめています。"
+        description="必要な設定と最低限の導線だけをまとめています。"
       />
       <div className="grid gap-4">
         {sections.map((section) => (

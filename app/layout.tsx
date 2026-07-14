@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Archive, BarChart3, Bot, CalendarDays, ChevronDown, Columns3, FileText, Home, KeyRound, ListChecks, Sparkles, Swords, User, WandSparkles } from "lucide-react";
+import { BarChart3, CalendarDays, ChevronDown, Columns3, Home, KeyRound, ListChecks, Sparkles, User } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -33,19 +33,13 @@ const secondaryNavGroups = [
     label: "AI・運用",
     items: [
       { href: "/performance-report", label: "AIレポート", icon: Sparkles },
-      { href: "/ai-chat", label: "AIチャット", icon: Bot },
-      { href: "/post-planner", label: "AI投稿企画", icon: WandSparkles },
-      { href: "/post-plan-history", label: "企画履歴", icon: Archive },
       { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 }
     ]
   },
   {
     label: "分析",
     items: [
-      { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 },
-      { href: "/reports", label: "レポート", icon: FileText },
-      { href: "/competitors", label: "競合分析", icon: Swords },
-      { href: "/competitor-dashboard", label: "競合ダッシュボード", icon: BarChart3 }
+      { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 }
     ]
   }
 ];

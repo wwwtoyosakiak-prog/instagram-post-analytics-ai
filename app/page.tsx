@@ -69,13 +69,13 @@ export default function Home() {
               href="/analysis"
               icon={<BarChart3 size={18} />}
               title="分析を見る"
-              description="ダッシュボード、レポート、AI分析をまとめて開けます。"
+              description="ダッシュボードを中心に確認します。"
             />
             <CategoryLink
               href="/settings"
               icon={<KeyRound size={18} />}
               title="設定を整える"
-              description="アカウント、トークン、カレンダー設定をまとめています。"
+              description="アカウント、トークン、制作パイプラインを開けます。"
             />
           </div>
           <div className="mt-5">
