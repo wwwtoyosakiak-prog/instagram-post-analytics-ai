@@ -739,7 +739,8 @@ export default function DashboardPage() {
   const data = useMemo(() => {
     const targetPosts = effectivePosts;
     const todayKey = toTokyoDateKey(new Date());
-    const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, todayKey);
+    const graphEndKey = graphPeriod === "1" ? shiftTokyoDateKey(todayKey, -1) : todayKey;
+    const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, graphEndKey);
     const currentMonthKey = currentMonth();
     const monthlyPosts = targetPosts.filter((post) => post.date.startsWith(currentMonthKey));
     const todayPosts = targetPosts.filter((post) => post.date === todayKey);
@@ -765,8 +766,8 @@ export default function DashboardPage() {
       daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
       return daily;
     }, new Map<string, number>());
-    const graphRangeStart = shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
-    const graphRangeEnd = todayKey;
+    const graphRangeStart = shiftTokyoDateKey(graphEndKey, -(Number(graphPeriod) - 1));
+    const graphRangeEnd = graphEndKey;
     const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
       .map((date) => ({
         axisLabel: `${date.slice(5).replace("-", "/")}|${weekdayJa(date)}`,
@@ -809,7 +810,8 @@ export default function DashboardPage() {
       graphTotalViews: graphPosts.reduce((sum, post) => sum + post.views, 0),
       graphAverageEngagementRate: average(graphPosts.map((post) => getMetrics(post).engagementRate)),
       graphAverageSaves: average(graphPosts.map((post) => post.saves)),
-      graphPeriodLabel: graphPeriod === "1" ? "一日" : graphPeriod === "7" ? "一週間" : graphPeriod === "14" ? "二週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
+      graphPeriodLabel: graphPeriod === "1" ? "前日" : graphPeriod === "7" ? "一週間" : graphPeriod === "14" ? "二週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
+      graphEndKey,
 
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
       todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
@@ -829,8 +831,9 @@ export default function DashboardPage() {
 
   const accountInsightSummary = useMemo(() => {
     const todayKey = toTokyoDateKey(new Date());
-    const graphRangeStart = shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
-    const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= todayKey);
+    const graphEndKey = graphPeriod === "1" ? shiftTokyoDateKey(todayKey, -1) : todayKey;
+    const graphRangeStart = shiftTokyoDateKey(graphEndKey, -(Number(graphPeriod) - 1));
+    const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= graphEndKey);
     const sourceTrend = filteredTrend.length ? filteredTrend : accountInsightsTrend;
     const latestRow = sourceTrend[sourceTrend.length - 1] ?? null;
     const sumField = (key: keyof DashboardAccountInsightTrendRow) => {
