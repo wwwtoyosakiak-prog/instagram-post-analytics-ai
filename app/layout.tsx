@@ -80,14 +80,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   {secondaryNavGroups.map((group) => (
                     <div key={group.label}>
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">{group.label}</p>
-                      <div className="grid gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {group.items.map((item) => {
                           const Icon = item.icon;
                           return (
                             <Link
                               key={item.href}
                               href={item.href}
-                              className={`${navLinkClass} w-full justify-start`}
+                              className={`${navLinkClass} justify-start`}
                             >
                               <Icon size={16} aria-hidden />
                               {item.label}
