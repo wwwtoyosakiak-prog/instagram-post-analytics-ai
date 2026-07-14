@@ -834,7 +834,7 @@ export default function DashboardPage() {
     const graphEndKey = graphPeriod === "1" ? shiftTokyoDateKey(todayKey, -1) : todayKey;
     const graphRangeStart = shiftTokyoDateKey(graphEndKey, -(Number(graphPeriod) - 1));
     const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= graphEndKey);
-    const sourceTrend = filteredTrend.length ? filteredTrend : accountInsightsTrend;
+    const sourceTrend = filteredTrend;
     const latestRow = sourceTrend[sourceTrend.length - 1] ?? null;
     const sumField = (key: keyof DashboardAccountInsightTrendRow) => {
       const values = sourceTrend

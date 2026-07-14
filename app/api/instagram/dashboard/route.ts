@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
     .from('instagram_daily_snapshots')
     .select('date, followers_count')
     .order('date', { ascending: true })
-    .limit(90);
+    .limit(365);
   if (activeAccountId) snapQuery = snapQuery.eq('account_id', activeAccountId);
   const { data: snapshots } = await snapQuery;
 
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
     .from('instagram_account_insights')
     .select('date, reach, impressions, profile_views, website_clicks, follower_count')
     .order('date', { ascending: false })
-    .limit(90);
+    .limit(365);
   if (activeAccountId) aiQuery = aiQuery.eq('account_id', activeAccountId);
   const { data: accountInsightsRaw } = await aiQuery;
   const accountInsights = [...(accountInsightsRaw ?? [])].reverse();
