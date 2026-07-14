@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
@@ -20,7 +20,7 @@ export default function PostKpisPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const loadData = useEffectEvent(async () => {
+  const loadData = useCallback(async () => {
       setLoading(true);
       setError("");
 
@@ -59,9 +59,7 @@ export default function PostKpisPage() {
           );
         }
 
-        if (!selectedId && plansData.plans?.[0]?.id) {
-          setSelectedId(plansData.plans[0].id);
-        }
+        setSelectedId((current) => current || plansData.plans?.[0]?.id || "");
       } catch (caught) {
         setError(
           caught instanceof Error
@@ -71,7 +69,7 @@ export default function PostKpisPage() {
       } finally {
         setLoading(false);
       }
-    });
+    }, []);
 
   useEffect(() => {
     void loadData();

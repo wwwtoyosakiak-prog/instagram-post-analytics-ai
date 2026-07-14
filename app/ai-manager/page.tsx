@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import type {
@@ -23,7 +23,7 @@ export default function AiManagerPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const loadManager = useEffectEvent(async () => {
+  const loadManager = useCallback(async () => {
     async function loadTaskStates(date: string) {
       const response = await fetch(
         `/api/ai-manager/tasks?date=${encodeURIComponent(date)}`,
@@ -129,7 +129,7 @@ export default function AiManagerPage() {
     } finally {
       setLoading(false);
     }
-  });
+  }, []);
 
   useEffect(() => {
     void loadManager();

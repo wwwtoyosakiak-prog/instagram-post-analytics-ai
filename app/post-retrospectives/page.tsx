@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
@@ -38,7 +38,7 @@ export default function PostRetrospectivesPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const loadPlans = useEffectEvent(async () => {
+  const loadPlans = useCallback(async () => {
       setLoading(true);
       setError("");
 
@@ -57,9 +57,7 @@ export default function PostRetrospectivesPage() {
         const loadedPlans = data.plans ?? [];
         setPlans(loadedPlans);
 
-        if (!selectedId && loadedPlans[0]?.id) {
-          setSelectedId(loadedPlans[0].id);
-        }
+        setSelectedId((current) => current || loadedPlans[0]?.id || "");
       } catch (caught) {
         setError(
           caught instanceof Error
@@ -69,7 +67,7 @@ export default function PostRetrospectivesPage() {
       } finally {
         setLoading(false);
       }
-    });
+    }, []);
 
   useEffect(() => {
     void loadPlans();
