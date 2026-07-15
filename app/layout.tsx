@@ -18,33 +18,13 @@ const primaryNav = [
 const navLinkClass =
   "inline-flex h-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink";
 
-const secondaryNavGroups = [
-  {
-    label: "設定",
-    items: [
-      { href: "/accounts", label: "プロフィール", icon: User },
-      { href: "/token-management", label: "トークン管理", icon: KeyRound }
-    ]
-  },
-  {
-    label: "投稿管理",
-    items: [
-      { href: "/calendar", label: "カレンダー", icon: CalendarDays }
-    ]
-  },
-  {
-    label: "AI・運用",
-    items: [
-      { href: "/performance-report", label: "AIレポート", icon: Sparkles },
-      { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 }
-    ]
-  },
-  {
-    label: "分析",
-    items: [
-      { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 }
-    ]
-  }
+const secondaryNav = [
+  { href: "/accounts", label: "プロフィール", icon: User },
+  { href: "/token-management", label: "トークン管理", icon: KeyRound },
+  { href: "/calendar", label: "カレンダー", icon: CalendarDays },
+  { href: "/performance-report", label: "AIレポート", icon: Sparkles },
+  { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 },
+  { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 }
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -60,7 +40,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   <span>Instagram投稿分析AI</span>
                 </Link>
                 <nav className="flex flex-wrap items-center justify-end gap-2">
-                  {primaryNav.map((item) => {
+                  {[...primaryNav, ...secondaryNav].map((item) => {
                     const Icon = item.icon;
                     return (
                       <Link
@@ -74,30 +54,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     );
                   })}
                 </nav>
-              </div>
-              <div className="mt-3 rounded-md border border-stone-200 bg-white px-4 py-4">
-                <div className="grid gap-4 md:grid-cols-4">
-                  {secondaryNavGroups.map((group) => (
-                    <div key={group.label}>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">{group.label}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {group.items.map((item) => {
-                          const Icon = item.icon;
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={`${navLinkClass} justify-start`}
-                            >
-                              <Icon size={16} aria-hidden />
-                              {item.label}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </header>
