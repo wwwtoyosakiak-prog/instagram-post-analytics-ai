@@ -268,67 +268,6 @@ export type AiScoreHistory = AiScoreHistoryInput & {
   createdAt: string;
 };
 
-export type PerformanceReportPeriod = {
-  from: string;
-  to: string;
-};
-
-export type PerformanceReportComparison = {
-  posts: number | null;
-  views: number | null;
-  reach: number | null;
-  saves: number | null;
-  engagementRate: number | null;
-  aiScore: number | null;
-};
-
-export type PerformanceReport = {
-  period: PerformanceReportPeriod;
-  previousPeriod: PerformanceReportPeriod;
-  accountId: string | null;
-  totals: {
-    posts: number;
-    views: number;
-    reach: number;
-    likes: number;
-    comments: number;
-    saves: number;
-    shares: number;
-  };
-  averages: {
-    views: number;
-    reach: number;
-    likes: number;
-    comments: number;
-    saves: number;
-    shares: number;
-    engagementRate: number;
-    saveRate: number;
-    aiScore: number;
-  };
-  scoreBreakdown: {
-    content: number;
-    visual: number;
-    caption: number;
-    engagement: number;
-    discoverability: number;
-  };
-  bestPost: InstagramPost | null;
-  needsWorkPost: InstagramPost | null;
-  comparison: PerformanceReportComparison;
-};
-
-export type PerformanceReportAiSummary = {
-  overallSummary: string;
-  strengths: string[];
-  weaknesses: string[];
-  nextActions: string[];
-  contentIdeas: string[];
-  recommendedCtas: string[];
-  risks: string[];
-  evidence: string[];
-};
-
 export type MonthlyReport = {
   month: string;
   totalViews: number;
@@ -365,5 +304,4 @@ export type MonthlyGoal = MonthlyGoalInput & {
   createdAt: string;
   updatedAt: string;
 };
-
 

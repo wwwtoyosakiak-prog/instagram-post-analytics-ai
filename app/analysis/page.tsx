@@ -13,7 +13,6 @@ const sections = [
   {
     title: "AI分析",
     items: [
-      { href: "/performance-report", label: "AIレポート", description: "AIの総評を見る", icon: Sparkles },
       { href: "/ai-chat", label: "AIチャット", description: "質問しながら整理する", icon: Sparkles }
     ]
   },
