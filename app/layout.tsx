@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, CalendarDays, Home, KeyRound, ListChecks, User } from "lucide-react";
+import { BarChart3, Home, KeyRound, ListChecks } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,18 +10,13 @@ export const metadata: Metadata = {
 
 const primaryNav = [
   { href: "/", label: "トップ", icon: Home },
-  { href: "/posts", label: "投稿", icon: ListChecks }
+  { href: "/posts", label: "投稿", icon: ListChecks },
+  { href: "/analysis", label: "分析", icon: BarChart3 },
+  { href: "/settings", label: "設定", icon: KeyRound }
 ];
 
 const navLinkClass =
   "inline-flex h-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-ink";
-
-const secondaryNav = [
-  { href: "/accounts", label: "プロフィール", icon: User },
-  { href: "/token-management", label: "トークン管理", icon: KeyRound },
-  { href: "/calendar", label: "カレンダー", icon: CalendarDays },
-  { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 }
-];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -36,7 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   <span>Instagram投稿分析AI</span>
                 </Link>
                 <nav className="flex flex-wrap items-center justify-end gap-2">
-                  {[...primaryNav, ...secondaryNav].map((item) => {
+                  {primaryNav.map((item) => {
                     const Icon = item.icon;
                     return (
                       <Link

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, ClipboardList, KeyRound, ListChecks } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, KeyRound, ListChecks } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
@@ -49,7 +49,7 @@ export default function Home() {
     <div>
       <PageHeader
         title="今日の運用確認"
-        description="まず投稿を見るか、分析を見るか、設定を整えるかの3つから始めます。"
+        description="必要な入口だけを上にまとめています。まずは投稿、分析、カレンダー、設定から選べます。"
       />
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Stat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} />
@@ -57,8 +57,8 @@ export default function Home() {
       </div>
       <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Panel>
-          <h2 className="text-lg font-semibold text-ink">やりたいことから選ぶ</h2>
-          <div className="mt-4 grid gap-3">
+          <h2 className="text-lg font-semibold text-ink">よく使うページ</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <CategoryLink
               href="/posts"
               icon={<ListChecks size={18} />}
@@ -72,10 +72,16 @@ export default function Home() {
               description="ダッシュボードを中心に確認します。"
             />
             <CategoryLink
+              href="/calendar"
+              icon={<CalendarDays size={18} />}
+              title="カレンダーを見る"
+              description="投稿予定と日付の流れを確認します。"
+            />
+            <CategoryLink
               href="/settings"
               icon={<KeyRound size={18} />}
               title="設定を整える"
-              description="アカウント、トークン、制作パイプラインを開けます。"
+              description="アカウントや連携状態を確認します。"
             />
           </div>
           <div className="mt-5">
