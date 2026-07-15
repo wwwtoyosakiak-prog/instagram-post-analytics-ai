@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -166,12 +165,6 @@ export default function CompetitorDashboardPage() {
             </select>
           </div>
 
-          <Link
-            href="/competitors"
-            className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
-          >
-            競合データを管理
-          </Link>
         </div>
       </Panel>
 
@@ -186,7 +179,7 @@ export default function CompetitorDashboardPage() {
       ) : !selectedId ? (
         <Panel>
           <p className="text-sm leading-6 text-stone-600">
-            比較する競合を選択してください。競合投稿が未登録の場合は、先に競合分析画面から登録します。
+            比較する競合を選択してください。競合データが未登録の場合は、先に保存済みデータを用意してください。
           </p>
         </Panel>
       ) : (
