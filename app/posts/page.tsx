@@ -330,7 +330,7 @@ function UnifiedCard({
 
   const body = (
     <>
-      <div className="aspect-[4/3] bg-fog">
+      <div className="relative aspect-[4/3] bg-fog">
         {entry.thumbnail ? (
           <Image
             src={entry.thumbnail}
