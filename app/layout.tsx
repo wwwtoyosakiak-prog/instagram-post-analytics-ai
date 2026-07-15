@@ -10,9 +10,7 @@ export const metadata: Metadata = {
 
 const primaryNav = [
   { href: "/", label: "トップ", icon: Home },
-  { href: "/posts", label: "投稿", icon: ListChecks },
-  { href: "/analysis", label: "分析", icon: BarChart3 },
-  { href: "/settings", label: "設定", icon: KeyRound }
+  { href: "/posts", label: "投稿", icon: ListChecks }
 ];
 
 const navLinkClass =
