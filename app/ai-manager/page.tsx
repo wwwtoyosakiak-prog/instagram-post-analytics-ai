@@ -453,14 +453,6 @@ export default function AiManagerPage() {
               <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
                 {manager.coachContext}
               </p>
-              <div className="mt-4">
-                <Link
-                  href="/ai-chat"
-                  className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
-                >
-                  AIチャットで相談
-                </Link>
-              </div>
             </Panel>
           </div>
         </div>

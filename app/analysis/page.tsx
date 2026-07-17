@@ -1,11 +1,10 @@
-import { BarChart3, FileText, Sparkles } from "lucide-react";
+import { BarChart3, FileText } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, Panel } from "@/components/ui";
 
 const items = [
   { href: "/dashboard", label: "ダッシュボード", description: "投稿全体の数字を一度に見る", icon: BarChart3 },
   { href: "/reports", label: "レポート", description: "月ごとのまとまりを確認する", icon: FileText },
-  { href: "/ai-chat", label: "AIチャット", description: "数字の見方をAIに聞く", icon: Sparkles }
 ];
 
 export default function AnalysisPage() {
