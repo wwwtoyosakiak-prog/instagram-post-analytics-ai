@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarDays, ClipboardList, KeyRound, ListChecks } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, FileText, KeyRound, ListChecks } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
@@ -49,7 +49,7 @@ export default function Home() {
     <div>
       <PageHeader
         title="今日の運用確認"
-        description="必要な入口だけを上にまとめています。まずは投稿、分析、カレンダー、設定から選べます。"
+        description="必要な入口だけを上にまとめています。まずは投稿、ダッシュボード、レポート、カレンダー、設定から選べます。"
       />
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Stat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} />
@@ -66,10 +66,16 @@ export default function Home() {
               description="投稿一覧、投稿詳細、次に見るべき投稿へ進みます。"
             />
             <CategoryLink
-              href="/analysis"
+              href="/dashboard"
               icon={<BarChart3 size={18} />}
-              title="分析を見る"
-              description="ダッシュボードを中心に確認します。"
+              title="ダッシュボードを見る"
+              description="投稿全体の数字を確認します。"
+            />
+            <CategoryLink
+              href="/reports"
+              icon={<FileText size={18} />}
+              title="レポートを見る"
+              description="月ごとのまとまりを確認します。"
             />
             <CategoryLink
               href="/calendar"
@@ -103,7 +109,7 @@ export default function Home() {
           </div>
           <div className="mt-5 rounded-md border border-stone-200 bg-stone-50 p-4">
             <p className="text-sm font-medium text-ink">迷ったら</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認して、必要なら分析を見るだけで十分です。</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認して、必要ならダッシュボードかレポートを見るだけで十分です。</p>
           </div>
         </Panel>
       </div>
