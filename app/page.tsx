@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarDays, ClipboardList, FileText, KeyRound, ListChecks } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, Columns3, FileText, KeyRound, ListChecks, User } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
@@ -49,7 +49,7 @@ export default function Home() {
     <div>
       <PageHeader
         title="今日の運用確認"
-        description="必要な入口だけを上にまとめています。まずは投稿、ダッシュボード、レポート、カレンダー、設定から選べます。"
+        description="必要な入口だけを上にまとめています。投稿、数字、各種設定をそのまま開けます。"
       />
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Stat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} />
@@ -58,7 +58,7 @@ export default function Home() {
       <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Panel>
           <h2 className="text-lg font-semibold text-ink">よく使うページ</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <CategoryLink
               href="/posts"
               icon={<ListChecks size={18} />}
@@ -84,10 +84,22 @@ export default function Home() {
               description="投稿予定と日付の流れを確認します。"
             />
             <CategoryLink
-              href="/settings"
+              href="/accounts"
+              icon={<User size={18} />}
+              title="プロフィールを見る"
+              description="アカウント情報を確認します。"
+            />
+            <CategoryLink
+              href="/token-management"
               icon={<KeyRound size={18} />}
-              title="設定を整える"
-              description="アカウントや連携状態を確認します。"
+              title="トークン管理を見る"
+              description="連携状態と期限を確認します。"
+            />
+            <CategoryLink
+              href="/content-pipeline"
+              icon={<Columns3 size={18} />}
+              title="制作パイプラインを見る"
+              description="制作の進行を確認します。"
             />
           </div>
           <div className="mt-5">
@@ -109,7 +121,7 @@ export default function Home() {
           </div>
           <div className="mt-5 rounded-md border border-stone-200 bg-stone-50 p-4">
             <p className="text-sm font-medium text-ink">迷ったら</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認して、必要ならダッシュボードかレポートを見るだけで十分です。</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認して、必要な数字か設定ページをそのまま開けば十分です。</p>
           </div>
         </Panel>
       </div>

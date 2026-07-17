@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, FileText, Home, KeyRound, ListChecks } from "lucide-react";
+import { BarChart3, CalendarDays, Columns3, FileText, Home, KeyRound, ListChecks, User } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +13,10 @@ const primaryNav = [
   { href: "/posts", label: "投稿", icon: ListChecks },
   { href: "/dashboard", label: "ダッシュボード", icon: BarChart3 },
   { href: "/reports", label: "レポート", icon: FileText },
-  { href: "/settings", label: "設定", icon: KeyRound }
+  { href: "/accounts", label: "プロフィール", icon: User },
+  { href: "/token-management", label: "トークン管理", icon: KeyRound },
+  { href: "/calendar", label: "カレンダー", icon: CalendarDays },
+  { href: "/content-pipeline", label: "制作パイプライン", icon: Columns3 }
 ];
 
 const navLinkClass =
