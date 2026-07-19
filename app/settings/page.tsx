@@ -1,12 +1,11 @@
-import { KeyRound, User, CalendarDays, Columns3 } from "lucide-react";
+import { KeyRound, User, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, Panel } from "@/components/ui";
 
 const items = [
   { href: "/accounts", label: "プロフィール", description: "アカウント情報を確認する", icon: User },
   { href: "/token-management", label: "トークン管理", description: "連携状態と期限を見る", icon: KeyRound },
-  { href: "/calendar", label: "カレンダー", description: "投稿予定を整理する", icon: CalendarDays },
-  { href: "/content-pipeline", label: "制作パイプライン", description: "制作の進行を確認する", icon: Columns3 }
+  { href: "/calendar", label: "カレンダー", description: "投稿予定を整理する", icon: CalendarDays }
 ];
 
 export default function SettingsPage() {
@@ -17,7 +16,7 @@ export default function SettingsPage() {
         description="設定まわりのページをここにまとめています。必要なものだけを開ける形にしています。"
       />
       <Panel>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => {
             const Icon = item.icon;
             return (

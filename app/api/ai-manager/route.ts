@@ -5,7 +5,6 @@ type Body = {
   today?: string;
   schedules?: unknown[];
   notifications?: unknown[];
-  pipelineCards?: unknown[];
   growthStrategy?: unknown;
   weekTarget?: number;
 };
@@ -41,9 +40,6 @@ export async function POST(request: Request) {
         : [],
       notifications: Array.isArray(body.notifications)
         ? (body.notifications as never[])
-        : [],
-      pipelineCards: Array.isArray(body.pipelineCards)
-        ? (body.pipelineCards as never[])
         : [],
       growthStrategy:
         body.growthStrategy &&

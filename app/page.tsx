@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarDays, ClipboardList, Columns3, FileText, KeyRound, ListChecks, User } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, FileText, KeyRound, ListChecks, User } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
@@ -94,12 +94,6 @@ export default function Home() {
               icon={<KeyRound size={18} />}
               title="トークン管理を見る"
               description="連携状態と期限を確認します。"
-            />
-            <CategoryLink
-              href="/content-pipeline"
-              icon={<Columns3 size={18} />}
-              title="制作パイプラインを見る"
-              description="制作の進行を確認します。"
             />
           </div>
           <div className="mt-5">

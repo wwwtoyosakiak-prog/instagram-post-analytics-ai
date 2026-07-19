@@ -52,15 +52,6 @@ type Notification = {
   isRead: boolean;
 };
 
-type PipelineCard = {
-  id: string;
-  title: string;
-  stage: string;
-  dueDate: string | null;
-  priority: string;
-  assignee: string;
-};
-
 type GrowthStrategy = {
   score: number;
   risks: string[];
@@ -70,7 +61,6 @@ export type ManagerInput = {
   today: string;
   schedules: SchedulePost[];
   notifications: Notification[];
-  pipelineCards: PipelineCard[];
   growthStrategy: GrowthStrategy | null;
   weekTarget?: number;
 };
@@ -184,31 +174,6 @@ export function buildAiManager(
         detail: `準備率${readiness(post)}%です。今日中に整えてください。`,
         priority: "high",
         actionUrl: "/post-schedules",
-      }),
-    );
-
-  input.pipelineCards
-    .filter(
-      (card) =>
-        card.stage !== "posted" &&
-        Boolean(card.dueDate) &&
-        (card.dueDate as string) <= tomorrow,
-    )
-    .slice(0, 5)
-    .forEach((card) =>
-      tasks.push({
-        id: `pipeline:${card.id}`,
-        title: `制作タスク：${card.title}`,
-        detail: `${card.dueDate}締切・${card.stage}工程${
-          card.assignee ? `・担当 ${card.assignee}` : ""
-        }`,
-        priority:
-          card.dueDate && card.dueDate < input.today
-            ? "critical"
-            : card.priority === "high"
-              ? "high"
-              : "medium",
-        actionUrl: "/content-pipeline",
       }),
     );
 

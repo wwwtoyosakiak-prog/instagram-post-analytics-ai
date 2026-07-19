@@ -28,7 +28,6 @@ describe("AI manager", () => {
         },
       ],
       notifications: [],
-      pipelineCards: [],
       growthStrategy: null,
       weekTarget: 3,
     });
@@ -43,7 +42,6 @@ describe("AI manager", () => {
       today: "2026-07-13",
       schedules: [],
       notifications: [],
-      pipelineCards: [],
       growthStrategy: {
         score: 50,
         risks: [],

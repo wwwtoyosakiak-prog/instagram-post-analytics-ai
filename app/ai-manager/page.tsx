@@ -48,19 +48,16 @@ export default function AiManagerPage() {
       const [
         schedulesResponse,
         notificationsResponse,
-        pipelineResponse,
         postsResponse,
       ] = await Promise.all([
         fetch("/api/post-schedules", { cache: "no-store" }),
         fetch("/api/notifications", { cache: "no-store" }),
-        fetch("/api/content-pipeline", { cache: "no-store" }),
         fetch("/api/data/posts", { cache: "no-store" }),
       ]);
 
       const schedulesData = await schedulesResponse.json();
       const notificationsData =
         await notificationsResponse.json();
-      const pipelineData = await pipelineResponse.json();
       const postsData = await postsResponse.json();
 
       if (!schedulesResponse.ok) {
@@ -99,9 +96,6 @@ export default function AiManagerPage() {
               notificationsResponse.ok
                 ? notificationsData.notifications ?? []
                 : [],
-            pipelineCards: pipelineResponse.ok
-              ? pipelineData.cards ?? []
-              : [],
             growthStrategy: growthResponse.ok
               ? growthData.strategy
               : null,

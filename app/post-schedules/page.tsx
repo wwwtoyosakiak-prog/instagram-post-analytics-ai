@@ -146,12 +146,6 @@ export default function PostSchedulesPage() {
             >
               投稿企画を作る
             </Link>
-            <Link
-              href="/content-pipeline"
-              className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
-            >
-              制作パイプライン
-            </Link>
           </div>
         </div>
       </Panel>
@@ -250,7 +244,7 @@ export default function PostSchedulesPage() {
 
               {!upcoming.length ? (
                 <p className="mt-4 text-sm text-stone-500">
-                  投稿予定はまだありません。企画履歴または制作パイプラインで投稿予定日を設定してください。
+                  投稿予定はまだありません。企画履歴または投稿企画から投稿予定日を設定してください。
                 </p>
               ) : (
                 <div className="mt-4 space-y-4">
