@@ -16,12 +16,12 @@
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
-    "lucide-react": "^0.468.0",
-    "next": "^15.3.3",
+    "@supabase/supabase-js": "^2.110.7",
+    "lucide-react": "^1.25.0",
+    "next": "^16.2.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.15.3"
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
