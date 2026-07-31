@@ -4,10 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  Bot,
   CalendarDays,
   ChevronDown,
-  CircleHelp,
   FileText,
   Home,
   KeyRound,
@@ -32,15 +30,6 @@ const menuGroups = [
       { href: "/post-schedules", label: "投稿予定", icon: ListChecks },
       { href: "/goals", label: "目標管理", icon: Target },
       { href: "/accounts", label: "プロフィール", icon: User },
-    ],
-  },
-  {
-    title: "AIサポート",
-    links: [
-      { href: "/ai-manager", label: "AI運用マネージャー", icon: Bot },
-      { href: "/post-planner", label: "AI投稿企画", icon: Bot },
-      { href: "/operation-consultant", label: "AI運用相談", icon: CircleHelp },
-      { href: "/notifications", label: "通知センター", icon: Bot },
     ],
   },
   {
