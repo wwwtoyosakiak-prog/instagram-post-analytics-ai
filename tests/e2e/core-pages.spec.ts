@@ -1,5 +1,33 @@
 import { expect, test } from "@playwright/test";
 
+const retiredPagePaths = [
+  "/ai-agent",
+  "/ai-improvement-cycle",
+  "/ai-improvement-suggestions",
+  "/ai-learning",
+  "/ai-manager",
+  "/ai-manager-history",
+  "/analysis",
+  "/competitor-dashboard",
+  "/growth-advisor",
+  "/growth-history",
+  "/growth-strategy",
+  "/ig-dashboard",
+  "/instagram-api",
+  "/notification-automation",
+  "/notifications",
+  "/operation-consultant",
+  "/post-kpis",
+  "/post-plan-history",
+  "/post-planner",
+  "/post-retrospectives",
+  "/weekly-operation-review",
+  "/weekly-operation-review-ai",
+  "/weekly-operation-review-ai-history",
+  "/weekly-review-automation",
+  "/weekly-review-automation-settings",
+];
+
 test("ホーム画面を表示できる", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "今日、確認すること" })).toBeVisible();
@@ -16,6 +44,13 @@ test("カレンダーから投稿一覧へ移動できる", async ({ page }) => 
   await page.getByRole("link", { name: "投稿一覧を見る" }).click();
   await expect(page).toHaveURL(/\/posts$/);
   await expect(page.getByRole("heading", { name: "投稿一覧" })).toBeVisible();
+});
+
+test("削除した旧ページを直接開けない", async ({ request }) => {
+  for (const path of retiredPagePaths) {
+    const response = await request.get(path);
+    expect(response.status(), `${path} should return 404`).toBe(404);
+  }
 });
 
 test("ヘルスチェックAPIが応答する", async ({ request }) => {
