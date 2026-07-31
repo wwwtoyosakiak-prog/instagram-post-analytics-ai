@@ -3,7 +3,7 @@
  * ダッシュボード用の集計データを返す
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 function emptyDashboard() {
   return {
@@ -20,16 +20,10 @@ function emptyDashboard() {
   };
 }
 
-function supabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return url && key ? createClient(url, key) : null;
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('account_id');
-  const db = supabase();
+  const db = getSupabaseServerClient();
   if (!db) {
     return NextResponse.json({
       configured: false,
