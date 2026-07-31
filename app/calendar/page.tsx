@@ -51,8 +51,8 @@ export default function CalendarPage() {
       <Panel className="mb-6">
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div>
-            <label>表示月</label>
-            <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+            <label htmlFor="calendar-month">表示月</label>
+            <input id="calendar-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           </div>
           <div className="flex items-end gap-2">
             <button
