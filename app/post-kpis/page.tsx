@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
   buildBaselinePrediction,
@@ -209,12 +208,6 @@ export default function PostKpisPage() {
             </select>
           </div>
 
-          <Link
-            href="/post-schedules"
-            className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
-          >
-            投稿予約を確認
-          </Link>
         </div>
       </Panel>
 

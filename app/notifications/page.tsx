@@ -177,12 +177,6 @@ export default function NotificationsPage() {
             <Button onClick={() => void markAllRead()}>
               すべて既読にする
             </Button>
-            <Link
-              href="/post-schedules"
-              className="inline-flex h-10 items-center rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold"
-            >
-              投稿予約を確認
-            </Link>
           </div>
         </div>
       </Panel>

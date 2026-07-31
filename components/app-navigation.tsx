@@ -25,7 +25,6 @@ const menuGroups = [
     title: "日々の運用",
     links: [
       { href: "/calendar", label: "カレンダー", icon: CalendarDays },
-      { href: "/post-schedules", label: "投稿予定", icon: ListChecks },
       { href: "/accounts", label: "プロフィール", icon: User },
     ],
   },
