@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createInstagramGraphUrl, getInstagramGraphConfig, InstagramGraphConfig } from "@/lib/instagram-graph";
 import { InstagramSyncRun } from "@/lib/types";
+import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -99,8 +100,11 @@ function graphErrorMessage(error: GraphError | undefined, fallback: string) {
 }
 
 function logSyncError(error: SyncError) {
-  // Tokens and request URLs are intentionally excluded from server logs.
-  console.error("[instagram-sync]", JSON.stringify(error));
+  logServerIssue("instagram-sync", new Error(error.message), {
+    stage: error.stage,
+    code: error.code,
+    subcode: error.subcode,
+  });
 }
 
 async function graphRequest<T extends { error?: GraphError }>(url: URL): Promise<T> {
@@ -165,7 +169,7 @@ async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">) {
   try {
     await saveSyncRun(run);
   } catch (error) {
-    console.error("[instagram-sync-run-save]", error);
+    logServerIssue("instagram-sync-run-save", error);
   }
 }
 
@@ -271,7 +275,7 @@ function toSyncError(error: unknown, stage: SyncError["stage"], postId?: string)
   return {
     postId,
     stage,
-    message: error instanceof Error ? error.message : "不明なエラー",
+    message: safeErrorMessage(error, "不明なエラー"),
     code: graphError?.code,
     subcode: graphError?.error_subcode,
     traceId: graphError?.fbtrace_id
@@ -373,7 +377,6 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
   let insights;
   try {
     const isReel = isReelPost(post.media_type, post.media_product_type, post.permalink);
-    console.log(`[instagram-sync] post ${post.id} media_type=${post.media_type} media_product_type=${post.media_product_type} permalink=${post.permalink} isReel=${isReel}`);
     insights = await fetchInsights(post.id, config, isReel);
   } catch (error) {
     const detail = toSyncError(error, "insights", post.id);
@@ -458,7 +461,7 @@ async function handler(triggerType: SyncTriggerType) {
         } satisfies SyncResponseBody);
       }
     } catch (error) {
-      console.error("[instagram-sync-slot-check]", error);
+      logServerIssue("instagram-sync-slot-check", error);
     }
   }
 

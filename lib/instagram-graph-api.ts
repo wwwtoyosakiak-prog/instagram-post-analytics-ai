@@ -4,6 +4,7 @@
  */
 
 import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
+import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
@@ -96,9 +97,9 @@ export interface IgAccountInsights {
 }
 
 export type ApiError =
-  | { type: 'token_expired'; message: string; debug_url?: string; raw?: unknown }
-  | { type: 'permission_denied'; message: string; debug_url?: string; raw?: unknown }
-  | { type: 'unknown'; message: string; raw?: unknown; debug_url?: string };
+  | { type: 'token_expired'; message: string }
+  | { type: 'permission_denied'; message: string }
+  | { type: 'unknown'; message: string };
 
 // ── ヘルパー ─────────────────────────────────────────────
 
@@ -125,22 +126,21 @@ function getUid(igUserId?: string): string {
 }
 
 async function igFetch(url: string): Promise<unknown> {
-  const debugUrl = url.replace(/access_token=[^&]+/, 'access_token=REDACTED');
   const res = await fetch(url);
   const json = await res.json();
   if (!res.ok || (json as { error?: { message: string; code: number } }).error) {
     const err = (json as { error?: { message: string; code: number } }).error;
-    console.error('[Instagram API Error]', debugUrl, JSON.stringify(err));
+    logServerIssue('instagram-api', err, { status: res.status, code: err?.code });
     if (err?.code === 190) {
       const msg = (err?.message ?? '').toLowerCase();
       if (msg.includes('parse')) {
         // "Cannot parse access token" はトークン種別とエンドポイントの不一致（設定ミス）
-        throw { type: 'unknown', message: 'アクセストークンの形式エラーです（parse error）。INSTAGRAM_GRAPH_API_MODE 環境変数またはトークンの種類を確認してください。', debug_url: debugUrl, raw: err } as ApiError;
+        throw { type: 'unknown', message: 'アクセストークンの形式エラーです（parse error）。INSTAGRAM_GRAPH_API_MODE 環境変数またはトークンの種類を確認してください。' } as ApiError;
       }
-      throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。', debug_url: debugUrl, raw: err } as ApiError;
+      throw { type: 'token_expired', message: 'トークンが期限切れです。再連携してください。' } as ApiError;
     }
-    if (err?.code === 10 || err?.code === 200) throw { type: 'permission_denied', message: '必要なAPI権限がありません。', debug_url: debugUrl, raw: err } as ApiError;
-    throw { type: 'unknown', message: err?.message ?? 'API エラー', raw: json, debug_url: debugUrl } as ApiError;
+    if (err?.code === 10 || err?.code === 200) throw { type: 'permission_denied', message: '必要なAPI権限がありません。' } as ApiError;
+    throw { type: 'unknown', message: safeErrorMessage(err, 'API エラー') } as ApiError;
   }
   return json;
 }
@@ -226,8 +226,7 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string, med
     }
     return result;
   } catch (e) {
-    const detail = e instanceof Error ? e.message : 'unknown error';
-    console.warn(`[fetchMediaInsights] ${mediaId} failed: ${detail}`);
+    logServerIssue('instagram-media-insights', e, { mediaType, mediaProductType });
     return { raw_response: raw ?? e };
   }
 }
@@ -272,7 +271,7 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
       (result as Record<string, unknown>)[item.name] = val;
       dailyMetricSuccessCount += 1;
     } catch (e) {
-      console.warn(`[fetchAccountInsights] ${metric} 取得失敗:`, e);
+      logServerIssue('instagram-account-insights', e, { metric });
       const message = e instanceof Error
         ? e.message
         : typeof e === "object" && e && "message" in e && typeof (e as { message?: unknown }).message === "string"
@@ -297,7 +296,7 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
       const item = raw.data?.[0];
       if (item) (result as Record<string, unknown>)[item.name] = item.values?.[0]?.value ?? item.value ?? null;
     } catch (e) {
-      console.warn(`[fetchAccountInsights] ${metric} 取得失敗:`, e);
+      logServerIssue('instagram-account-insights', e, { metric });
       (result as Record<string, unknown>)[metric] = null;
     }
   }
