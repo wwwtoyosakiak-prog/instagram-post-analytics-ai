@@ -3,18 +3,6 @@
     {
       "path": "/api/cron/refresh-instagram-token",
       "schedule": "0 21 * * *"
-    },
-    {
-      "path": "/api/cron/generate-notifications",
-      "schedule": "0 23 * * *"
-    },
-    {
-      "path": "/api/cron/weekly-operation-review",
-      "schedule": "10 0 * * 1"
-    },
-    {
-      "path": "/api/ai-agent/run?cron=1",
-      "schedule": "30 0 * * 1"
     }
   ]
 }
