@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   CalendarDays,
-  ChevronDown,
   FileText,
   Home,
   KeyRound,
@@ -18,22 +17,9 @@ const primaryNav = [
   { href: "/posts", label: "投稿", icon: ListChecks },
   { href: "/dashboard", label: "分析", icon: BarChart3 },
   { href: "/reports", label: "レポート", icon: FileText },
-];
-
-const menuGroups = [
-  {
-    title: "日々の運用",
-    links: [
-      { href: "/calendar", label: "カレンダー", icon: CalendarDays },
-      { href: "/accounts", label: "プロフィール", icon: User },
-    ],
-  },
-  {
-    title: "連携",
-    links: [
-      { href: "/token-management", label: "Instagram連携", icon: KeyRound },
-    ],
-  },
+  { href: "/calendar", label: "カレンダー", icon: CalendarDays },
+  { href: "/accounts", label: "プロフィール", icon: User },
+  { href: "/token-management", label: "Instagram連携", icon: KeyRound },
 ];
 
 const pageNames: Record<string, string> = {
@@ -43,7 +29,6 @@ const pageNames: Record<string, string> = {
   dashboard: "分析",
   posts: "投稿",
   reports: "レポート",
-  settings: "設定",
   "token-management": "Instagram連携",
 };
 
@@ -74,31 +59,6 @@ export function AppNavigation() {
             })}
           </nav>
 
-          <details className="group relative order-2 sm:order-3">
-            <summary className="nav-more">
-              すべての機能
-              <ChevronDown size={16} className="transition group-open:rotate-180" aria-hidden />
-            </summary>
-            <div className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-stone-200 bg-white p-3 shadow-xl">
-              <p className="px-2 pb-2 text-xs text-stone-500">目的から選んでください</p>
-              {menuGroups.map((group) => (
-                <div key={group.title} className="border-t border-stone-100 py-2 first:border-0 first:pt-0">
-                  <p className="px-2 py-1 text-xs font-semibold text-stone-500">{group.title}</p>
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    {group.links.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <Link key={item.href} href={item.href} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-stone-700 hover:bg-stone-100 hover:text-ink">
-                          <Icon size={16} aria-hidden />
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </details>
         </div>
       </header>
       <div className="border-b border-stone-200 bg-stone-50">
