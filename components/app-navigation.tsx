@@ -10,7 +10,6 @@ import {
   Home,
   KeyRound,
   ListChecks,
-  Target,
   User,
 } from "lucide-react";
 
@@ -27,7 +26,6 @@ const menuGroups = [
     links: [
       { href: "/calendar", label: "カレンダー", icon: CalendarDays },
       { href: "/post-schedules", label: "投稿予定", icon: ListChecks },
-      { href: "/goals", label: "目標管理", icon: Target },
       { href: "/accounts", label: "プロフィール", icon: User },
     ],
   },
@@ -44,7 +42,6 @@ const pageNames: Record<string, string> = {
   analysis: "分析",
   calendar: "カレンダー",
   dashboard: "分析",
-  goals: "目標管理",
   posts: "投稿",
   reports: "レポート",
   settings: "設定",
