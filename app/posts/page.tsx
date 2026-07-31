@@ -261,8 +261,9 @@ export default function PostsPage() {
       {/* フィルターバー */}
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div>
-          <label className="block text-xs text-stone-500 mb-1">並び替え</label>
+          <label htmlFor="posts-sort" className="block text-xs text-stone-500 mb-1">並び替え</label>
           <select
+            id="posts-sort"
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as USort)}
             className="text-sm border border-stone-200 rounded-md px-3 py-1.5 bg-white"
@@ -276,8 +277,9 @@ export default function PostsPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-stone-500 mb-1">投稿タイプ</label>
+          <label htmlFor="posts-type-filter" className="block text-xs text-stone-500 mb-1">投稿タイプ</label>
           <select
+            id="posts-type-filter"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as UTypeFilter)}
             className="text-sm border border-stone-200 rounded-md px-3 py-1.5 bg-white"

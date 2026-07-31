@@ -111,8 +111,8 @@ function EditPostContent() {
             <input value={form.url} onChange={(e) => setValue("url", e.target.value)} />
           </div>
           <div className="md:col-span-2">
-            <label>投稿コメント</label>
-            <textarea rows={5} value={form.caption} onChange={(e) => setValue("caption", e.target.value)} required />
+            <label htmlFor="post-caption">投稿コメント</label>
+            <textarea id="post-caption" rows={5} value={form.caption} onChange={(e) => setValue("caption", e.target.value)} required />
           </div>
           <div className="md:col-span-2">
             <label>ハッシュタグ</label>
