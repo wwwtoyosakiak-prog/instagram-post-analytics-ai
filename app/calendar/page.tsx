@@ -42,8 +42,8 @@ export default function CalendarPage() {
         title="投稿カレンダー"
         description="投稿日ベースで、今月の投稿予定と実績を一覧で確認できます。"
         action={
-          <Link href="/posts/new" className="inline-flex h-10 items-center justify-center rounded-md bg-ink px-4 text-sm font-semibold text-white shadow-soft transition hover:bg-moss">
-            投稿を登録
+          <Link href="/posts" className="inline-flex h-10 items-center justify-center rounded-md bg-ink px-4 text-sm font-semibold text-white shadow-soft transition hover:bg-moss">
+            投稿一覧を見る
           </Link>
         }
       />
