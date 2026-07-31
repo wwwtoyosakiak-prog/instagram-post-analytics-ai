@@ -11,6 +11,13 @@ test("トークン管理画面を表示できる", async ({ page }) => {
   await expect(page.getByRole("button", { name: "今すぐ状態確認" })).toBeVisible();
 });
 
+test("カレンダーから投稿一覧へ移動できる", async ({ page }) => {
+  await page.goto("/calendar");
+  await page.getByRole("link", { name: "投稿一覧を見る" }).click();
+  await expect(page).toHaveURL(/\/posts$/);
+  await expect(page.getByRole("heading", { name: "投稿一覧" })).toBeVisible();
+});
+
 test("ヘルスチェックAPIが応答する", async ({ request }) => {
   const response = await request.get("/api/health");
   expect(response.ok()).toBeTruthy();
