@@ -122,6 +122,15 @@ export async function GET(request: Request) {
 }
 
 async function handler(triggerType: SyncTriggerType) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({
+      ok: false,
+      status: "failed",
+      error: "Instagramデータベースが未接続です。",
+      errors: ["Supabaseの環境設定を確認してください。"],
+    }, { status: 503 });
+  }
+
   const db = supabase();
   const startedAt = new Date().toISOString();
   const results = {

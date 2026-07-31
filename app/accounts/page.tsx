@@ -30,6 +30,7 @@ export default function AccountPage() {
   const [account, setAccount] = useState<InstagramAccount | null>(null);
   const [graphAccount, setGraphAccount] = useState<GraphApiAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionMessage, setConnectionMessage] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -53,6 +54,13 @@ export default function AccountPage() {
           media_count:     mediaCount,
         } as GraphApiAccount);
       }
+      setConnectionMessage(
+        dashData?.configured === false
+          ? dashData.message ?? "Instagramデータベースが未接続です。"
+          : dashData?.account
+            ? ""
+            : "Instagramデータはまだありません。ダッシュボードから同期してください。",
+      );
       setLoading(false);
     });
   }, []);
@@ -145,7 +153,7 @@ export default function AccountPage() {
       {/* Graph API 未連携の案内 */}
       {!graphAccount && !loading && (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          フォロワー数・プロフィール画像・bioを表示するには、ダッシュボードからInstagramデータを同期してください。
+          {connectionMessage || "フォロワー数・プロフィール画像・bioを表示するには、ダッシュボードからInstagramデータを同期してください。"}
         </div>
       )}
     </div>
