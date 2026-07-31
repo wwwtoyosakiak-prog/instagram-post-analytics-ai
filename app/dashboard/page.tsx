@@ -20,474 +20,54 @@ import {
 } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
-import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia } from "@/lib/post-merge";
-
-// ── Graph API 型 ──────────────────────────────────────────
-
-interface DashboardAccount {
-  name: string;
-  username: string;
-  followers_count: number;
-  profile_picture_url: string;
-  last_synced_at: string;
-}
-
-interface DashboardTotals {
-  posts: number;
-  reach: number;
-  impressions: number;
-  likes: number;
-  comments: number;
-  saved: number;
-  shares: number;
-  views: number;
-}
-
-interface DashboardAccountInsightTrendRow {
-  date: string;
-  reach: number | null;
-  impressions: number | null;
-  profile_views: number | null;
-  website_clicks: number | null;
-  follower_count: number | null;
-}
-
-interface DashboardApiResponse {
-  configured?: boolean;
-  message?: string;
-  account?: DashboardAccount | null;
-  totals?: DashboardTotals;
-  account_insights_trend?: DashboardAccountInsightTrendRow[];
-}
-
-type SyncHistoryRow =
-  | {
-      kind: "scheduled";
-      key: string;
-      plannedAt: string;
-      executedAt: string;
-      sortAtMs: number;
-      triggerLabel: "自動";
-      statusLabel: string;
-      fetchedPostsLabel: string;
-      savedPostsLabel: string;
-      savedSnapshotsLabel: string;
-      errorLabel: string;
-    }
-  | {
-      kind: "manual";
-      key: string;
-      plannedAt: "手動実行";
-      executedAt: string;
-      sortAtMs: number;
-      triggerLabel: "手動";
-      statusLabel: string;
-      fetchedPostsLabel: string;
-      savedPostsLabel: string;
-      savedSnapshotsLabel: string;
-      errorLabel: string;
-    };
-
-// ── Manual 型 ──────────────────────────────────────────────
-
-type GrowthAnalysis = {
-  summary: string;
-  openingPatterns: string[];
-  themes: string[];
-  formatPatterns: string[];
-  hashtagPatterns: string[];
-  nextActions: string[];
-};
-
-// ── 共通ユーティリティ ─────────────────────────────────────
-
-const fmt = (v: number | null | undefined) =>
-  v == null ? '–' : v.toLocaleString('ja-JP');
-
-// ── UI コンポーネント ─────────────────────────────────────
-
-function SourceBadge({ source }: { source: MetricSource }) {
-  return source === 'api'
-    ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">未取得</span>;
-}
-
-function GrowthPattern({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="border-l-2 border-clay pl-4">
-      <h4 className="text-sm font-semibold text-ink">{title}</h4>
-      <ul className="mt-2 grid gap-2 text-sm leading-6 text-stone-700">
-        {items.map((item) => <li key={item}>{item}</li>)}
-      </ul>
-    </section>
-  );
-}
-
-function GrowthSummaryPanel({ title, summary }: { title: string; summary: ReturnType<typeof calculateInsightGrowth> }) {
-  return (
-    <div className="rounded-md border border-stone-200 bg-white/80 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-semibold text-ink">{title}</h3>
-        <span className="text-xs text-stone-500">対象 {summary.syncedPosts}投稿</span>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Insight label="閲覧増加" value={`+${summary.viewsGrowth.toLocaleString()}`} />
-        <Insight label="成長率" value={`+${summary.viewsGrowthRate.toFixed(1)}%`} />
-        <Insight label="保存増加" value={`+${summary.savedGrowth.toLocaleString()}`} />
-        <Insight label="シェア増加" value={`+${summary.sharesGrowth.toLocaleString()}`} />
-      </div>
-      <div className="mt-4 grid gap-2">
-        {summary.topPosts.map((item, index) => (
-          <Link key={item.post.id} href={`/posts/detail?id=${item.post.id}`}
-            className="flex items-center justify-between gap-3 border-t border-stone-100 pt-2 text-sm hover:text-clay">
-            <span className="line-clamp-1">{index + 1}. {videoTitle(item.post)}</span>
-            <span className="shrink-0 font-semibold">+{item.viewsGrowth.toLocaleString()}</span>
-          </Link>
-        ))}
-        {!summary.topPosts.length ? <p className="text-sm text-stone-500">この期間の同期履歴はまだありません。</p> : null}
-      </div>
-    </div>
-  );
-}
-
-function Insight({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-base font-bold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function SyncInfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg bg-white/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-xs font-semibold text-stone-500">{label}</span>
-      <span className="text-sm font-semibold text-ink">{value}</span>
-    </div>
-  );
-}
-
-function CompareStat({
-  label, currentDay, previousDay, currentWeek, previousWeek, suffix = "", decimal = false
-}: {
-  label: string; currentDay: number; previousDay: number;
-  currentWeek: number; previousWeek: number; suffix?: string; decimal?: boolean;
-}) {
-  const renderValue = (value: number) => decimal ? `${value.toFixed(2)}${suffix}` : `${Math.round(value).toLocaleString()}${suffix}`;
-  return (
-    <div className="rounded-xl border border-stone-200/80 bg-fog/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</p>
-      <div className="mt-3 grid gap-3">
-        <div className="rounded-lg bg-white/80 p-3">
-          <p className="text-xs font-semibold text-stone-500">前日比</p>
-          <p className="mt-1 text-sm font-bold text-ink">{renderValue(currentDay)} / {renderValue(previousDay)}</p>
-          <p className="mt-1 text-xs text-stone-600">差分 {renderDelta(currentDay - previousDay, suffix, decimal)}</p>
-        </div>
-        <div className="rounded-lg bg-white/80 p-3">
-          <p className="text-xs font-semibold text-stone-500">前週比</p>
-          <p className="mt-1 text-sm font-bold text-ink">{renderValue(currentWeek)} / {renderValue(previousWeek)}</p>
-          <p className="mt-1 text-xs text-stone-600">差分 {renderDelta(currentWeek - previousWeek, suffix, decimal)}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function renderDelta(value: number, suffix = "", decimal = false) {
-  const prefix = value > 0 ? "+" : "";
-  return decimal ? `${prefix}${value.toFixed(2)}${suffix}` : `${prefix}${Math.round(value).toLocaleString()}${suffix}`;
-}
-
-function SectionLead({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">{eyebrow}</p>
-      <h2 className="mt-2 text-lg font-bold text-ink">{title}</h2>
-      <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
-    </div>
-  );
-}
-
-function HeroStat({ label, value, note, tone }: {
-  label: string; value: string; note: string; tone: "moss" | "clay" | "sky" | "plum";
-}) {
-  const toneClasses = {
-    moss: "from-moss/18 border-moss/20 text-moss",
-    clay: "from-clay/18 border-clay/20 text-clay",
-    sky: "from-skyglass border-skyglass/90 text-teal-800",
-    plum: "from-plum/16 border-plum/20 text-plum"
-  };
-  return (
-    <div className={`rounded-2xl border bg-gradient-to-br to-white/90 p-5 shadow-panel ${toneClasses[tone]}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-ink">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-stone-600">{note}</p>
-    </div>
-  );
-}
-
-function ChartPanel({ title, description, accent, children, className = "", chartHeightClassName = "h-72" }: {
-  title: string; description: string; accent: "moss" | "clay" | "sky" | "plum"; children: React.ReactElement;
-  className?: string; chartHeightClassName?: string;
-}) {
-  const accentClasses = { moss: "bg-moss", clay: "bg-clay", sky: "bg-teal-700", plum: "bg-plum" };
-  return (
-    <Panel className={`relative overflow-hidden ${className}`}>
-      <div className={`absolute left-0 top-0 h-full w-1 ${accentClasses[accent]}`} />
-      <div className="pl-3">
-        <h2 className="font-semibold">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
-      </div>
-      <div className={chartHeightClassName}>
-        <ResponsiveContainer width="100%" height="100%">
-          {children}
-        </ResponsiveContainer>
-      </div>
-    </Panel>
-  );
-}
-
-function DateWeekdayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
-  const raw = String(payload?.value ?? "");
-  const [dateLabel, weekdayLabel] = raw.split("|");
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={14} textAnchor="middle" fill="#57534e" fontSize={12}>
-        <tspan x={0}>{dateLabel}</tspan>
-        <tspan x={0} dy={14} fontSize={11} fill="#78716c">{weekdayLabel}</tspan>
-      </text>
-    </g>
-  );
-}
-
-function GraphPeriodTabs({
-  graphPeriod,
-  setGraphPeriod,
-}: {
-  graphPeriod: "1" | "7" | "14" | "30" | "90" | "365";
-  setGraphPeriod: (period: "1" | "7" | "14" | "30" | "90" | "365") => void;
-}) {
-  return (
-    <div className="grid grid-cols-6 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
-      {(["1", "7", "14", "30", "90", "365"] as const).map((period) => (
-        <button
-          key={period}
-          type="button"
-          onClick={() => setGraphPeriod(period)}
-          className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
-        >
-          {period === "1" ? "一日" : period === "7" ? "一週間" : period === "14" ? "二週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── ヘルパー関数 ──────────────────────────────────────────
-
-function videoTitle(post: InstagramPost) {
-  const firstLine = post.caption.split("\n").map((line) => line.trim()).find(Boolean);
-  return firstLine || `${post.date}の動画投稿`;
-}
-
-function getPostPreview(post: InstagramPost) {
-  return post.screenshot || post.thumbnailUrl || post.mediaUrl || "";
-}
-
-function toTokyoDateHour(iso: string) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", hourCycle: "h23"
-    }).formatToParts(new Date(iso)).map((part) => [part.type, part.value])
-  );
-  return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: parts.hour };
-}
-
-function toTokyoDateTimeParts(iso: string) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23"
-    }).formatToParts(new Date(iso)).map((part) => [part.type, part.value])
-  );
-  return {
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    hour: Number(parts.hour),
-    minute: Number(parts.minute)
-  };
-}
-
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
-function toTokyoDateKey(date: Date) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric", month: "2-digit", day: "2-digit"
-    }).formatToParts(date).map((part) => [part.type, part.value])
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-function filterPostsByPeriod(posts: InstagramPost[], period: "1" | "7" | "14" | "30" | "90" | "365", todayKey: string) {
-  const end = new Date(`${todayKey}T00:00:00+09:00`);
-  const start = new Date(end);
-  start.setDate(start.getDate() - (Number(period) - 1));
-  const startKey = toTokyoDateKey(start);
-  return posts.filter((post) => post.date >= startKey && post.date <= todayKey);
-}
-
-function getNextScheduledSyncTime(now: Date) {
-  const slots = [0, 6, 12, 18];
-  const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-  const next = new Date(jstNow);
-  next.setSeconds(0, 0);
-
-  const currentMinutes = next.getHours() * 60 + next.getMinutes();
-  const nextSlot = slots.find((hour) => currentMinutes < (hour * 60 + 17));
-
-  if (typeof nextSlot === "number") {
-    next.setHours(nextSlot, 17, 0, 0);
-  } else {
-    next.setDate(next.getDate() + 1);
-    next.setHours(slots[0], 17, 0, 0);
-  }
-
-  return new Date(next.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-}
-
-function getLatestExpectedScheduledTime(now: Date) {
-  const slots = [0, 6, 12, 18];
-  const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-  const expected = new Date(jstNow);
-  expected.setSeconds(0, 0);
-
-  const currentMinutes = expected.getHours() * 60 + expected.getMinutes();
-  const pastSlots = slots.filter((hour) => currentMinutes >= (hour * 60 + 17));
-
-  if (pastSlots.length) {
-    expected.setHours(pastSlots[pastSlots.length - 1], 17, 0, 0);
-  } else {
-    expected.setDate(expected.getDate() - 1);
-    expected.setHours(slots[slots.length - 1], 17, 0, 0);
-  }
-
-  return new Date(expected.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-}
-
-function getSyncMonitor(now: Date, latestScheduledFinishedAt?: string) {
-  const expectedScheduledAt = getLatestExpectedScheduledTime(now);
-  const nextScheduledAt = getNextScheduledSyncTime(now);
-  const latestScheduledAtMs = latestScheduledFinishedAt ? new Date(latestScheduledFinishedAt).getTime() : 0;
-  const expectedAtMs = expectedScheduledAt.getTime();
-  const graceMs = 15 * 60 * 1000;
-  const isDelayed = now.getTime() >= expectedAtMs + graceMs && latestScheduledAtMs < expectedAtMs;
-  return { expectedScheduledAt, nextScheduledAt, isDelayed };
-}
-
-function shiftTokyoDateKey(dateKey: string, offsetDays: number) {
-  const base = new Date(`${dateKey}T00:00:00+09:00`);
-  base.setDate(base.getDate() + offsetDays);
-  return toTokyoDateKey(base);
-}
-
-function getDateRangeKeys(startKey: string, endKey: string) {
-  const keys: string[] = [];
-  let currentKey = startKey;
-  while (currentKey <= endKey) {
-    keys.push(currentKey);
-    currentKey = shiftTokyoDateKey(currentKey, 1);
-  }
-  return keys;
-}
-
-function getPreviousRangeKeys(todayKey: string, days: number) {
-  const end = shiftTokyoDateKey(todayKey, -days);
-  const start = shiftTokyoDateKey(todayKey, -(days * 2) + 1);
-  return { start, end };
-}
-
-function formatDateTimeJst(value: string) {
-  return new Date(value).toLocaleString("ja-JP", {
-    timeZone: "Asia/Tokyo", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit"
-  });
-}
-
-function formatTimeJst(value: string) {
-  return new Date(value).toLocaleTimeString("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-
-function getScheduledSlotTime(dateKey: string, hour: number) {
-  return new Date(`${dateKey}T${String(hour).padStart(2, "0")}:17:00+09:00`);
-}
-
-function getScheduledPlannedLabel(iso: string) {
-  const parts = toTokyoDateTimeParts(iso);
-  const currentMinutes = parts.hour * 60 + parts.minute;
-  const plannedHour = [...SCHEDULED_SYNC_HOURS].reverse().find((hour) => currentMinutes >= (hour * 60 + 17));
-  const targetDateKey = typeof plannedHour === "number" ? parts.date : shiftTokyoDateKey(parts.date, -1);
-  const targetHour = typeof plannedHour === "number" ? plannedHour : SCHEDULED_SYNC_HOURS[SCHEDULED_SYNC_HOURS.length - 1];
-  return `${targetDateKey} ${String(targetHour).padStart(2, "0")}:17`;
-}
-
-function getScheduledPlannedAtFromStartedAt(iso: string) {
-  const parts = toTokyoDateTimeParts(iso);
-  const currentMinutes = parts.hour * 60 + parts.minute;
-  const plannedHour = [...SCHEDULED_SYNC_HOURS].reverse().find((hour) => currentMinutes >= (hour * 60 + 17));
-  const targetDateKey = typeof plannedHour === "number" ? parts.date : shiftTokyoDateKey(parts.date, -1);
-  const targetHour = typeof plannedHour === "number" ? plannedHour : SCHEDULED_SYNC_HOURS[SCHEDULED_SYNC_HOURS.length - 1];
-  return getScheduledSlotTime(targetDateKey, targetHour);
-}
-
-function formatDelayMinutes(totalMinutes: number) {
-  if (totalMinutes < 60) return `${totalMinutes}分`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes === 0 ? `${hours}時間` : `${hours}時間${minutes}分`;
-}
-
-function formatOptionalMetric(value: number | null | undefined) {
-  return value == null ? "未取得" : value.toLocaleString("ja-JP");
-}
-
-const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
-const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
-
-function syncStatusLabel(status: InstagramSyncRun["status"]) {
-  if (status === "success") return "成功";
-  if (status === "partial") return "一部失敗";
-  return "失敗";
-}
-
-function syncCountLabel(value: number, apiMode: string) {
-  if (apiMode === "github_actions") return "未取得";
-  return `${value.toLocaleString()}件`;
-}
+import { mergePostMetrics, matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
+import type {
+  DashboardAccount,
+  DashboardAccountInsightTrendRow,
+  DashboardApiResponse,
+  GraphPeriod,
+  GrowthAnalysis,
+  SyncHistoryRow,
+} from "@/components/dashboard/types";
+import {
+  ChartPanel,
+  CompareStat,
+  DateWeekdayTick,
+  GraphPeriodTabs,
+  GrowthPattern,
+  GrowthSummaryPanel,
+  HeroStat,
+  Insight,
+  MiniMetric,
+  SectionLead,
+  SourceBadge,
+  SyncInfoRow,
+} from "@/components/dashboard/widgets";
+import {
+  SCHEDULED_SYNC_TIMES_LABEL,
+  SCHEDULED_SYNC_HOURS,
+  currentMonth,
+  filterPostsByPeriod,
+  fmt,
+  formatDateTimeJst,
+  formatDelayMinutes,
+  formatOptionalMetric,
+  formatTimeJst,
+  getDateRangeKeys,
+  getPostPreview,
+  getPreviousRangeKeys,
+  getScheduledPlannedAtFromStartedAt,
+  getScheduledPlannedLabel,
+  getScheduledSlotTime,
+  getSyncMonitor,
+  shiftTokyoDateKey,
+  syncCountLabel,
+  syncStatusLabel,
+  toTokyoDateHour,
+  toTokyoDateKey,
+  toTokyoDateTimeParts,
+  videoTitle,
+} from "@/components/dashboard/utils";
 
 // ── メインページ（統合ダッシュボード） ────────────────────
 
@@ -508,7 +88,7 @@ export default function DashboardPage() {
 
   // ── UI state ──
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
-  const [graphPeriod, setGraphPeriod] = useState<"1" | "7" | "14" | "30" | "90" | "365">("30");
+  const [graphPeriod, setGraphPeriod] = useState<GraphPeriod>("30");
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
