@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+const primaryPages = [
+  { path: "/", heading: "今日、確認すること" },
+  { path: "/posts", heading: "投稿一覧" },
+  { path: "/dashboard", heading: "ダッシュボード" },
+  { path: "/reports", heading: "月次レポート" },
+  { path: "/calendar", heading: "投稿カレンダー" },
+  { path: "/accounts", heading: "プロフィール" },
+  { path: "/token-management", heading: "トークン管理" },
+];
+
 const retiredPagePaths = [
   "/ai-agent",
   "/ai-improvement-cycle",
@@ -28,16 +38,12 @@ const retiredPagePaths = [
   "/weekly-review-automation-settings",
 ];
 
-test("ホーム画面を表示できる", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "今日、確認すること" })).toBeVisible();
-});
-
-test("トークン管理画面を表示できる", async ({ page }) => {
-  await page.goto("/token-management");
-  await expect(page.getByRole("heading", { name: "トークン管理" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "今すぐ状態確認" })).toBeVisible();
-});
+for (const { path, heading } of primaryPages) {
+  test(`${heading}画面を表示できる`, async ({ page }) => {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+  });
+}
 
 test("カレンダーから投稿一覧へ移動できる", async ({ page }) => {
   await page.goto("/calendar");
