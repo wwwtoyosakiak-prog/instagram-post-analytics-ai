@@ -34,12 +34,12 @@ export default function ReportsPage() {
       setInsightHistory(loadedInsights);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
       setMonth(initialMonth);
-      setFiscalYear(String(getFiscalYear(initialMonth, fiscalStartMonth)));
+      setFiscalYear(String(getFiscalYear(initialMonth, 4)));
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
       });
     });
-  }, [fiscalStartMonth]);
+  }, []);
 
   useEffect(() => {
     if (!month) return;
@@ -165,8 +165,8 @@ export default function ReportsPage() {
       <Panel className="mb-6">
         <div className="grid gap-3 md:grid-cols-1">
           <div>
-            <label>対象月</label>
-            <input className="mt-1" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setFiscalYear(String(getFiscalYear(e.target.value, fiscalStartMonth))); setSelectedReport(null); }} />
+            <label htmlFor="report-month">対象月</label>
+            <input id="report-month" className="mt-1" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setFiscalYear(String(getFiscalYear(e.target.value, fiscalStartMonth))); setSelectedReport(null); }} />
           </div>
         </div>
       </Panel>
@@ -174,19 +174,19 @@ export default function ReportsPage() {
         <h2 className="font-semibold">年度集計</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <div>
-            <label>対象年度</label>
-            <input className="mt-1" type="number" min="2000" max="2100" value={fiscalYear} onChange={(event) => setFiscalYear(event.target.value)} />
+            <label htmlFor="report-fiscal-year">対象年度</label>
+            <input id="report-fiscal-year" className="mt-1" type="number" min="2000" max="2100" value={fiscalYear} onChange={(event) => setFiscalYear(event.target.value)} />
           </div>
           <div>
-            <label>年度の開始月</label>
-            <select className="mt-1" value={fiscalStartMonth} onChange={(event) => setFiscalStartMonth(Number(event.target.value))}>
+            <label htmlFor="report-fiscal-start-month">年度の開始月</label>
+            <select id="report-fiscal-start-month" className="mt-1" value={fiscalStartMonth} onChange={(event) => setFiscalStartMonth(Number(event.target.value))}>
               <option value={1}>1月始まり</option>
               <option value={4}>4月始まり</option>
             </select>
           </div>
           <div>
-            <label>対象期間</label>
-            <div className="mt-1 rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-sm font-semibold text-ink">
+            <p className="text-sm font-medium text-stone-700">対象期間</p>
+            <div className="mt-1 rounded-md border border-stone-200 bg-white/80 px-3 py-2 text-sm font-semibold text-ink" aria-label="対象期間">
               {annualReport.months[0]} 〜 {annualReport.months[11]}
             </div>
           </div>

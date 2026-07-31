@@ -106,6 +106,21 @@ test("投稿タイプで一覧を絞り込める", async ({ page }) => {
   await expect(page.getByText("1 件", { exact: true })).toBeVisible();
 });
 
+test("カレンダーとレポートの期間を表示名から操作できる", async ({ page }) => {
+  await page.goto("/calendar");
+  await page.getByLabel("表示月").fill("2026-06");
+  await expect(page.getByLabel("表示月")).toHaveValue("2026-06");
+
+  await page.goto("/reports");
+  await expect(page.getByLabel("対象月")).toHaveValue("2026-07");
+  await page.getByLabel("対象月").fill("2026-05");
+  await page.getByLabel("対象年度").fill("2025");
+  await page.getByLabel("年度の開始月").selectOption("1");
+  await expect(page.getByLabel("対象月")).toHaveValue("2026-05");
+  await expect(page.getByLabel("対象年度")).toHaveValue("2025");
+  await expect(page.getByLabel("年度の開始月")).toHaveValue("1");
+});
+
 test("投稿詳細から編集して保存できる", async ({ page }) => {
   await page.goto("/posts/detail?id=post-video");
   await expect(page.getByRole("heading", { name: "投稿詳細・AI分析", exact: true })).toBeVisible();
@@ -113,6 +128,25 @@ test("投稿詳細から編集して保存できる", async ({ page }) => {
   await page.getByRole("link", { name: "編集", exact: true }).click();
   await expect(page).toHaveURL(/\/posts\/edit\?id=post-video$/);
   await expect(page.getByRole("heading", { name: "投稿編集", exact: true })).toBeVisible();
+
+  for (const field of [
+    "対象アカウント",
+    "投稿日",
+    "データ登録日",
+    "投稿タイプ",
+    "投稿画像・動画の枚数",
+    "投稿URL",
+    "ハッシュタグ",
+    "いいね数",
+    "コメント数",
+    "保存数",
+    "シェア数",
+    "表示数 / views",
+    "メモ",
+    "投稿画像スクショ",
+  ]) {
+    await expect(page.getByLabel(field, { exact: true })).toBeVisible();
+  }
 
   await page.getByLabel("投稿コメント").fill("編集後の動画投稿");
   await page.getByRole("button", { name: "変更を保存", exact: true }).click();
