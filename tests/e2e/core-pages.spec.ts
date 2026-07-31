@@ -62,5 +62,8 @@ test("削除した旧ページを直接開けない", async ({ request }) => {
 test("ヘルスチェックAPIが応答する", async ({ request }) => {
   const response = await request.get("/api/health");
   expect(response.ok()).toBeTruthy();
+  expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(response.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(response.headers()["x-frame-options"]).toBe("DENY");
   await expect(response.json()).resolves.toMatchObject({ ok: true });
 });
