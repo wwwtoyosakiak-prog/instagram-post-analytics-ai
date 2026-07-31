@@ -106,17 +106,16 @@ export default function Home() {
           </div>
           <div className="mt-5 rounded-md border border-stone-200 bg-stone-50 p-4">
             <p className="text-sm font-medium text-ink">迷ったら</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">投稿を確認して、必要な数字か設定ページをそのまま開けば十分です。</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">まず投稿を確認し、次に分析、最後にレポートを見れば十分です。</p>
           </div>
         </Panel>
       </div>
       <Panel>
-        <h2 className="text-lg font-semibold text-ink">その他のよく使う機能</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="text-lg font-semibold text-ink">管理と連携</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <CategoryLink href="/calendar" icon={<CalendarDays size={18} />} title="カレンダー" description="投稿日と予定を確認" />
           <CategoryLink href="/accounts" icon={<User size={18} />} title="プロフィール" description="アカウント情報を管理" />
           <CategoryLink href="/token-management" icon={<KeyRound size={18} />} title="Instagram連携" description="連携状態と期限を確認" />
-          <CategoryLink href="/settings" icon={<ClipboardList size={18} />} title="設定" description="保存先とデータを管理" />
         </div>
       </Panel>
     </div>
