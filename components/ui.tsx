@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ReactNode } from "react";
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
@@ -15,14 +14,6 @@ export function PageHeader({ title, description, action }: { title: string; desc
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <section className={`rounded-lg border border-stone-200 bg-white p-5 md:p-6 ${className}`}>{children}</section>;
-}
-
-export function ButtonLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className="inline-flex h-10 items-center justify-center rounded-md bg-ink px-4 text-sm font-medium text-white transition hover:bg-stone-800">
-      {children}
-    </Link>
-  );
 }
 
 export function Button({ children, type = "button", onClick, variant = "primary", disabled = false }: { children: ReactNode; type?: "button" | "submit"; onClick?: () => void; variant?: "primary" | "secondary"; disabled?: boolean }) {

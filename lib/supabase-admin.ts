@@ -1,4 +1,4 @@
-import { AiAnalysis, AiAnalysisRecord, AiScoreHistory, AiScoreHistoryInput, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, AiScoreHistory, AiScoreHistoryInput, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
 import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 import { scoreHistoryFromAnalysis } from "@/lib/score-history";
 
@@ -114,20 +114,6 @@ type MonthlyReportRow = {
   needs_work_posts: InstagramPost[];
   summary: string;
   next_month_policy: string[];
-  created_at: string;
-  updated_at: string;
-};
-
-type GoalRow = {
-  id: string;
-  account_id: string | null;
-  month: string;
-  target_posts: number;
-  target_views: number;
-  target_saves: number;
-  target_save_rate: number;
-  target_engagement_rate: number;
-  memo: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -496,35 +482,6 @@ function monthlyReportToRow(report: MonthlyReport, accountId: string | null, acc
   };
 }
 
-function mapGoal(row: GoalRow): MonthlyGoal {
-  return {
-    id: row.id,
-    accountId: row.account_id,
-    month: row.month,
-    targetPosts: row.target_posts,
-    targetViews: row.target_views,
-    targetSaves: row.target_saves,
-    targetSaveRate: row.target_save_rate,
-    targetEngagementRate: row.target_engagement_rate,
-    memo: row.memo ?? "",
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function goalToRow(input: MonthlyGoalInput) {
-  return {
-    account_id: input.accountId && input.accountId !== "all" ? input.accountId : null,
-    month: input.month,
-    target_posts: input.targetPosts,
-    target_views: input.targetViews,
-    target_saves: input.targetSaves,
-    target_save_rate: input.targetSaveRate,
-    target_engagement_rate: input.targetEngagementRate,
-    memo: input.memo
-  };
-}
-
 export async function listAccountsFromSupabase() {
   const rows = await supabaseRequest<AccountRow[]>("instagram_accounts?select=*&order=created_at.desc");
   return rows.map(mapAccount);
@@ -692,13 +649,6 @@ export async function listSyncRunsFromSupabase() {
   return rows.map(mapSyncRun);
 }
 
-export async function getLatestScheduledSyncRunFromSupabase() {
-  const rows = await supabaseRequest<SyncRunRow[]>(
-    "instagram_sync_runs?trigger_type=eq.scheduled&select=*&order=finished_at.desc&limit=1"
-  );
-  return rows[0] ? mapSyncRun(rows[0]) : null;
-}
-
 export async function getInstagramAccessTokenFromSupabase(provider = "instagram_graph_api") {
   const rows = await supabaseRequest<InstagramAccessTokenRow[]>(
     `instagram_access_tokens?provider=eq.${encodeURIComponent(provider)}&select=*&limit=1`
@@ -754,50 +704,4 @@ export async function createMonthlyReportInSupabase(report: MonthlyReport, accou
     body: JSON.stringify(monthlyReportToRow(report, accountId, accountName))
   });
   return mapMonthlyReport(rows[0]);
-}
-
-export async function listGoalsFromSupabase(accountId?: string | null, month?: string | null) {
-  const filters = ["select=*", "order=month.desc,updated_at.desc"];
-  if (month) filters.push(`month=eq.${encodeURIComponent(month)}`);
-  if (accountId && accountId !== "all") filters.push(`account_id=eq.${encodeURIComponent(accountId)}`);
-  if (accountId === "all") filters.push("account_id=is.null");
-  const rows = await supabaseRequest<GoalRow[]>(`instagram_monthly_goals?${filters.join("&")}`);
-  return rows.map(mapGoal);
-}
-
-export async function createGoalInSupabase(input: MonthlyGoalInput) {
-  const rows = await supabaseRequest<GoalRow[]>("instagram_monthly_goals", {
-    method: "POST",
-    body: JSON.stringify(goalToRow(input))
-  });
-  return mapGoal(rows[0]);
-}
-
-export async function updateGoalInSupabase(id: string, input: MonthlyGoalInput) {
-  const rows = await supabaseRequest<GoalRow[]>(`instagram_monthly_goals?id=eq.${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: JSON.stringify(goalToRow(input))
-  });
-  return rows[0] ? mapGoal(rows[0]) : null;
-}
-
-export async function deleteGoalFromSupabase(id: string) {
-  await supabaseRequest<void>(`instagram_monthly_goals?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
-export async function upsertGoalsInSupabase(goals: MonthlyGoal[]) {
-  const rows = goals.map((goal) => ({
-    id: goal.id,
-    ...goalToRow(goal),
-    created_at: goal.createdAt,
-    updated_at: goal.updatedAt
-  }));
-  const result = await supabaseRequest<GoalRow[]>("instagram_monthly_goals?on_conflict=id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=representation"
-    },
-    body: JSON.stringify(rows)
-  });
-  return result.map(mapGoal);
 }
