@@ -12,18 +12,11 @@ import {
   getMetric,
   type ApiError,
 } from '@/lib/instagram-graph-api';
-import { createClient } from '@supabase/supabase-js';
 import type { InstagramSyncRun } from '@/lib/types';
 import { logServerIssue } from '@/lib/safe-logging';
+import { isSupabaseServerConfigured, requireSupabaseServerClient } from '@/lib/supabase-server';
 
 export const maxDuration = 180;
-
-function supabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase 環境変数が未設定です');
-  return createClient(url, key);
-}
 
 type ExistingAccountRow = {
   id: string;
@@ -46,7 +39,7 @@ function isAuthorizedCronRequest(request: Request) {
 type SyncTriggerType = "manual" | "scheduled";
 
 async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
-  const db = supabase();
+  const db = requireSupabaseServerClient();
   const { error } = await db.from('instagram_sync_runs').insert({
     trigger_type: run.triggerType,
     status: run.status,
@@ -123,7 +116,7 @@ export async function GET(request: Request) {
 }
 
 async function handler(triggerType: SyncTriggerType) {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isSupabaseServerConfigured()) {
     return NextResponse.json({
       ok: false,
       status: "failed",
@@ -132,7 +125,7 @@ async function handler(triggerType: SyncTriggerType) {
     }, { status: 503 });
   }
 
-  const db = supabase();
+  const db = requireSupabaseServerClient();
   const startedAt = new Date().toISOString();
   const results = {
     account: null as unknown,
