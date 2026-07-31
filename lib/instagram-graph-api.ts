@@ -319,9 +319,3 @@ export async function fetchFollowerSnapshot(igUserId?: string): Promise<{
     media_count: info.media_count,
   };
 }
-
-// ── リール動画かどうかの判定 ─────────────────────────────
-
-export function isReel(mediaType: string, permalink: string): boolean {
-  return mediaType === 'VIDEO' || permalink.includes('/reel/');
-}

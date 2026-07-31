@@ -71,7 +71,7 @@ export function normalizeMetrics(
   };
 }
 
-export function median(values: number[]) {
+function median(values: number[]) {
   if (!values.length) return 0;
 
   const sorted = values
@@ -128,7 +128,7 @@ export function buildBaselinePrediction(
   };
 }
 
-export function achievementRate(
+function achievementRate(
   predicted: number,
   actual: number,
 ): number | null {

@@ -26,10 +26,6 @@ export function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
-export function byDateAsc(a: InstagramPost, b: InstagramPost) {
-  return new Date(a.date).getTime() - new Date(b.date).getTime();
-}
-
 export function weekdayJa(date: string) {
   return ["日", "月", "火", "水", "木", "金", "土"][new Date(`${date}T00:00:00`).getDay()];
 }
