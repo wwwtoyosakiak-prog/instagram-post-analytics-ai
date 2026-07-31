@@ -5,14 +5,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+function emptyDashboard() {
+  return {
+    account: null,
+    totals: { posts: 0, reach: 0, impressions: 0, likes: 0, comments: 0, saved: 0, shares: 0, views: 0 },
+    avg_engagement_rate: 0,
+    top_by_views: [],
+    top_by_save_rate: [],
+    by_day_of_week: {},
+    by_hour: {},
+    by_media_type: {},
+    follower_snapshots: [],
+    account_insights_trend: [],
+  };
+}
+
 function supabase() {
-  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? createClient(url, key) : null;
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('account_id');
   const db = supabase();
+  if (!db) {
+    return NextResponse.json({
+      configured: false,
+      message: 'Instagramデータベースが未接続です。',
+      ...emptyDashboard(),
+    });
+  }
 
   // アカウント情報
   let accountQuery = db
@@ -138,6 +162,7 @@ export async function GET(req: NextRequest) {
   const accountInsights = [...(accountInsightsRaw ?? [])].reverse();
 
   return NextResponse.json({
+    configured: true,
     account,
     totals,
     avg_engagement_rate: avgEngRate,

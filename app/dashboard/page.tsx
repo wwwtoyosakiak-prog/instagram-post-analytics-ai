@@ -53,6 +53,8 @@ interface DashboardAccountInsightTrendRow {
 }
 
 interface DashboardApiResponse {
+  configured?: boolean;
+  message?: string;
   account?: DashboardAccount | null;
   totals?: DashboardTotals;
   account_insights_trend?: DashboardAccountInsightTrendRow[];
@@ -500,6 +502,7 @@ export default function DashboardPage() {
   const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
   const [dashAccount, setDashAccount] = useState<DashboardAccount | null>(null);
   const [accountInsightsTrend, setAccountInsightsTrend] = useState<DashboardAccountInsightTrendRow[]>([]);
+  const [apiConnectionMessage, setApiConnectionMessage] = useState("Instagram連携を確認中...");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
@@ -532,10 +535,18 @@ export default function DashboardPage() {
         fetch('/api/instagram/dashboard').then(r => r.ok ? r.json() : null),
       ]);
       setApiMedia((mediaRes as { data: ApiMedia[] }).data ?? []);
-      setDashAccount((dashRes as DashboardApiResponse | null)?.account ?? null);
-      setAccountInsightsTrend((dashRes as DashboardApiResponse | null)?.account_insights_trend ?? []);
+      const dashboard = dashRes as DashboardApiResponse | null;
+      setDashAccount(dashboard?.account ?? null);
+      setAccountInsightsTrend(dashboard?.account_insights_trend ?? []);
+      setApiConnectionMessage(
+        dashboard?.configured === false
+          ? dashboard.message ?? "Instagramデータベースが未接続です。"
+          : dashboard?.account
+            ? ""
+            : "Instagramデータはまだありません。同期してください。",
+      );
     } catch {
-      // 無視
+      setApiConnectionMessage("Instagramデータを取得できませんでした。しばらくしてから再度お試しください。");
     }
   };
 
@@ -1043,7 +1054,7 @@ export default function DashboardPage() {
                   )}
                 </>
               ) : (
-                <p className="text-sm text-stone-500">アカウント情報を読み込み中...</p>
+                <p className="text-sm text-stone-500">{apiConnectionMessage}</p>
               )}
             </div>
           </div>
