@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 const publicPaths = new Set(["/api/health"]);
 const cronProtectedPaths = [
   "/api/cron/",
-  "/api/ai-agent/run",
   "/api/instagram/full-sync",
   "/api/instagram/sync",
 ];
