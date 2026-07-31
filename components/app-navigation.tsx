@@ -10,7 +10,6 @@ import {
   Home,
   KeyRound,
   ListChecks,
-  Settings,
   Target,
   User,
 } from "lucide-react";
@@ -33,10 +32,9 @@ const menuGroups = [
     ],
   },
   {
-    title: "連携・設定",
+    title: "連携",
     links: [
       { href: "/token-management", label: "Instagram連携", icon: KeyRound },
-      { href: "/settings", label: "設定", icon: Settings },
     ],
   },
 ];
