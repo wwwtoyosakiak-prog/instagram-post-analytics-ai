@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
+import {
+  ApiRequestError,
+  apiErrorResponse,
+  fetchJsonWithTimeout,
+  isRecord,
+  readJsonObject,
+  readOpenAiOutput,
+  readUpstreamError,
+} from "@/lib/server-api";
 
 type GrowthPost = {
   post: InstagramPost;
@@ -10,11 +19,17 @@ type GrowthPost = {
 };
 
 export async function POST(request: Request) {
-  const { posts, period, account } = (await request.json()) as {
-    posts?: GrowthPost[];
-    period?: "day" | "week" | "month";
-    account?: InstagramAccount | null;
-  };
+  try {
+  const body = await readJsonObject(request);
+  const posts = body.posts as GrowthPost[] | undefined;
+  const period = body.period as "day" | "week" | "month" | undefined;
+  const account = body.account as InstagramAccount | null | undefined;
+  if (posts !== undefined && (!Array.isArray(posts) || posts.some((item) => !isRecord(item) || !isRecord(item.post)))) {
+    throw new ApiRequestError("動画ランキングの形式が正しくありません。", 400);
+  }
+  if (period !== undefined && !["day", "week", "month"].includes(period)) {
+    throw new ApiRequestError("分析期間が正しくありません。", 400);
+  }
   const targets = posts?.slice(0, 5) ?? [];
   if (!targets.length) {
     return NextResponse.json({ error: "分析できる動画ランキングがありません。" }, { status: 400 });
@@ -50,7 +65,7 @@ ${targets.map((item, index) => {
   "nextActions": ["次回の具体的な投稿改善案"]
 }`;
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const { response, data } = await fetchJsonWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -62,12 +77,18 @@ ${targets.map((item, index) => {
       text: { format: { type: "json_object" } }
     })
   });
-  const data = await response.json();
   if (!response.ok) {
-    return NextResponse.json({ error: data.error?.message ?? "OpenAI APIの呼び出しに失敗しました。" }, { status: response.status });
+    return NextResponse.json({ error: readUpstreamError(data, "OpenAI APIの呼び出しに失敗しました。") }, { status: response.status });
   }
-  const raw = data.output_text ?? data.output?.flatMap((item: { content?: { text?: string }[] }) => item.content ?? []).map((item: { text?: string }) => item.text).join("");
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const raw = readOpenAiOutput(data);
+  let parsed: Record<string, unknown>;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!isRecord(value)) throw new Error("not an object");
+    parsed = value;
+  } catch {
+    throw new ApiRequestError("AI分析結果の形式が不正でした。もう一度分析してください。", 502);
+  }
   const asList = (value: unknown) => Array.isArray(value) ? value.map(String) : [];
   return NextResponse.json({
     analysis: {
@@ -80,4 +101,7 @@ ${targets.map((item, index) => {
     },
     model
   });
+  } catch (error) {
+    return apiErrorResponse(error, "growth-analysis-api");
+  }
 }

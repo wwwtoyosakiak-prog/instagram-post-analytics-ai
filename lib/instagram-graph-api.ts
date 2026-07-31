@@ -5,6 +5,7 @@
 
 import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
 import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
+import { fetchJsonWithTimeout } from "@/lib/server-api";
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
@@ -126,8 +127,7 @@ function getUid(igUserId?: string): string {
 }
 
 async function igFetch(url: string): Promise<unknown> {
-  const res = await fetch(url);
-  const json = await res.json();
+  const { response: res, data: json } = await fetchJsonWithTimeout(url);
   if (!res.ok || (json as { error?: { message: string; code: number } }).error) {
     const err = (json as { error?: { message: string; code: number } }).error;
     logServerIssue('instagram-api', err, { status: res.status, code: err?.code });
