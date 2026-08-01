@@ -2,29 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
-  loadAllInsightData, loadAnalysesData,
-  loadPostsData,
-  loadSyncRunsData,
-} from "@/lib/cloud-storage";
-import {
   InstagramInsightSnapshot,
-  InstagramPost, InstagramSyncRun,
   PostType,
 } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
-import { mergePostMetrics, matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
+import { mergePostMetrics, matchPostToMedia } from "@/lib/post-merge";
 import type {
-  DashboardAccount,
   DashboardAccountInsightTrendRow,
-  DashboardApiResponse,
   GraphPeriod,
   GrowthAnalysis,
   SyncHistoryRow,
@@ -68,23 +60,25 @@ import {
   toTokyoDateTimeParts,
   videoTitle,
 } from "@/components/dashboard/utils";
+import { useDashboardSync } from "@/components/dashboard/use-dashboard-sync";
+import { useDashboardData } from "@/components/dashboard/use-dashboard-data";
 
 // ── メインページ（統合ダッシュボード） ────────────────────
 
 export default function DashboardPage() {
-  // ── 手入力データ state ──
-  const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
-  const [insightDate, setInsightDate] = useState("");
-  const [syncRuns, setSyncRuns] = useState<InstagramSyncRun[]>([]);
-
-  // ── Graph API state ──
-  const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
-  const [dashAccount, setDashAccount] = useState<DashboardAccount | null>(null);
-  const [accountInsightsTrend, setAccountInsightsTrend] = useState<DashboardAccountInsightTrendRow[]>([]);
-  const [apiConnectionMessage, setApiConnectionMessage] = useState("Instagram連携を確認中...");
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState('');
+  const {
+    posts,
+    insightHistory,
+    insightDate,
+    setInsightDate,
+    syncRuns,
+    apiMedia,
+    dashAccount,
+    accountInsightsTrend,
+    apiConnectionMessage,
+    refreshDashboard,
+    refreshApiData,
+  } = useDashboardData();
 
   // ── UI state ──
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
@@ -92,105 +86,15 @@ export default function DashboardPage() {
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
-  const [syncMessage, setSyncMessage] = useState("");
-  const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
-  const refreshDashboard = async () => {
-    const [loadedPosts, loadedInsights, loadedSyncRuns] = await Promise.all([
-      loadPostsData(),
-      loadAllInsightData(), loadSyncRunsData()
-    ]);
-    setPosts(loadedPosts);
-    setInsightHistory(loadedInsights);
-    setSyncRuns(loadedSyncRuns);
-    const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
-    if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
-    Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then(() => undefined);
-  };
-
-  const refreshApiData = async () => {
-    try {
-      const [mediaRes, dashRes] = await Promise.all([
-        fetch('/api/instagram/media?limit=200').then(r => r.ok ? r.json() : { data: [] }),
-        fetch('/api/instagram/dashboard').then(r => r.ok ? r.json() : null),
-      ]);
-      setApiMedia((mediaRes as { data: ApiMedia[] }).data ?? []);
-      const dashboard = dashRes as DashboardApiResponse | null;
-      setDashAccount(dashboard?.account ?? null);
-      setAccountInsightsTrend(dashboard?.account_insights_trend ?? []);
-      setApiConnectionMessage(
-        dashboard?.configured === false
-          ? dashboard.message ?? "Instagramデータベースが未接続です。"
-          : dashboard?.account
-            ? ""
-            : "Instagramデータはまだありません。同期してください。",
-      );
-    } catch {
-      setApiConnectionMessage("Instagramデータを取得できませんでした。しばらくしてから再度お試しください。");
-    }
-  };
-
-  useEffect(() => {
-    refreshDashboard();
-    refreshApiData();
-  }, []);
-
-  // ── Graph API フルシンク ──
-  const handleFullSync = async () => {
-    setSyncing(true);
-    setSyncMsg('同期中...');
-    setSyncMessage("");
-    setSyncErrorMessage("");
-    try {
-      const historySyncResponse = await fetch("/api/instagram/full-sync", { method: "POST" });
-      const historySyncData = await historySyncResponse.json() as {
-        ok: boolean;
-        status?: "success" | "partial" | "failed";
-        media_fetched?: number;
-        media_saved?: number;
-        insights_fetched?: number;
-        insights_failed?: number;
-        error?: string;
-        errors?: string[];
-      };
-
-      const firstError =
-        historySyncData.error ??
-        historySyncData.errors?.[0] ??
-        "同期に失敗しました。";
-
-      if ((!historySyncResponse.ok && historySyncResponse.status !== 207) || historySyncData.ok === false) {
-        throw new Error(firstError);
-      }
-
-      await Promise.all([refreshApiData(), refreshDashboard()]);
-
-      const fetchedPosts = historySyncData.media_fetched ?? historySyncData.media_saved ?? 0;
-      const savedPosts = historySyncData.media_saved ?? 0;
-      const savedInsights = historySyncData.insights_fetched ?? 0;
-      const failedInsights = historySyncData.insights_failed ?? 0;
-      const isPartial = historySyncData.status === "partial" || failedInsights > 0 || historySyncResponse.status === 207;
-
-      setSyncMsg(
-        `${isPartial ? "⚠️ 一部完了" : "✅ 同期完了"}: 取得${fetchedPosts}件 / 投稿保存${savedPosts}件 / 履歴保存${savedInsights}件 / 失敗${failedInsights}件`
-      );
-      setSyncMessage(
-        isPartial
-          ? `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。一部でエラーがありました。`
-          : `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。`
-      );
-      if (isPartial) {
-        setSyncErrorMessage(firstError);
-      }
-    } catch (error) {
-      setSyncMsg("");
-      setSyncErrorMessage(error instanceof Error ? error.message : '❌ 通信エラーが発生しました');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const syncButtonLabel = syncing ? "同期中..." : "Instagramデータを同期";
+  const {
+    syncing,
+    syncButtonLabel,
+    syncMsg,
+    syncMessage,
+    syncErrorMessage,
+    handleFullSync,
+  } = useDashboardSync(refreshApiData, refreshDashboard);
 
   // ── 統合ロジック ──────────────────────────────────────
 
