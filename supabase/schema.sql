@@ -2,6 +2,7 @@ create extension if not exists "pgcrypto";
 
 create table if not exists public.instagram_accounts (
   id text primary key default gen_random_uuid()::text,
+  owner_id text not null default 'owner',
   name text not null,
   username text not null,
   instagram_api_username text,
@@ -19,6 +20,7 @@ create table if not exists public.instagram_accounts (
 
 create table if not exists public.instagram_posts (
   id text primary key default gen_random_uuid()::text,
+  owner_id text not null default 'owner',
   account_id text references public.instagram_accounts(id) on delete set null,
   date date not null,
   recorded_date date not null,
@@ -48,6 +50,7 @@ create table if not exists public.instagram_posts (
 
 create table if not exists public.instagram_post_insight_snapshots (
   id text primary key default gen_random_uuid()::text,
+  owner_id text not null default 'owner',
   post_id text not null references public.instagram_posts(id) on delete cascade,
   captured_at timestamptz not null default now(),
   views bigint not null default 0,
@@ -61,6 +64,7 @@ create table if not exists public.instagram_post_insight_snapshots (
 
 create table if not exists public.instagram_sync_runs (
   id text primary key default gen_random_uuid()::text,
+  owner_id text not null default 'owner',
   trigger_type text not null check (trigger_type in ('manual', 'scheduled')),
   status text not null check (status in ('success', 'partial', 'failed')),
   started_at timestamptz not null default now(),
@@ -85,6 +89,7 @@ create index if not exists instagram_post_insight_snapshots_post_captured_idx
 
 create table if not exists public.instagram_post_analyses (
   id text primary key default gen_random_uuid()::text,
+  owner_id text not null default 'owner',
   post_id text not null references public.instagram_posts(id) on delete cascade,
   first_impression text not null,
   image_message text not null,
@@ -102,6 +107,7 @@ create table if not exists public.instagram_post_analyses (
 
 create table if not exists public.instagram_monthly_reports (
   id text primary key default gen_random_uuid()::text,
+  owner_id text not null default 'owner',
   month text not null,
   account_id text references public.instagram_accounts(id) on delete set null,
   account_name text not null default 'すべて',

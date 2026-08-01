@@ -52,29 +52,60 @@ function readBasicCredentials(request: NextRequest) {
   }
 }
 
+function readConfiguredUsers() {
+  const configuredUsers = process.env.APP_ACCESS_USERS;
+  if (configuredUsers) {
+    if (
+      process.env.USER_DATA_OWNERSHIP_ENABLED !== "true"
+      || !process.env.SUPABASE_URL
+      || !process.env.SUPABASE_SERVICE_ROLE_KEY
+    ) return null;
+    try {
+      const parsed = JSON.parse(configuredUsers) as unknown;
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return null;
+      const users = Object.entries(parsed)
+        .filter((entry): entry is [string, string] => Boolean(entry[0]) && typeof entry[1] === "string" && Boolean(entry[1]))
+        .map(([username, password]) => ({ username, password, ownerId: username }));
+      return users.length > 0 ? users : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const username = process.env.APP_ACCESS_USER;
+  const password = process.env.APP_ACCESS_PASSWORD;
+  if (!username && !password) return [];
+  if (!username || !password) return null;
+  return [{ username, password, ownerId: "owner" }];
+}
+
 export function middleware(request: NextRequest) {
   if (publicPaths.has(request.nextUrl.pathname) || isCronRequest(request)) {
     return nextWithAuthenticatedUser(request);
   }
 
-  const expectedUsername = process.env.APP_ACCESS_USER;
-  const expectedPassword = process.env.APP_ACCESS_PASSWORD;
-
-  if (!expectedUsername && !expectedPassword) {
+  const configuredUsers = readConfiguredUsers();
+  if (configuredUsers?.length === 0) {
     return nextWithAuthenticatedUser(request);
   }
 
-  if (!expectedUsername || !expectedPassword) {
+  if (!configuredUsers) {
     return new NextResponse("Access protection is not configured correctly.", { status: 503 });
   }
 
   const credentials = readBasicCredentials(request);
-  if (
-    credentials
-    && constantTimeEqual(credentials.username, expectedUsername)
-    && constantTimeEqual(credentials.password, expectedPassword)
-  ) {
-    return nextWithAuthenticatedUser(request, expectedUsername);
+  const matchedUser = credentials
+    ? configuredUsers.find(({ username, password }) =>
+      constantTimeEqual(credentials.username, username) && constantTimeEqual(credentials.password, password))
+    : null;
+  if (matchedUser) {
+    if (matchedUser.ownerId !== "owner" && request.nextUrl.pathname.startsWith("/api/instagram/")) {
+      return NextResponse.json(
+        { error: "このユーザーのInstagram連携はまだ設定されていません。" },
+        { status: 403, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    return nextWithAuthenticatedUser(request, matchedUser.ownerId);
   }
 
   return new NextResponse("Authentication required.", {

@@ -2,11 +2,24 @@ import { AiAnalysis, AiAnalysisRecord, AiScoreHistory, AiScoreHistoryInput, Inst
 import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 import { scoreHistoryFromAnalysis } from "@/lib/score-history";
 import { supabaseRestRequest } from "@/lib/supabase-server";
+import { DEFAULT_DATA_OWNER } from "@/lib/authenticated-user";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && serviceRoleKey);
+
+function ownerFilter(ownerId: string) {
+  return `owner_id=eq.${encodeURIComponent(ownerId)}`;
+}
+
+function withOwnerFilter(ownerId: string, filters: string) {
+  return process.env.USER_DATA_OWNERSHIP_ENABLED === "true" ? `${ownerFilter(ownerId)}&${filters}` : filters;
+}
+
+function ownerField(ownerId: string) {
+  return process.env.USER_DATA_OWNERSHIP_ENABLED === "true" ? { owner_id: ownerId } : {};
+}
 
 type AccountRow = {
   id: string;
@@ -462,34 +475,35 @@ function monthlyReportToRow(report: MonthlyReport, accountId: string | null, acc
   };
 }
 
-export async function listAccountsFromSupabase() {
-  const rows = await supabaseRequest<AccountRow[]>("instagram_accounts?select=*&order=created_at.desc");
+export async function listAccountsFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
+  const rows = await supabaseRequest<AccountRow[]>(`instagram_accounts?${withOwnerFilter(ownerId, "select=*&order=created_at.desc")}`);
   return rows.map(mapAccount);
 }
 
-export async function createAccountInSupabase(input: InstagramAccountInput) {
+export async function createAccountInSupabase(input: InstagramAccountInput, ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<AccountRow[]>("instagram_accounts", {
     method: "POST",
-    body: JSON.stringify(accountToRow(input))
+    body: JSON.stringify({ ...accountToRow(input), ...ownerField(ownerId) })
   });
   return mapAccount(rows[0]);
 }
 
-export async function updateAccountInSupabase(id: string, input: InstagramAccountInput) {
-  const rows = await supabaseRequest<AccountRow[]>(`instagram_accounts?id=eq.${encodeURIComponent(id)}`, {
+export async function updateAccountInSupabase(id: string, input: InstagramAccountInput, ownerId = DEFAULT_DATA_OWNER) {
+  const rows = await supabaseRequest<AccountRow[]>(`instagram_accounts?${withOwnerFilter(ownerId, `id=eq.${encodeURIComponent(id)}`)}`, {
     method: "PATCH",
     body: JSON.stringify(accountToRow(input))
   });
   return rows[0] ? mapAccount(rows[0]) : null;
 }
 
-export async function deleteAccountFromSupabase(id: string) {
-  await supabaseRequest<void>(`instagram_accounts?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+export async function deleteAccountFromSupabase(id: string, ownerId = DEFAULT_DATA_OWNER) {
+  await supabaseRequest<void>(`instagram_accounts?${withOwnerFilter(ownerId, `id=eq.${encodeURIComponent(id)}`)}`, { method: "DELETE" });
 }
 
-export async function upsertAccountsInSupabase(accounts: InstagramAccount[]) {
+export async function upsertAccountsInSupabase(accounts: InstagramAccount[], ownerId = DEFAULT_DATA_OWNER) {
   const rows = accounts.map((account) => ({
     id: account.id,
+    ...ownerField(ownerId),
     ...accountToRow(account),
     created_at: account.createdAt,
     updated_at: account.updatedAt
@@ -504,10 +518,10 @@ export async function upsertAccountsInSupabase(accounts: InstagramAccount[]) {
   return result.map(mapAccount);
 }
 
-export async function listPostsFromSupabase() {
+export async function listPostsFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
   const [rows, latestInsights] = await Promise.all([
-    supabaseRequest<PostRow[]>("instagram_posts?select=*&order=date.desc"),
-    listLatestInsightSnapshotsFromSupabase()
+    supabaseRequest<PostRow[]>(`instagram_posts?${withOwnerFilter(ownerId, "select=*&order=date.desc")}`),
+    listLatestInsightSnapshotsFromSupabase(ownerId)
   ]);
   const insightByPostId = new Map(latestInsights.map((insight) => [insight.postId, insight]));
   return rows.map((row) => {
@@ -526,29 +540,30 @@ export async function listPostsFromSupabase() {
   });
 }
 
-export async function createPostInSupabase(input: InstagramPostInput) {
+export async function createPostInSupabase(input: InstagramPostInput, ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<PostRow[]>("instagram_posts", {
     method: "POST",
-    body: JSON.stringify(postToRow(input))
+    body: JSON.stringify({ ...postToRow(input), ...ownerField(ownerId) })
   });
   return mapPost(rows[0]);
 }
 
-export async function updatePostInSupabase(id: string, input: InstagramPostInput) {
-  const rows = await supabaseRequest<PostRow[]>(`instagram_posts?id=eq.${encodeURIComponent(id)}`, {
+export async function updatePostInSupabase(id: string, input: InstagramPostInput, ownerId = DEFAULT_DATA_OWNER) {
+  const rows = await supabaseRequest<PostRow[]>(`instagram_posts?${withOwnerFilter(ownerId, `id=eq.${encodeURIComponent(id)}`)}`, {
     method: "PATCH",
     body: JSON.stringify(postToRow(input))
   });
   return rows[0] ? mapPost(rows[0]) : null;
 }
 
-export async function deletePostFromSupabase(id: string) {
-  await supabaseRequest<void>(`instagram_posts?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+export async function deletePostFromSupabase(id: string, ownerId = DEFAULT_DATA_OWNER) {
+  await supabaseRequest<void>(`instagram_posts?${withOwnerFilter(ownerId, `id=eq.${encodeURIComponent(id)}`)}`, { method: "DELETE" });
 }
 
-export async function upsertPostsInSupabase(posts: InstagramPost[]) {
+export async function upsertPostsInSupabase(posts: InstagramPost[], ownerId = DEFAULT_DATA_OWNER) {
   const rows = posts.map((post) => ({
     id: post.id,
+    ...ownerField(ownerId),
     ...postToRow(post),
     created_at: post.createdAt,
     updated_at: post.updatedAt
@@ -563,13 +578,13 @@ export async function upsertPostsInSupabase(posts: InstagramPost[]) {
   return result.map(mapPost);
 }
 
-export async function listAnalysesFromSupabase(postId: string) {
-  const rows = await supabaseRequest<AnalysisRow[]>(`instagram_post_analyses?post_id=eq.${encodeURIComponent(postId)}&select=*&order=created_at.desc`);
+export async function listAnalysesFromSupabase(postId: string, ownerId = DEFAULT_DATA_OWNER) {
+  const rows = await supabaseRequest<AnalysisRow[]>(`instagram_post_analyses?${withOwnerFilter(ownerId, `post_id=eq.${encodeURIComponent(postId)}&select=*&order=created_at.desc`)}`);
   return rows.map(mapAnalysis);
 }
 
-export async function listLatestAnalysesFromSupabase() {
-  const rows = await supabaseRequest<AnalysisRow[]>("instagram_post_analyses?select=*&order=created_at.desc");
+export async function listLatestAnalysesFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
+  const rows = await supabaseRequest<AnalysisRow[]>(`instagram_post_analyses?${withOwnerFilter(ownerId, "select=*&order=created_at.desc")}`);
   const latestByPostId = new Map<string, AiAnalysisRecord>();
   for (const row of rows) {
     if (!latestByPostId.has(row.post_id)) latestByPostId.set(row.post_id, mapAnalysis(row));
@@ -577,52 +592,54 @@ export async function listLatestAnalysesFromSupabase() {
   return [...latestByPostId.values()];
 }
 
-export async function createScoreHistoryInSupabase(input: AiScoreHistoryInput) {
+export async function createScoreHistoryInSupabase(input: AiScoreHistoryInput, ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<ScoreHistoryRow[]>("ai_score_history", {
     method: "POST",
-    body: JSON.stringify(scoreHistoryToRow(input))
+    body: JSON.stringify({ ...scoreHistoryToRow(input), ...ownerField(ownerId) })
   });
   return mapScoreHistory(rows[0]);
 }
 
-export async function listScoreHistoryFromSupabase(postId?: string, limit = 100) {
+export async function listScoreHistoryFromSupabase(postId?: string, limit = 100, ownerId = DEFAULT_DATA_OWNER) {
   const filters = ["select=*", "order=created_at.asc", `limit=${limit}`];
+  if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") filters.unshift(ownerFilter(ownerId));
   if (postId) filters.push(`post_id=eq.${encodeURIComponent(postId)}`);
   const rows = await supabaseRequest<ScoreHistoryRow[]>(`ai_score_history?${filters.join("&")}`);
   return rows.map(mapScoreHistory);
 }
 
-export async function createAnalysisInSupabase(postId: string, analysis: AiAnalysis) {
-  const previous = await listAnalysesFromSupabase(postId);
+export async function createAnalysisInSupabase(postId: string, analysis: AiAnalysis, ownerId = DEFAULT_DATA_OWNER) {
+  const previous = await listAnalysesFromSupabase(postId, ownerId);
   const scoreDelta = previous[0] ? analysis.score - previous[0].score : null;
   const rows = await supabaseRequest<AnalysisRow[]>("instagram_post_analyses", {
     method: "POST",
-    body: JSON.stringify(analysisToRow(postId, analysis, scoreDelta))
+    body: JSON.stringify({ ...analysisToRow(postId, analysis, scoreDelta), ...ownerField(ownerId) })
   });
   const saved = mapAnalysis(rows[0]);
   await createScoreHistoryInSupabase(
-    scoreHistoryFromAnalysis(postId, saved.id, analysis)
+    scoreHistoryFromAnalysis(postId, saved.id, analysis),
+    ownerId
   );
   return saved;
 }
 
-export async function listInsightSnapshotsFromSupabase(postId: string) {
+export async function listInsightSnapshotsFromSupabase(postId: string, ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<InsightSnapshotRow[]>(
-    `instagram_post_insight_snapshots?post_id=eq.${encodeURIComponent(postId)}&select=*&order=captured_at.desc`
+    `instagram_post_insight_snapshots?${withOwnerFilter(ownerId, `post_id=eq.${encodeURIComponent(postId)}&select=*&order=captured_at.desc`)}`
   );
   return rows.map(mapInsightSnapshot);
 }
 
-export async function listAllInsightSnapshotsFromSupabase() {
+export async function listAllInsightSnapshotsFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<InsightSnapshotRow[]>(
-    "instagram_post_insight_snapshots?select=*&order=captured_at.asc"
+    `instagram_post_insight_snapshots?${withOwnerFilter(ownerId, "select=*&order=captured_at.asc")}`
   );
   return rows.map(mapInsightSnapshot);
 }
 
-export async function listLatestInsightSnapshotsFromSupabase() {
+export async function listLatestInsightSnapshotsFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<InsightSnapshotRow[]>(
-    "instagram_post_insight_snapshots?select=*&order=captured_at.desc"
+    `instagram_post_insight_snapshots?${withOwnerFilter(ownerId, "select=*&order=captured_at.desc")}`
   );
   const latestByPostId = new Map<string, InstagramInsightSnapshot>();
   for (const row of rows) {
@@ -631,9 +648,9 @@ export async function listLatestInsightSnapshotsFromSupabase() {
   return [...latestByPostId.values()];
 }
 
-export async function listSyncRunsFromSupabase() {
+export async function listSyncRunsFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<SyncRunRow[]>(
-    "instagram_sync_runs?select=*&order=finished_at.desc&limit=20"
+    `instagram_sync_runs?${withOwnerFilter(ownerId, "select=*&order=finished_at.desc&limit=20")}`
   );
   return rows.map(mapSyncRun);
 }
@@ -678,8 +695,9 @@ export async function getLatestInstagramOperationLogFromSupabase(domain: Instagr
   return rows[0] ? mapInstagramOperationLog(rows[0]) : null;
 }
 
-export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null) {
+export async function listMonthlyReportsFromSupabase(accountId?: string | null, month?: string | null, ownerId = DEFAULT_DATA_OWNER) {
   const filters = ["select=*", "order=created_at.desc"];
+  if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") filters.unshift(ownerFilter(ownerId));
   if (month) filters.push(`month=eq.${encodeURIComponent(month)}`);
   if (accountId && accountId !== "all") filters.push(`account_id=eq.${encodeURIComponent(accountId)}`);
   if (accountId === "all") filters.push("account_id=is.null");
@@ -687,10 +705,10 @@ export async function listMonthlyReportsFromSupabase(accountId?: string | null, 
   return rows.map(mapMonthlyReport);
 }
 
-export async function createMonthlyReportInSupabase(report: MonthlyReport, accountId: string | null, accountName: string) {
+export async function createMonthlyReportInSupabase(report: MonthlyReport, accountId: string | null, accountName: string, ownerId = DEFAULT_DATA_OWNER) {
   const rows = await supabaseRequest<MonthlyReportRow[]>("instagram_monthly_reports", {
     method: "POST",
-    body: JSON.stringify(monthlyReportToRow(report, accountId, accountName))
+    body: JSON.stringify({ ...monthlyReportToRow(report, accountId, accountName), ...ownerField(ownerId) })
   });
   return mapMonthlyReport(rows[0]);
 }

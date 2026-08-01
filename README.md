@@ -269,6 +269,22 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結果、月次レポート、改善タスク、月間目標は、Supabase保存が有効な場合に保存済みデータを取得して出力します。
 
+## 複数ユーザーで利用する
+
+複数のID・パスワードを設定すると、プロフィール、投稿、分析履歴、インサイト、同期履歴、月次レポートをログインユーザーごとに分けて保存できます。既存データは `owner` ユーザーに引き継がれます。
+
+1. Supabase SQL Editorで `supabase/add-user-data-ownership.sql` を1回実行します。
+2. Vercelに以下の環境変数を追加して再デプロイします。
+
+```env
+USER_DATA_OWNERSHIP_ENABLED=true
+APP_ACCESS_USERS={"owner":"現在のパスワード","teammate":"追加ユーザーのパスワード"}
+```
+
+`APP_ACCESS_USERS` のキーがログインIDです。パスワードは十分に長い別々の値にし、GitHubへ保存しないでください。設定ミスでデータが共有されないよう、SQL適用前、`USER_DATA_OWNERSHIP_ENABLED=true` がない場合、またはSupabase保存が未設定の場合は複数ユーザー設定を受け付けません。
+
+従来の `APP_ACCESS_USER` と `APP_ACCESS_PASSWORD` はそのまま利用でき、その場合は既存の `owner` データを表示します。追加ユーザーには既存のInstagram連携情報を公開せず、個別のInstagram連携を設定するまでは手入力データとAI分析だけを利用できます。
+
 ## 将来のAPI・データベース連携
 
 現在の登録データは、Supabase設定済みの場合はサーバー側、未設定の場合はブラウザのlocalStorageに保存します。将来的に外部APIや別データベースへ移行する場合は、`lib/cloud-storage.ts` と `lib/supabase-admin.ts` を差し替えます。差し替え時の契約は `lib/data-repository.ts` に型として整理しています。
