@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
@@ -14,13 +14,16 @@ export default function CalendarPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const monthChangedByUser = useRef(false);
 
   useEffect(() => {
     Promise.all([loadPostsData(), loadAccountsData()]).then(([loadedPosts, loadedAccounts]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       const latestPost = [...loadedPosts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-      if (latestPost) setMonth(latestPost.date.slice(0, 7));
+      if (latestPost) {
+        setMonth((currentMonth) => monthChangedByUser.current ? currentMonth : latestPost.date.slice(0, 7));
+      }
     });
   }, []);
 
@@ -52,12 +55,23 @@ export default function CalendarPage() {
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div>
             <label htmlFor="calendar-month">表示月</label>
-            <input id="calendar-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+            <input
+              id="calendar-month"
+              type="month"
+              value={month}
+              onChange={(event) => {
+                monthChangedByUser.current = true;
+                setMonth(event.target.value);
+              }}
+            />
           </div>
           <div className="flex items-end gap-2">
             <button
               type="button"
-              onClick={() => setMonth(shiftMonth(month, -1))}
+              onClick={() => {
+                monthChangedByUser.current = true;
+                setMonth(shiftMonth(month, -1));
+              }}
               className="inline-flex h-10 items-center justify-center rounded-md border border-stone-200 bg-white px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
             >
               <ChevronLeft size={16} aria-hidden />
@@ -65,7 +79,10 @@ export default function CalendarPage() {
             </button>
             <button
               type="button"
-              onClick={() => setMonth(shiftMonth(month, 1))}
+              onClick={() => {
+                monthChangedByUser.current = true;
+                setMonth(shiftMonth(month, 1));
+              }}
               className="inline-flex h-10 items-center justify-center rounded-md border border-stone-200 bg-white px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
             >
               次月
