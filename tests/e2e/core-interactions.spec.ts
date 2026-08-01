@@ -128,8 +128,10 @@ test("カレンダーの読み込み完了後も選択した月を維持する",
     await route.fulfill({ json: { posts: fixturePosts } });
   });
 
+  const postsRequest = page.waitForRequest("**/api/data/posts**");
   const postsResponse = page.waitForResponse("**/api/data/posts**");
   await page.goto("/calendar");
+  await postsRequest;
   await page.getByLabel("表示月").fill("2026-06");
   await postsResponse;
 
