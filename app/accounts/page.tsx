@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { User } from "lucide-react";
-import { PageHeader, PageLoading } from "@/components/ui";
-import { loadAccountsData } from "@/lib/cloud-storage";
+import { Download, ShieldCheck, Upload, User } from "lucide-react";
+import { Button, PageHeader, PageLoading, Panel } from "@/components/ui";
+import { loadAccountsData, loadPostsData, saveAccountsData, savePostsData } from "@/lib/cloud-storage";
 import { requestJsonOr } from "@/lib/client-api";
 import { InstagramAccount } from "@/lib/types";
+import { getSelectedAccountId, withSelectedAccount } from "@/lib/account-preference";
+import { createBackup, parseBackup } from "@/lib/data-backup";
 
 interface GraphApiAccount {
   name: string;
@@ -36,10 +38,11 @@ export default function AccountPage() {
   useEffect(() => {
     Promise.all([
       loadAccountsData(),
-      requestJsonOr<DashboardResponse | null>("/api/instagram/dashboard", null)
+      requestJsonOr<DashboardResponse | null>(withSelectedAccount("/api/instagram/dashboard"), null)
     ]).then(([accounts, dashData]) => {
       const list = Array.isArray(accounts) ? accounts : [];
-      const acc = list[0] ?? null;
+      const selectedAccountId = getSelectedAccountId();
+      const acc = list.find((item) => item.id === selectedAccountId) ?? list[0] ?? null;
       setAccount(acc);
       if (dashData?.account) {
         const snaps = dashData.follower_snapshots ?? [];
@@ -156,7 +159,85 @@ export default function AccountPage() {
           {connectionMessage || "フォロワー数・プロフィール画像・bioを表示するには、ダッシュボードからInstagramデータを同期してください。"}
         </div>
       )}
+
+      <DataProtectionPanel />
     </div>
+  );
+}
+
+function DataProtectionPanel() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const exportBackup = async () => {
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const [accounts, posts] = await Promise.all([loadAccountsData(), loadPostsData()]);
+      const backup = createBackup(accounts, posts);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `instagram-analysis-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`${accounts.length}件のプロフィールと${posts.length}件の投稿を書き出しました。`);
+    } catch {
+      setError("データを書き出せませんでした。時間をおいて再度お試しください。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restoreBackup = async (file: File) => {
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const backup = parseBackup(await file.text());
+      await saveAccountsData(backup.accounts);
+      await savePostsData(backup.posts);
+      setMessage(`${backup.accounts.length}件のプロフィールと${backup.posts.length}件の投稿を復元しました。`);
+    } catch {
+      setError("このファイルは復元できません。サイトから書き出したバックアップを選んでください。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel className="mt-6">
+      <div className="flex items-start gap-3">
+        <ShieldCheck size={22} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden />
+        <div>
+          <h2 className="font-semibold text-ink">データを保護</h2>
+          <p className="mt-1 text-sm leading-6 text-stone-600">プロフィールと投稿を1つのファイルに保存し、必要なときに戻せます。</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <Button onClick={exportBackup} disabled={busy} variant="secondary">
+          <span className="inline-flex items-center gap-2"><Download size={17} aria-hidden />データを書き出す</span>
+        </Button>
+        <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-moss">
+          <Upload size={17} aria-hidden />データを復元
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            disabled={busy}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void restoreBackup(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+      {message ? <p role="status" className="mt-3 text-sm text-emerald-700">{message}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}
+    </Panel>
   );
 }
 

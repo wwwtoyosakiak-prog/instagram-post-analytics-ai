@@ -19,6 +19,7 @@ import type {
 } from "@/components/dashboard/types";
 import { toTokyoDateHour } from "@/components/dashboard/utils";
 import { requestJsonOr } from "@/lib/client-api";
+import { withSelectedAccount } from "@/lib/account-preference";
 
 export function useDashboardData() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -49,8 +50,8 @@ export function useDashboardData() {
   const refreshApiData = useCallback(async () => {
     try {
       const [mediaResponse, dashboardResponse] = await Promise.all([
-        requestJsonOr<{ data: ApiMedia[] }>("/api/instagram/media?limit=200", { data: [] }),
-        requestJsonOr<DashboardApiResponse | null>("/api/instagram/dashboard", null),
+        requestJsonOr<{ data: ApiMedia[] }>(withSelectedAccount("/api/instagram/media?limit=200"), { data: [] }),
+        requestJsonOr<DashboardApiResponse | null>(withSelectedAccount("/api/instagram/dashboard"), null),
       ]);
       setApiMedia(mediaResponse.data ?? []);
       const dashboard = dashboardResponse;

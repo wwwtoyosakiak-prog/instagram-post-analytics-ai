@@ -136,15 +136,44 @@ const menuDestinations = [
 ];
 
 for (const destination of menuDestinations) {
-  test(`メインメニューから${destination.link}へ移動できる`, async ({ page }) => {
+  test(`メインメニューから${destination.link}へ移動できる`, async ({ page, isMobile }) => {
     await page.goto("/");
-    await page.getByRole("navigation", { name: "メインメニュー" })
-      .getByRole("link", { name: destination.link, exact: true })
-      .click();
+    const isBottomDestination = ["投稿", "分析", "レポート", "プロフィール"].includes(destination.link);
+    if (isMobile && isBottomDestination) {
+      await page.getByRole("navigation", { name: "スマートフォン用メニュー" })
+        .getByRole("link", { name: destination.link, exact: true })
+        .click();
+    } else if (isMobile) {
+      await page.getByRole("link", { name: new RegExp(`^${destination.link}`) }).click();
+    } else {
+      await page.getByRole("navigation", { name: "メインメニュー" })
+        .getByRole("link", { name: destination.link, exact: true })
+        .click();
+    }
     await expect(page).toHaveURL(new RegExp(`${destination.path}$`));
     await expect(page.getByRole("heading", { name: destination.heading, exact: true })).toBeVisible();
   });
 }
+
+test("表示するアカウントを全画面共通で切り替えられる", async ({ page }) => {
+  await page.unroute("**/api/data/accounts**");
+  await page.route("**/api/data/accounts**", (route) => route.fulfill({ json: { accounts: [
+    { id: "account-e2e", name: "メイン", username: "main" },
+    { id: "account-second", name: "サブ", username: "sub" },
+  ] } }));
+
+  await page.goto("/");
+  await page.getByLabel("表示するInstagramアカウント").selectOption("account-second");
+  await expect(page.getByLabel("表示するInstagramアカウント")).toHaveValue("account-second");
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem("instagram-ai-selected-account-v1"))).toBe("account-second");
+});
+
+test("プロフィールからデータを書き出し・復元できる", async ({ page }) => {
+  await page.goto("/accounts");
+  await expect(page.getByRole("heading", { name: "データを保護" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "データを書き出す" })).toBeVisible();
+  await expect(page.getByText("データを復元", { exact: true })).toBeVisible();
+});
 
 test("投稿タイプで一覧を絞り込める", async ({ page }) => {
   await page.goto("/posts");

@@ -13,11 +13,15 @@ import { ClientApiError, requestJson } from "@/lib/client-api";
 import { logClientIssue } from "@/lib/safe-logging";
 import { InstagramAccount, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
+import { filterPostsForSelectedAccount } from "@/lib/account-preference";
 
 type ServerStatus = {
   mode: "supabase" | "local";
   serverStorageEnabled: boolean;
 };
+
+let accountsCache: { value: InstagramAccount[]; savedAt: number } | null = null;
+let accountsLoadPromise: Promise<InstagramAccount[]> | null = null;
 
 async function requestStorageJson<T>(url: string, init?: RequestInit): Promise<T> {
   try {
@@ -54,13 +58,25 @@ export async function getServerStorageStatus(): Promise<ServerStatus> {
 }
 
 export async function loadAccountsData() {
+  if (accountsCache && Date.now() - accountsCache.savedAt < 30_000) return accountsCache.value;
+  if (accountsLoadPromise) return accountsLoadPromise;
+  accountsLoadPromise = (async () => {
+    try {
+      const data = await requestStorageJson<{ accounts: InstagramAccount[] }>("/api/data/accounts");
+      saveAccounts(data.accounts);
+      accountsCache = { value: data.accounts, savedAt: Date.now() };
+      return data.accounts;
+    } catch (error) {
+      logStorageFallback("accounts-load", error);
+      const accounts = loadAccounts();
+      accountsCache = { value: accounts, savedAt: Date.now() };
+      return accounts;
+    }
+  })();
   try {
-    const data = await requestStorageJson<{ accounts: InstagramAccount[] }>("/api/data/accounts");
-    saveAccounts(data.accounts);
-    return data.accounts;
-  } catch (error) {
-    logStorageFallback("accounts-load", error);
-    return loadAccounts();
+    return await accountsLoadPromise;
+  } finally {
+    accountsLoadPromise = null;
   }
 }
 
@@ -68,10 +84,44 @@ export async function loadPostsData() {
   try {
     const data = await requestStorageJson<{ posts: InstagramPost[] }>("/api/data/posts");
     savePosts(data.posts);
-    return data.posts;
+    return filterPostsForSelectedAccount(data.posts);
   } catch (error) {
     logStorageFallback("posts-load", error);
-    return loadPosts();
+    return filterPostsForSelectedAccount(loadPosts());
+  }
+}
+
+export async function saveAccountsData(accounts: InstagramAccount[]) {
+  try {
+    const data = await requestStorageJson<{ accounts: InstagramAccount[] }>("/api/data/accounts", {
+      method: "POST",
+      body: JSON.stringify({ accounts }),
+    });
+    saveAccounts(data.accounts);
+    accountsCache = { value: data.accounts, savedAt: Date.now() };
+    return data.accounts;
+  } catch (error) {
+    logStorageFallback("accounts-save", error);
+    const restoredIds = new Set(accounts.map((account) => account.id));
+    const merged = [...accounts, ...loadAccounts().filter((account) => !restoredIds.has(account.id))];
+    saveAccounts(merged);
+    accountsCache = { value: merged, savedAt: Date.now() };
+    return accounts;
+  }
+}
+
+export async function savePostsData(posts: InstagramPost[]) {
+  try {
+    const data = await requestStorageJson<{ posts: InstagramPost[] }>("/api/data/posts", {
+      method: "POST",
+      body: JSON.stringify({ posts }),
+    });
+    savePosts(data.posts);
+    return data.posts;
+  } catch (error) {
+    logStorageFallback("posts-save", error);
+    upsertManyPosts(posts);
+    return posts;
   }
 }
 

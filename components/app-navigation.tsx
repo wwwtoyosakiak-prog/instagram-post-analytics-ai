@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -11,6 +12,9 @@ import {
   ListChecks,
   User,
 } from "lucide-react";
+import { loadAccountsData } from "@/lib/cloud-storage";
+import type { InstagramAccount } from "@/lib/types";
+import { getSelectedAccountId, setSelectedAccountId } from "@/lib/account-preference";
 
 const primaryNav = [
   { href: "/", label: "ホーム", icon: Home },
@@ -36,6 +40,13 @@ export function AppNavigation() {
   const pathname = usePathname();
   const firstSegment = pathname.split("/").filter(Boolean)[0];
   const currentName = pathname === "/" ? "ホーム" : pageNames[firstSegment] ?? "便利な機能";
+  const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [selectedAccountId, setSelectedAccount] = useState("all");
+
+  useEffect(() => {
+    setSelectedAccount(getSelectedAccountId());
+    loadAccountsData().then(setAccounts);
+  }, []);
 
   return (
     <>
@@ -46,7 +57,26 @@ export function AppNavigation() {
             <span className="hidden sm:inline">Instagram投稿分析AI</span>
           </Link>
 
-          <nav aria-label="メインメニュー" className="order-3 flex w-full gap-1 overflow-x-auto sm:order-2 sm:w-auto">
+          {accounts.length > 1 ? (
+            <label className="flex min-w-0 items-center gap-2 text-xs text-stone-500">
+              <span className="hidden lg:inline">表示中</span>
+              <select
+                aria-label="表示するInstagramアカウント"
+                className="h-10 max-w-44 py-1"
+                value={selectedAccountId}
+                onChange={(event) => {
+                  setSelectedAccountId(event.target.value);
+                  setSelectedAccount(event.target.value);
+                  window.location.reload();
+                }}
+              >
+                <option value="all">すべて</option>
+                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </select>
+            </label>
+          ) : null}
+
+          <nav aria-label="メインメニュー" className="order-3 hidden w-full gap-1 overflow-x-auto md:order-2 md:flex md:w-auto">
             {primaryNav.map((item) => {
               const Icon = item.icon;
               const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -66,6 +96,18 @@ export function AppNavigation() {
           <Link href="/" className="hover:text-ink">ホーム</Link>
           {pathname !== "/" ? <><span className="mx-2">/</span><span className="font-medium text-stone-700">{currentName}</span></> : null}
         </div>
+      </nav>
+      <nav aria-label="スマートフォン用メニュー" className="mobile-bottom-nav md:hidden">
+        {primaryNav.slice(0, 4).concat(primaryNav[5]).map((item) => {
+          const Icon = item.icon;
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={active ? "mobile-nav-active" : ""}>
+              <Icon size={19} aria-hidden />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </>
   );

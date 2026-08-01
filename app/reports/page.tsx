@@ -8,6 +8,7 @@ import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, Instagram
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 import { calculateInsightGrowth, InsightGrowthSummary } from "@/lib/insight-growth";
 import { requestJson } from "@/lib/client-api";
+import { getSelectedAccountId } from "@/lib/account-preference";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -32,6 +33,7 @@ export default function ReportsPage() {
     Promise.all([loadPostsData(), loadAccountsData(), loadAllInsightData(), loadLatestAnalysesData()]).then(([loadedPosts, loadedAccounts, loadedInsights, analyses]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
+      setAccountId(getSelectedAccountId());
       setInsightHistory(loadedInsights);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
       setMonth(initialMonth);
