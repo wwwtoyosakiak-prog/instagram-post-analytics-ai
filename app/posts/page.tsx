@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, PageHeader, PageLoading, Stat } from "@/components/ui";
-import { loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
+import { loadLatestAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics } from "@/lib/metrics";
 import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia } from "@/lib/post-merge";
@@ -96,15 +96,12 @@ export default function PostsPage() {
     Promise.all([
       loadPostsData(),
       requestJsonOr<{ data: ApiMedia[] }>("/api/instagram/media?limit=100", { data: [] }),
-    ]).then(([loadedPosts, mediaJson]) => {
+      loadLatestAnalysesData(),
+    ]).then(([loadedPosts, mediaJson, analyses]) => {
       setPosts(loadedPosts);
       setApiMedia((mediaJson as { data: ApiMedia[] }).data ?? []);
+      setLatestScoreByPostId(Object.fromEntries(analyses.map((analysis) => [analysis.postId, analysis.score])));
       setLoading(false);
-      Promise.all(
-        loadedPosts.map(async (p) => [p.id, (await loadAnalysesData(p.id))[0]?.score] as const)
-      ).then((scores) => {
-        setLatestScoreByPostId(Object.fromEntries(scores.filter(([, s]) => typeof s === "number")));
-      });
     });
   }, []);
 

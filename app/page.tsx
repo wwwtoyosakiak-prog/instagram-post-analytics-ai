@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarDays, Check, CheckCircle2, ClipboardList, FileText, KeyRound, ListChecks, User } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
-import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
+import { getServerStorageStatus, loadLatestAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { requestJsonOr } from "@/lib/client-api";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
@@ -21,14 +21,13 @@ export default function Home() {
       loadPostsData(),
       getServerStorageStatus(),
       requestJsonOr<{ status?: string } | null>("/api/instagram/token/status", null),
-    ]).then(([loadedPosts, status, token]) => {
+      loadLatestAnalysesData(),
+    ]).then(([loadedPosts, status, token, analyses]) => {
       setPosts(loadedPosts);
       setServerStorageEnabled(status.serverStorageEnabled);
       setTokenStatus(token?.status ?? null);
-      Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
-        setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
-        setLoaded(true);
-      });
+      setLatestAnalysisByPostId(Object.fromEntries(analyses.map((analysis) => [analysis.postId, analysis])));
+      setLoaded(true);
     });
   }, []);
 

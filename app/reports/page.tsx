@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button, EmptyState, PageHeader, Panel, Stat } from "@/components/ui";
-import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
+import { loadAccountsData, loadAllInsightData, loadLatestAnalysesData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 import { calculateInsightGrowth, InsightGrowthSummary } from "@/lib/insight-growth";
@@ -29,16 +29,14 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setReportGeneratedAt(new Date().toISOString());
-    Promise.all([loadPostsData(), loadAccountsData(), loadAllInsightData()]).then(([loadedPosts, loadedAccounts, loadedInsights]) => {
+    Promise.all([loadPostsData(), loadAccountsData(), loadAllInsightData(), loadLatestAnalysesData()]).then(([loadedPosts, loadedAccounts, loadedInsights, analyses]) => {
       setPosts(loadedPosts);
       setAccounts(loadedAccounts);
       setInsightHistory(loadedInsights);
       const initialMonth = loadedPosts[0]?.date.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
       setMonth(initialMonth);
       setFiscalYear(String(getFiscalYear(initialMonth, 4)));
-      Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
-        setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
-      });
+      setLatestAnalysisByPostId(Object.fromEntries(analyses.map((analysis) => [analysis.postId, analysis])));
     });
   }, []);
 

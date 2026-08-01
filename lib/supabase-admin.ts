@@ -568,6 +568,15 @@ export async function listAnalysesFromSupabase(postId: string) {
   return rows.map(mapAnalysis);
 }
 
+export async function listLatestAnalysesFromSupabase() {
+  const rows = await supabaseRequest<AnalysisRow[]>("instagram_post_analyses?select=*&order=created_at.desc");
+  const latestByPostId = new Map<string, AiAnalysisRecord>();
+  for (const row of rows) {
+    if (!latestByPostId.has(row.post_id)) latestByPostId.set(row.post_id, mapAnalysis(row));
+  }
+  return [...latestByPostId.values()];
+}
+
 export async function createScoreHistoryInSupabase(input: AiScoreHistoryInput) {
   const rows = await supabaseRequest<ScoreHistoryRow[]>("ai_score_history", {
     method: "POST",
