@@ -109,6 +109,16 @@ export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord
   }
 }
 
+export async function loadLatestAnalysesData(): Promise<AiAnalysisRecord[]> {
+  try {
+    const data = await requestStorageJson<{ analyses: AiAnalysisRecord[] }>("/api/data/analyses?latest=true");
+    return data.analyses;
+  } catch (error) {
+    logStorageFallback("latest-analyses-load", error);
+    return [];
+  }
+}
+
 export async function loadInsightData(postId: string): Promise<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }> {
   try {
     return await requestStorageJson<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }>(`/api/data/insights?postId=${encodeURIComponent(postId)}`);

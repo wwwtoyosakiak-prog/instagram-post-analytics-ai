@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   loadAllInsightData,
-  loadAnalysesData,
   loadPostsData,
   loadSyncRunsData,
 } from "@/lib/cloud-storage";
@@ -45,10 +44,6 @@ export function useDashboardData() {
       (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
     )[0];
     if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
-
-    void Promise.all(
-      loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const),
-    );
   }, []);
 
   const refreshApiData = useCallback(async () => {

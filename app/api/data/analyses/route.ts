@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAnalysisInSupabase, isSupabaseConfigured, listAnalysesFromSupabase } from "@/lib/supabase-admin";
+import { createAnalysisInSupabase, isSupabaseConfigured, listAnalysesFromSupabase, listLatestAnalysesFromSupabase } from "@/lib/supabase-admin";
 import { AiAnalysis } from "@/lib/types";
 
 function disabledResponse() {
@@ -8,6 +8,10 @@ function disabledResponse() {
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured) return disabledResponse();
+  if (request.nextUrl.searchParams.get("latest") === "true") {
+    const analyses = await listLatestAnalysesFromSupabase();
+    return NextResponse.json({ analyses });
+  }
   const postId = request.nextUrl.searchParams.get("postId");
   if (!postId) return NextResponse.json({ error: "postId is required." }, { status: 400 });
   const analyses = await listAnalysesFromSupabase(postId);
