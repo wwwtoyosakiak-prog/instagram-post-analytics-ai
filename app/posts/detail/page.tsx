@@ -2,14 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
-import { deletePostData, loadAccountsData, loadAnalysesData, loadInsightData, loadPostsData, saveAnalysisData } from "@/lib/cloud-storage";
-import { AiAnalysis, AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
-import { formatPercent, getMetrics, postTypeLabels } from "@/lib/metrics";
-import { matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
+import { AiAnalysis, AiAnalysisRecord, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
+import { formatPercent, postTypeLabels } from "@/lib/metrics";
+import type { ApiMedia } from "@/lib/post-merge";
+import { usePostDetail } from "@/components/posts/use-post-detail";
 
 export default function PostDetailPage() {
   return (
@@ -21,91 +21,36 @@ export default function PostDetailPage() {
 
 function PostDetailContent() {
   const params = useSearchParams();
-  const router = useRouter();
   const id = params.get("id") ?? "";
-  const [post, setPost] = useState<InstagramPost | null>(null);
-  const [account, setAccount] = useState<InstagramAccount | null>(null);
-  const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
-  const [analysisHistory, setAnalysisHistory] = useState<AiAnalysisRecord[]>([]);
-  const [latestInsight, setLatestInsight] = useState<InstagramInsightSnapshot | null>(null);
-  const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
-  const [matchedMedia, setMatchedMedia] = useState<ApiMedia | null>(null);
-  const [insightLoading, setInsightLoading] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [savingAnalysis, setSavingAnalysis] = useState(false);
-  const [error, setError] = useState("");
-  const [analysisMessage, setAnalysisMessage] = useState("");
-
-  useEffect(() => {
-    setInsightLoading(true);
-    Promise.all([
-      loadPostsData(),
-      loadAccountsData(),
-      loadAnalysesData(id),
-      loadInsightData(id),
-      fetch("/api/instagram/media?limit=200").then((r) => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
-    ]).then(([posts, accounts, analyses, insightData, mediaJson]) => {
-      const foundPost = posts.find((item) => item.id === id) ?? null;
-      setPost(foundPost);
-      setAccount(accounts[0] ?? null);
-      setAnalysisHistory(analyses);
-      setAnalysis(analyses[0] ?? null);
-      setLatestInsight(insightData.insight);
-      setInsightHistory(insightData.insights);
-      const mediaList = (mediaJson as { data?: ApiMedia[] }).data ?? [];
-      setMatchedMedia(foundPost ? matchPostToMedia(foundPost, mediaList) ?? null : null);
-      setInsightLoading(false);
-    });
-  }, [id]);
+  const {
+    post,
+    metrics,
+    analysis,
+    setAnalysis,
+    analysisHistory,
+    latestInsight,
+    insightHistory,
+    matchedMedia,
+    insightLoading,
+    analyzing,
+    savingAnalysis,
+    error,
+    analysisMessage,
+    analyze,
+    removePost,
+  } = usePostDetail(id);
 
   if (!post) {
     return <PageHeader title="投稿が見つかりません" description="一覧から投稿を選び直してください。" />;
   }
 
-  const metrics = getMetrics(post);
-
-  const analyze = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ post, account })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "分析に失敗しました。");
-      setAnalysis(data.analysis);
-      setSavingAnalysis(true);
-      const saved = await saveAnalysisData(post.id, data.analysis);
-      if (saved) {
-        setAnalysisHistory((current) => [saved, ...current]);
-        setAnalysis(saved);
-        setAnalysisMessage("AI分析結果を保存しました。");
-      } else {
-        setAnalysisMessage("AI分析結果を表示しました。サーバー保存は未設定です。");
-      }
-    } catch {
-      setError("GitHub Pages公開版ではOpenAI分析は動きません。利用する場合はVercelなどのAPIが動く環境で公開してください。");
-    } finally {
-      setLoading(false);
-      setSavingAnalysis(false);
-    }
-  };
-
-  const removePost = async () => {
-    if (!window.confirm("この投稿データを削除しますか？")) return;
-    await deletePostData(post.id);
-    router.push("/posts");
-  };
-
   return (
     <div>
       <PageHeader title="投稿詳細・AI分析" description="投稿内容、画像、数値をもとに改善案を確認します。" />
       <div className="grid gap-4 md:grid-cols-3">
-        <Stat label="エンゲージメント数" value={metrics.engagement.toLocaleString()} />
-        <Stat label="反応率" value={formatPercent(metrics.engagementRate)} note="いいね等の反応 ÷ 表示数" />
-        <Stat label="保存率" value={formatPercent(metrics.saveRate)} />
+        <Stat label="エンゲージメント数" value={metrics!.engagement.toLocaleString()} />
+        <Stat label="反応率" value={formatPercent(metrics!.engagementRate)} note="いいね等の反応 ÷ 表示数" />
+        <Stat label="保存率" value={formatPercent(metrics!.saveRate)} />
       </div>
       <LatestInsightSection
         insight={latestInsight}
@@ -151,7 +96,7 @@ function PostDetailContent() {
         </Panel>
         <Panel>
           <div className="mb-4 flex flex-wrap gap-2">
-            <Button onClick={analyze} disabled={loading || savingAnalysis}>{loading ? "分析中..." : savingAnalysis ? "保存中..." : "OpenAIで分析・保存"}</Button>
+            <Button onClick={analyze} disabled={analyzing || savingAnalysis}>{analyzing ? "分析中..." : savingAnalysis ? "保存中..." : "OpenAIで分析・保存"}</Button>
           </div>
           {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           {analysisMessage ? <p className="mb-4 rounded-md bg-skyglass px-3 py-2 text-sm text-ink">{analysisMessage}</p> : null}
