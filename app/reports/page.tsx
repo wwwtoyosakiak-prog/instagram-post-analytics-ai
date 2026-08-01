@@ -241,14 +241,15 @@ export default function ReportsPage() {
           </div>
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full text-sm">
+              <caption className="sr-only">月ごとの投稿数、表示数、保存数、保存率、エンゲージメント率</caption>
               <thead>
                 <tr className="border-b border-stone-200 text-left text-stone-500">
-                  <th className="py-2 pr-4">月</th>
-                  <th className="py-2 pr-4">投稿</th>
-                  <th className="py-2 pr-4">表示数</th>
-                  <th className="py-2 pr-4">保存数</th>
-                  <th className="py-2 pr-4">保存率</th>
-                  <th className="py-2 pr-4">ER</th>
+                  <th scope="col" className="py-2 pr-4">月</th>
+                  <th scope="col" className="py-2 pr-4">投稿</th>
+                  <th scope="col" className="py-2 pr-4">表示数</th>
+                  <th scope="col" className="py-2 pr-4">保存数</th>
+                  <th scope="col" className="py-2 pr-4">保存率</th>
+                  <th scope="col" className="py-2 pr-4">ER</th>
                 </tr>
               </thead>
               <tbody>

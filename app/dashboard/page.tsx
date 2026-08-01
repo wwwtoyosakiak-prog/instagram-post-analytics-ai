@@ -819,6 +819,7 @@ export default function DashboardPage() {
             <SectionLead eyebrow="History" title="同期履歴一覧" description="直近5回の実行結果を確認できます。" />
             <div className="mt-4 overflow-auto">
               <table>
+                <caption className="sr-only">直近5回の同期予定と実行結果</caption>
                 <thead>
                   <tr><th>予定時刻</th><th>実施時刻</th><th>種別</th><th>状態</th><th>取得</th><th>投稿保存</th><th>履歴保存</th><th>エラー内容</th></tr>
                 </thead>
@@ -863,6 +864,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-3 gap-1 rounded-md border border-stone-200 bg-white/80 p-1" aria-label="動画ランキング期間">
                 {(["day", "week", "month"] as const).map((period) => (
                   <button key={period} type="button"
+                    aria-pressed={videoPeriod === period}
                     onClick={() => { setVideoPeriod(period); setGrowthAnalysis(null); setGrowthAnalysisError(""); }}
                     className={`h-9 min-w-16 rounded px-3 text-sm font-semibold transition ${videoPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}>
                     {period === "day" ? "日" : period === "week" ? "週" : "月"}
