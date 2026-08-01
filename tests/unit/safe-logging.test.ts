@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { logServerIssue, redactSensitiveLogText, safeErrorMessage } from "@/lib/safe-logging";
+import { logClientIssue, logServerIssue, redactSensitiveLogText, safeErrorMessage } from "@/lib/safe-logging";
 
 describe("safe logging", () => {
   it("URL、トークン、長い識別子を伏字にする", () => {
@@ -28,5 +28,28 @@ describe("safe logging", () => {
 
   it("不明な値には安全な既定メッセージを使う", () => {
     expect(safeErrorMessage({ token: "secret" })).toBe("処理に失敗しました。");
+  });
+
+  it("クライアントログでも機密情報を伏字にする", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    logClientIssue("profile-load", new Error("failed https://example.com/private?token=secret"));
+
+    expect(spy).toHaveBeenCalledWith("[profile-load] failed [REDACTED_URL]");
+    expect(JSON.stringify(spy.mock.calls)).not.toContain("secret");
+    spy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it("本番環境ではクライアント警告を出さない", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    logClientIssue("profile-load", new Error("offline"));
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+    vi.unstubAllEnvs();
   });
 });
