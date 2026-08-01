@@ -1,13 +1,8 @@
 'use client';
 
 import Image from "next/image";
-import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
-import { Button, PageHeader, Panel } from "@/components/ui";
+import { PageHeader, Panel } from "@/components/ui";
 import {
   InstagramInsightSnapshot,
   PostType,
@@ -22,19 +17,16 @@ import type {
   SyncHistoryRow,
 } from "@/components/dashboard/types";
 import {
-  ChartPanel,
   CompareStat,
-  DateWeekdayTick,
   GraphPeriodTabs,
-  GrowthPattern,
-  GrowthSummaryPanel,
   HeroStat,
   Insight,
   MiniMetric,
   SectionLead,
-  SourceBadge,
   SyncInfoRow,
 } from "@/components/dashboard/widgets";
+import { DashboardCharts, HourlyInsightPanel, PeriodGrowthSection } from "@/components/dashboard/analysis-sections";
+import { VideoRankingSection, type VideoRankingPeriod } from "@/components/dashboard/video-ranking-section";
 import {
   SCHEDULED_SYNC_TIMES_LABEL,
   SCHEDULED_SYNC_HOURS,
@@ -46,7 +38,6 @@ import {
   formatOptionalMetric,
   formatTimeJst,
   getDateRangeKeys,
-  getPostPreview,
   getPreviousRangeKeys,
   getScheduledPlannedAtFromStartedAt,
   getScheduledPlannedLabel,
@@ -82,7 +73,7 @@ export default function DashboardPage() {
   } = useDashboardData();
 
   // ── UI state ──
-  const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
+  const [videoPeriod, setVideoPeriod] = useState<VideoRankingPeriod>("day");
   const [graphPeriod, setGraphPeriod] = useState<GraphPeriod>("30");
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
@@ -854,80 +845,19 @@ export default function DashboardPage() {
             </div>
           </Panel>
 
-          {/* 伸びている動画ランキング */}
-          <section className="mb-6 border-y border-stone-200 py-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-ink">伸びている動画ランキング</h2>
-                <p className="mt-1 text-sm text-stone-600">同期履歴から期間内の閲覧数増加を比較します。</p>
-              </div>
-              <div className="grid grid-cols-3 gap-1 rounded-md border border-stone-200 bg-white/80 p-1" aria-label="動画ランキング期間">
-                {(["day", "week", "month"] as const).map((period) => (
-                  <button key={period} type="button"
-                    aria-pressed={videoPeriod === period}
-                    onClick={() => { setVideoPeriod(period); setGrowthAnalysis(null); setGrowthAnalysisError(""); }}
-                    className={`h-9 min-w-16 rounded px-3 text-sm font-semibold transition ${videoPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}>
-                    {period === "day" ? "日" : period === "week" ? "週" : "月"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {growingVideos.length ? (
-              <div className="mt-5 grid gap-2">
-                {growingVideos.map((item, index) => (
-                  <Link key={item.post.id} href={`/posts/detail?id=${item.post.id}`}
-                    className="grid gap-3 border-b border-stone-200 px-2 py-4 transition hover:bg-white/60 md:grid-cols-[52px_64px_1fr_auto] md:items-center">
-                    <span className="text-2xl font-bold text-clay">{index + 1}</span>
-                    {getPostPreview(item.post) ? (
-                      <Image
-                        src={getPostPreview(item.post)}
-                        alt="投稿サムネイル"
-                        width={64}
-                        height={64}
-                        unoptimized
-                        className="h-16 w-16 rounded-md object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-16 w-16 items-center justify-center rounded-md bg-fog text-[10px] text-stone-500">画像なし</span>
-                    )}
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5">
-                        <span className="block truncate font-semibold text-ink">{videoTitle(item.post)}</span>
-                        <SourceBadge source={item.hasApiData ? 'api' : 'manual'} />
-                      </span>
-                      <span className="mt-1 block text-xs text-stone-500">投稿日 {item.post.date} / リーチ {item.reach.toLocaleString()}</span>
-                    </span>
-                    <span className="text-left md:text-right">
-                      <span className="block text-lg font-bold text-ink">+{item.growth.toLocaleString()} 閲覧</span>
-                      <span className="mt-1 block text-xs text-stone-500">現在 {item.views.toLocaleString()} / 履歴 {item.snapshotCount}回</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-5 rounded-md border border-dashed border-stone-300 px-4 py-5 text-sm text-stone-600">この期間に同期された動画データがありません。</p>
-            )}
-            <p className="mt-3 text-xs leading-5 text-stone-500">期間内の履歴が1回だけの場合は、現在の閲覧数を増加値として表示します。継続同期すると実際の差分になります。</p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button onClick={analyzeGrowingVideos} disabled={!growingVideos.length || growthAnalysisLoading}>
-                {growthAnalysisLoading ? "共通点を分析中..." : "上位動画の共通点をAI分析"}
-              </Button>
-              {growthAnalysisError ? <p className="text-sm text-red-700">{growthAnalysisError}</p> : null}
-            </div>
-            {growthAnalysis ? (
-              <div className="mt-6 border-t border-stone-200 pt-5">
-                <h3 className="font-semibold text-ink">AIによる共通点分析</h3>
-                <p className="mt-2 text-sm leading-6 text-stone-700">{growthAnalysis.summary}</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <GrowthPattern title="冒頭文・フック" items={growthAnalysis.openingPatterns} />
-                  <GrowthPattern title="テーマ" items={growthAnalysis.themes} />
-                  <GrowthPattern title="動画形式・構成" items={growthAnalysis.formatPatterns} />
-                  <GrowthPattern title="ハッシュタグ" items={growthAnalysis.hashtagPatterns} />
-                  <GrowthPattern title="次回アクション" items={growthAnalysis.nextActions} />
-                </div>
-              </div>
-            ) : null}
-          </section>
+          <VideoRankingSection
+            period={videoPeriod}
+            onPeriodChange={(period) => {
+              setVideoPeriod(period);
+              setGrowthAnalysis(null);
+              setGrowthAnalysisError("");
+            }}
+            videos={growingVideos}
+            analysis={growthAnalysis}
+            analysisLoading={growthAnalysisLoading}
+            analysisError={growthAnalysisError}
+            onAnalyze={() => { void analyzeGrowingVideos(); }}
+          />
 
           {/* 読み取りポイント */}
           <Panel className="mb-6">
@@ -944,89 +874,9 @@ export default function DashboardPage() {
         </>
       ) : null}
 
-      {/* チャート */}
-      <section className="mt-8">
-        <SectionLead eyebrow="Charts" title="推移と比較" description="時系列の流れ、投稿タイプ差、カテゴリ差を横断して確認できるグラフ群です。" />
-        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm text-stone-600">{data.graphPeriodLabel}の投稿 {data.graphCount}件をもとに集計しています。期間切替は上のタブと共通です。</p>
-        </div>
-      </section>
-      <div className="mt-4 grid gap-6 lg:grid-cols-2">
-        <ChartPanel title="日別表示数の推移" description="投稿日ごとの表示数の流れです。大きく伸びた日を先に把握できます。" accent="clay" className="lg:col-span-2" chartHeightClassName="h-80">
-          <LineChart data={data.dailyViews} margin={{ top: 8, right: 12, left: 0, bottom: 12 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="axisLabel"
-              interval="preserveStartEnd"
-              minTickGap={18}
-              tickMargin={10}
-              tick={<DateWeekdayTick />}
-              height={52}
-            />
-            <YAxis />
-            <Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.tooltipLabel ?? ""} />
-            <Line type="monotone" dataKey="views" name="表示数" stroke="#b55d3e" strokeWidth={2} />
-          </LineChart>
-        </ChartPanel>
-        <ChartPanel title="投稿タイプ別の平均表示数" description="動画・画像など、形式ごとの平均表示数を比較します。" accent="moss">
-          <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageViews" name="平均表示数" fill="#53624a" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="投稿タイプ別の平均エンゲージメント率" description="反応率が高い投稿形式を比較します。" accent="clay">
-          <BarChart data={data.typeData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageEngagementRate" name="平均エンゲージメント率" fill="#b55d3e" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="曜日別の平均エンゲージメント率" description="反応が出やすい曜日の偏りを確認します。" accent="sky">
-          <BarChart data={data.weekdayData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="averageEngagementRate" name="平均エンゲージメント率" fill="#2f766d" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="保存数ランキング" description="保存されやすかった投稿を上位順に見ます。" accent="moss">
-          <BarChart data={data.saveRank}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="saves" name="保存数" fill="#53624a" /></BarChart>
-        </ChartPanel>
-        <ChartPanel title="いいね数ランキング" description="いいね数の上位投稿を一覧で確認します。" accent="clay">
-          <BarChart data={data.likeRank}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Legend /><Bar dataKey="likes" name="いいね数" fill="#b55d3e" /></BarChart>
-        </ChartPanel>
-      </div>
-
-      {/* 時間別閲覧数 */}
-      <Panel className="mt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="font-semibold">時間別の閲覧数変化</h2>
-            <p className="mt-1 text-sm text-stone-600">1日4回の定期同期で保存したインサイトを、選択日の時間帯ごとに表示します。</p>
-          </div>
-          <div className="w-full sm:w-52">
-            <label htmlFor="insight-date">表示する日</label>
-            <input id="insight-date" type="date" value={insightDate} onChange={(event) => setInsightDate(event.target.value)} />
-          </div>
-        </div>
-        {hourlyInsightData.length ? (
-          <div className="mt-5 h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hourlyInsightData}>
-                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" /><YAxis />
-                <Tooltip
-  formatter={(value, name) => [
-    Number(value ?? 0).toLocaleString(),
-    String(name),
-  ]}
-/>
-                <Legend />
-                <Line type="monotone" dataKey="views" name="合計閲覧数" stroke="#b55d3e" strokeWidth={2} />
-                <Line type="monotone" dataKey="growth" name="前回からの増加" stroke="#2f766d" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p className="mt-5 rounded-md bg-fog p-4 text-sm text-stone-600">選択日の同期履歴はまだありません。</p>
-        )}
-      </Panel>
-
-      {/* 週・月の伸び */}
-      <section className="mt-6 border-y border-stone-200 py-6">
-        <SectionLead eyebrow="Growth" title="週・月の伸び" description="Instagram API の同期履歴から、期間内にどれだけ増えたかを比較します。" />
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <GrowthSummaryPanel title="一週間" summary={periodGrowth.week} />
-          <GrowthSummaryPanel title="一ヶ月" summary={periodGrowth.month} />
-        </div>
-      </section>
+      <DashboardCharts data={data} />
+      <HourlyInsightPanel insightDate={insightDate} onInsightDateChange={setInsightDate} rows={hourlyInsightData} />
+      <PeriodGrowthSection week={periodGrowth.week} month={periodGrowth.month} />
     </div>
   );
 }
