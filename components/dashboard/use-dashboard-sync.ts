@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { requestJson } from "@/lib/client-api";
 
 type RefreshDashboard = () => Promise<void>;
 
@@ -31,11 +32,15 @@ export function useDashboardSync(
     setSyncErrorMessage("");
 
     try {
-      const response = await fetch("/api/instagram/full-sync", { method: "POST" });
-      const result = await response.json() as FullSyncResponse;
+      const result = await requestJson<FullSyncResponse>(
+        "/api/instagram/full-sync",
+        { method: "POST" },
+        "同期に失敗しました。",
+        120_000,
+      );
       const firstError = result.error ?? result.errors?.[0] ?? "同期に失敗しました。";
 
-      if ((!response.ok && response.status !== 207) || result.ok === false) {
+      if (result.ok === false) {
         throw new Error(firstError);
       }
 
@@ -45,7 +50,7 @@ export function useDashboardSync(
       const savedPosts = result.media_saved ?? 0;
       const savedInsights = result.insights_fetched ?? 0;
       const failedInsights = result.insights_failed ?? 0;
-      const isPartial = result.status === "partial" || failedInsights > 0 || response.status === 207;
+      const isPartial = result.status === "partial" || failedInsights > 0;
 
       setSyncMsg(
         `${isPartial ? "⚠️ 一部完了" : "✅ 同期完了"}: 取得${fetchedPosts}件 / 投稿保存${savedPosts}件 / 履歴保存${savedInsights}件 / 失敗${failedInsights}件`,

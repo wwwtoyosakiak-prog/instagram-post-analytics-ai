@@ -8,6 +8,7 @@ import { loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics } from "@/lib/metrics";
 import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia } from "@/lib/post-merge";
+import { requestJsonOr } from "@/lib/client-api";
 
 // ── 型 ──────────────────────────────────────────────────────
 
@@ -94,9 +95,7 @@ export default function PostsPage() {
   useEffect(() => {
     Promise.all([
       loadPostsData(),
-      fetch("/api/instagram/media?limit=100")
-        .then((r) => r.ok ? r.json() : { data: [] })
-        .catch(() => ({ data: [] })),
+      requestJsonOr<{ data: ApiMedia[] }>("/api/instagram/media?limit=100", { data: [] }),
     ]).then(([loadedPosts, mediaJson]) => {
       setPosts(loadedPosts);
       setApiMedia((mediaJson as { data: ApiMedia[] }).data ?? []);

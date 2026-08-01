@@ -62,6 +62,7 @@ import {
 } from "@/components/dashboard/utils";
 import { useDashboardSync } from "@/components/dashboard/use-dashboard-sync";
 import { useDashboardData } from "@/components/dashboard/use-dashboard-data";
+import { requestJson } from "@/lib/client-api";
 
 // ── メインページ（統合ダッシュボード） ────────────────────
 
@@ -171,13 +172,11 @@ export default function DashboardPage() {
     setGrowthAnalysisLoading(true);
     setGrowthAnalysisError("");
     try {
-      const response = await fetch("/api/instagram/growth-analysis", {
+      const data = await requestJson<{ analysis: GrowthAnalysis }>("/api/instagram/growth-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ posts: growingVideos, period: videoPeriod, account: null })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "共通点分析に失敗しました。");
+      }, "共通点分析に失敗しました。");
       setGrowthAnalysis(data.analysis);
     } catch (error) {
       setGrowthAnalysisError(error instanceof Error ? error.message : "共通点分析に失敗しました。");
