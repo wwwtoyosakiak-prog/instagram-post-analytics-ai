@@ -3,11 +3,7 @@
  * Supabaseから投稿一覧と最新インサイトを返す
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function supabase() {
-  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-}
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -15,7 +11,14 @@ export async function GET(req: NextRequest) {
   const mediaType = searchParams.get('media_type'); // IMAGE / VIDEO / CAROUSEL_ALBUM
   const limit = parseInt(searchParams.get('limit') ?? '50');
 
-  const db = supabase();
+  const db = getSupabaseServerClient();
+  if (!db) {
+    return NextResponse.json({
+      configured: false,
+      data: [],
+      message: 'Instagramデータベースが未接続です。',
+    });
+  }
   let query = db
     .from('instagram_media')
     .select(`
@@ -46,5 +49,5 @@ export async function GET(req: NextRequest) {
     return { ...m, latest_insights: latest, instagram_media_insights: undefined };
   });
 
-  return NextResponse.json({ data: result });
+  return NextResponse.json({ configured: true, data: result });
 }

@@ -3,16 +3,34 @@
  * ダッシュボード用の集計データを返す
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
-function supabase() {
-  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+function emptyDashboard() {
+  return {
+    account: null,
+    totals: { posts: 0, reach: 0, impressions: 0, likes: 0, comments: 0, saved: 0, shares: 0, views: 0 },
+    avg_engagement_rate: 0,
+    top_by_views: [],
+    top_by_save_rate: [],
+    by_day_of_week: {},
+    by_hour: {},
+    by_media_type: {},
+    follower_snapshots: [],
+    account_insights_trend: [],
+  };
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('account_id');
-  const db = supabase();
+  const db = getSupabaseServerClient();
+  if (!db) {
+    return NextResponse.json({
+      configured: false,
+      message: 'Instagramデータベースが未接続です。',
+      ...emptyDashboard(),
+    });
+  }
 
   // アカウント情報
   let accountQuery = db
@@ -123,7 +141,7 @@ export async function GET(req: NextRequest) {
     .from('instagram_daily_snapshots')
     .select('date, followers_count')
     .order('date', { ascending: true })
-    .limit(90);
+    .limit(365);
   if (activeAccountId) snapQuery = snapQuery.eq('account_id', activeAccountId);
   const { data: snapshots } = await snapQuery;
 
@@ -132,12 +150,13 @@ export async function GET(req: NextRequest) {
     .from('instagram_account_insights')
     .select('date, reach, impressions, profile_views, website_clicks, follower_count')
     .order('date', { ascending: false })
-    .limit(90);
+    .limit(365);
   if (activeAccountId) aiQuery = aiQuery.eq('account_id', activeAccountId);
   const { data: accountInsightsRaw } = await aiQuery;
   const accountInsights = [...(accountInsightsRaw ?? [])].reverse();
 
   return NextResponse.json({
+    configured: true,
     account,
     totals,
     avg_engagement_rate: avgEngRate,

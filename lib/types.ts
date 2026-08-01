@@ -172,7 +172,62 @@ export type PostMetrics = {
   commentRate: number;
 };
 
+export type AiImprovementPriority = "high" | "medium" | "low";
+export type AiSuggestionConfidence = "high" | "medium" | "low";
+
+export type AiImprovementDetail = {
+  priority: AiImprovementPriority;
+  category: string;
+  issue: string;
+  suggestion: string;
+  example: string;
+};
+
+export type AiHashtagSuggestion = {
+  recommended: string[];
+  core: string[];
+  niche: string[];
+  local: string[];
+  remove: string[];
+  reason: string;
+  copyText: string;
+};
+
+export type AiPostingTimeSuggestion = {
+  bestDay: string;
+  bestTime: string;
+  alternatives: string[];
+  reason: string;
+  confidence: AiSuggestionConfidence;
+  evidence: "account_data" | "post_history" | "general_tendency";
+};
+
+export type AiCaptionSuggestion = {
+  hook: string;
+  hookOptions?: string[];
+  improvedCaption: string;
+  shortVersion: string;
+  reelVersion?: string;
+  ctaStrongVersion?: string;
+  callToAction: string;
+  ctaOptions?: string[];
+  changes: string[];
+  strategy?: string;
+};
+
+export type AiScoreBreakdown = {
+  total: number;
+  content: number;
+  visual: number;
+  caption: number;
+  engagement: number;
+  discoverability: number;
+  summary: string;
+  confidence: AiSuggestionConfidence;
+};
+
 export type AiAnalysis = {
+  analysisVersion?: 2;
   firstImpression: string;
   imageMessage: string;
   captionClarity: string;
@@ -183,12 +238,33 @@ export type AiAnalysis = {
   nextIdeas: string[];
   hashtags: string[];
   score: number;
+  improvementsDetailed?: AiImprovementDetail[];
+  hashtagSuggestion?: AiHashtagSuggestion;
+  postingTimeSuggestion?: AiPostingTimeSuggestion;
+  captionSuggestion?: AiCaptionSuggestion;
+  scoreBreakdown?: AiScoreBreakdown;
 };
 
 export type AiAnalysisRecord = AiAnalysis & {
   id: string;
   postId: string;
   scoreDelta: number | null;
+  createdAt: string;
+};
+
+export type AiScoreHistoryInput = {
+  postId: string;
+  analysisId: string | null;
+  score: number;
+  contentScore: number | null;
+  visualScore: number | null;
+  captionScore: number | null;
+  engagementScore: number | null;
+  discoverabilityScore: number | null;
+};
+
+export type AiScoreHistory = AiScoreHistoryInput & {
+  id: number;
   createdAt: string;
 };
 
@@ -211,22 +287,3 @@ export type MonthlyReportRecord = MonthlyReport & {
   createdAt: string;
   updatedAt: string;
 };
-
-export type MonthlyGoalInput = {
-  accountId?: string | null;
-  month: string;
-  targetPosts: number;
-  targetViews: number;
-  targetSaves: number;
-  targetSaveRate: number;
-  targetEngagementRate: number;
-  memo: string;
-};
-
-export type MonthlyGoal = MonthlyGoalInput & {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-

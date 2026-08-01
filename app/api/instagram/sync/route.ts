@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createInstagramGraphUrl, getInstagramGraphConfig, InstagramGraphConfig } from "@/lib/instagram-graph";
 import { InstagramSyncRun } from "@/lib/types";
+import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
+import { getMissingSupabaseEnvNames, supabaseRestRequest } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -99,8 +101,11 @@ function graphErrorMessage(error: GraphError | undefined, fallback: string) {
 }
 
 function logSyncError(error: SyncError) {
-  // Tokens and request URLs are intentionally excluded from server logs.
-  console.error("[instagram-sync]", JSON.stringify(error));
+  logServerIssue("instagram-sync", new Error(error.message), {
+    stage: error.stage,
+    code: error.code,
+    subcode: error.subcode,
+  });
 }
 
 async function graphRequest<T extends { error?: GraphError }>(url: URL): Promise<T> {
@@ -114,33 +119,8 @@ async function graphRequest<T extends { error?: GraphError }>(url: URL): Promise
   return data;
 }
 
-async function supabaseRequest<T>(path: string, init: RequestInit): Promise<T> {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase環境変数が設定されていません。");
-
-  const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...(init.headers || {})
-    },
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Supabase request failed (${response.status}): ${detail}`);
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
-}
-
 async function saveSyncRun(run: Omit<InstagramSyncRun, "id">) {
-  await supabaseRequest<unknown[]>("instagram_sync_runs", {
+  await supabaseRestRequest<unknown[]>("instagram_sync_runs", {
     method: "POST",
     body: JSON.stringify({
       trigger_type: run.triggerType,
@@ -165,12 +145,12 @@ async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">) {
   try {
     await saveSyncRun(run);
   } catch (error) {
-    console.error("[instagram-sync-run-save]", error);
+    logServerIssue("instagram-sync-run-save", error);
   }
 }
 
 async function getLatestScheduledSyncRun() {
-  const rows = await supabaseRequest<Array<{ finished_at: string }>>(
+  const rows = await supabaseRestRequest<Array<{ finished_at: string }>>(
     "instagram_sync_runs?trigger_type=eq.scheduled&api_mode=neq.full-sync&select=finished_at&order=finished_at.desc&limit=1",
     { method: "GET" }
   );
@@ -236,19 +216,19 @@ async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount |
   const username = posts.find((post) => post.username)?.username?.replace(/^@/, "").trim();
   if (!username) return null;
 
-  const linkedByApiUsername = await supabaseRequest<SyncedAccount[]>(
+  const linkedByApiUsername = await supabaseRestRequest<SyncedAccount[]>(
     `instagram_accounts?instagram_api_username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
     { method: "GET" }
   );
   if (linkedByApiUsername[0]) return linkedByApiUsername[0];
 
-  const existing = await supabaseRequest<SyncedAccount[]>(
+  const existing = await supabaseRestRequest<SyncedAccount[]>(
     `instagram_accounts?username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
     { method: "GET" }
   );
   if (existing[0]) return existing[0];
 
-  const created = await supabaseRequest<SyncedAccount[]>("instagram_accounts", {
+  const created = await supabaseRestRequest<SyncedAccount[]>("instagram_accounts", {
     method: "POST",
     body: JSON.stringify({
       name: username,
@@ -271,7 +251,7 @@ function toSyncError(error: unknown, stage: SyncError["stage"], postId?: string)
   return {
     postId,
     stage,
-    message: error instanceof Error ? error.message : "不明なエラー",
+    message: safeErrorMessage(error, "不明なエラー"),
     code: graphError?.code,
     subcode: graphError?.error_subcode,
     traceId: graphError?.fbtrace_id
@@ -338,7 +318,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
   const date = timestamp.slice(0, 10);
 
   try {
-    await supabaseRequest<unknown[]>("instagram_posts?on_conflict=id", {
+    await supabaseRestRequest<unknown[]>("instagram_posts?on_conflict=id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify({
@@ -373,7 +353,6 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
   let insights;
   try {
     const isReel = isReelPost(post.media_type, post.media_product_type, post.permalink);
-    console.log(`[instagram-sync] post ${post.id} media_type=${post.media_type} media_product_type=${post.media_product_type} permalink=${post.permalink} isReel=${isReel}`);
     insights = await fetchInsights(post.id, config, isReel);
   } catch (error) {
     const detail = toSyncError(error, "insights", post.id);
@@ -383,7 +362,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
   }
 
   try {
-    await supabaseRequest<unknown[]>("instagram_post_insight_snapshots", {
+    await supabaseRestRequest<unknown[]>("instagram_post_insight_snapshots", {
       method: "POST",
       body: JSON.stringify({
         post_id: post.id,
@@ -404,10 +383,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
 
 async function handler(triggerType: SyncTriggerType) {
   const startedAt = new Date().toISOString();
-  const missing = [
-    !process.env.SUPABASE_URL && "SUPABASE_URL",
-    !process.env.SUPABASE_SERVICE_ROLE_KEY && "SUPABASE_SERVICE_ROLE_KEY"
-  ].filter(Boolean);
+  const missing = getMissingSupabaseEnvNames();
   if (missing.length) {
     const capturedAt = new Date().toISOString();
     const payload: SyncResponseBody = {
@@ -458,7 +434,7 @@ async function handler(triggerType: SyncTriggerType) {
         } satisfies SyncResponseBody);
       }
     } catch (error) {
-      console.error("[instagram-sync-slot-check]", error);
+      logServerIssue("instagram-sync-slot-check", error);
     }
   }
 

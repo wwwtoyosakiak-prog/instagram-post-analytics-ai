@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { PageHeader } from "@/components/ui";
@@ -29,6 +30,7 @@ export default function AccountPage() {
   const [account, setAccount] = useState<InstagramAccount | null>(null);
   const [graphAccount, setGraphAccount] = useState<GraphApiAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionMessage, setConnectionMessage] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -52,6 +54,13 @@ export default function AccountPage() {
           media_count:     mediaCount,
         } as GraphApiAccount);
       }
+      setConnectionMessage(
+        dashData?.configured === false
+          ? dashData.message ?? "Instagramデータベースが未接続です。"
+          : dashData?.account
+            ? ""
+            : "Instagramデータはまだありません。ダッシュボードから同期してください。",
+      );
       setLoading(false);
     });
   }, []);
@@ -72,9 +81,12 @@ export default function AccountPage() {
           {/* プロフィール画像 */}
           <div className="shrink-0 flex justify-center md:justify-start">
             {graphAccount?.profile_picture_url ? (
-              <img
+              <Image
                 src={graphAccount.profile_picture_url}
                 alt="プロフィール画像"
+                width={144}
+                height={144}
+                unoptimized
                 className="h-28 w-28 rounded-full border-2 border-stone-200 object-cover md:h-36 md:w-36"
               />
             ) : (
@@ -141,7 +153,7 @@ export default function AccountPage() {
       {/* Graph API 未連携の案内 */}
       {!graphAccount && !loading && (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          フォロワー数・プロフィール画像・bioを表示するには、ダッシュボードからInstagramデータを同期してください。
+          {connectionMessage || "フォロワー数・プロフィール画像・bioを表示するには、ダッシュボードからInstagramデータを同期してください。"}
         </div>
       )}
     </div>

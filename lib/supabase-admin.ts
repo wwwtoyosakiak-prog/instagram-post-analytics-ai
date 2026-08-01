@@ -1,4 +1,7 @@
-import { AiAnalysis, AiAnalysisRecord, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyGoal, MonthlyGoalInput, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { AiAnalysis, AiAnalysisRecord, AiScoreHistory, AiScoreHistoryInput, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
+import { normalizeAiAnalysis } from "@/lib/ai-analysis";
+import { scoreHistoryFromAnalysis } from "@/lib/score-history";
+import { supabaseRestRequest } from "@/lib/supabase-server";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -62,6 +65,20 @@ type AnalysisRow = {
   hashtags: string[];
   score: number;
   score_delta: number | null;
+  analysis_v2: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type ScoreHistoryRow = {
+  id: number;
+  post_id: string;
+  analysis_id: string | null;
+  score: number;
+  content_score: number | null;
+  visual_score: number | null;
+  caption_score: number | null;
+  engagement_score: number | null;
+  discoverability_score: number | null;
   created_at: string;
 };
 
@@ -98,20 +115,6 @@ type MonthlyReportRow = {
   needs_work_posts: InstagramPost[];
   summary: string;
   next_month_policy: string[];
-  created_at: string;
-  updated_at: string;
-};
-
-type GoalRow = {
-  id: string;
-  account_id: string | null;
-  month: string;
-  target_posts: number;
-  target_views: number;
-  target_saves: number;
-  target_save_rate: number;
-  target_engagement_rate: number;
-  memo: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -174,28 +177,7 @@ function assertConfigured() {
 
 async function supabaseRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   assertConfigured();
-  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: serviceRoleKey!,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...(init.headers ?? {})
-    },
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Supabase request failed: ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return supabaseRestRequest<T>(path, init);
 }
 
 function mapAccount(row: AccountRow): InstagramAccount {
@@ -285,9 +267,7 @@ function postToRow(input: InstagramPostInput) {
 }
 
 function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
-  return {
-    id: row.id,
-    postId: row.post_id,
+  const normalized = normalizeAiAnalysis({
     firstImpression: row.first_impression,
     imageMessage: row.image_message,
     captionClarity: row.caption_clarity,
@@ -298,8 +278,36 @@ function mapAnalysis(row: AnalysisRow): AiAnalysisRecord {
     nextIdeas: row.next_ideas ?? [],
     hashtags: row.hashtags ?? [],
     score: row.score,
-    scoreDelta: row.score_delta,
-    createdAt: row.created_at
+    ...(row.analysis_v2 ?? {}),
+  });
+  return { id: row.id, postId: row.post_id, ...normalized, scoreDelta: row.score_delta, createdAt: row.created_at };
+}
+
+function mapScoreHistory(row: ScoreHistoryRow): AiScoreHistory {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    analysisId: row.analysis_id,
+    score: Number(row.score),
+    contentScore: row.content_score == null ? null : Number(row.content_score),
+    visualScore: row.visual_score == null ? null : Number(row.visual_score),
+    captionScore: row.caption_score == null ? null : Number(row.caption_score),
+    engagementScore: row.engagement_score == null ? null : Number(row.engagement_score),
+    discoverabilityScore: row.discoverability_score == null ? null : Number(row.discoverability_score),
+    createdAt: row.created_at,
+  };
+}
+
+function scoreHistoryToRow(input: AiScoreHistoryInput) {
+  return {
+    post_id: input.postId,
+    analysis_id: input.analysisId,
+    score: input.score,
+    content_score: input.contentScore,
+    visual_score: input.visualScore,
+    caption_score: input.captionScore,
+    engagement_score: input.engagementScore,
+    discoverability_score: input.discoverabilityScore,
   };
 }
 
@@ -414,7 +422,8 @@ function analysisToRow(postId: string, analysis: AiAnalysis, scoreDelta: number 
     next_ideas: analysis.nextIdeas,
     hashtags: analysis.hashtags,
     score: analysis.score,
-    score_delta: scoreDelta
+    score_delta: scoreDelta,
+    analysis_v2: { analysisVersion: analysis.analysisVersion ?? 2, improvementsDetailed: analysis.improvementsDetailed ?? [], hashtagSuggestion: analysis.hashtagSuggestion ?? null, postingTimeSuggestion: analysis.postingTimeSuggestion ?? null, captionSuggestion: analysis.captionSuggestion ?? null, scoreBreakdown: analysis.scoreBreakdown ?? null }
   };
 }
 
@@ -450,35 +459,6 @@ function monthlyReportToRow(report: MonthlyReport, accountId: string | null, acc
     needs_work_posts: report.needsWorkPosts,
     summary: report.summary,
     next_month_policy: report.nextMonthPolicy
-  };
-}
-
-function mapGoal(row: GoalRow): MonthlyGoal {
-  return {
-    id: row.id,
-    accountId: row.account_id,
-    month: row.month,
-    targetPosts: row.target_posts,
-    targetViews: row.target_views,
-    targetSaves: row.target_saves,
-    targetSaveRate: row.target_save_rate,
-    targetEngagementRate: row.target_engagement_rate,
-    memo: row.memo ?? "",
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function goalToRow(input: MonthlyGoalInput) {
-  return {
-    account_id: input.accountId && input.accountId !== "all" ? input.accountId : null,
-    month: input.month,
-    target_posts: input.targetPosts,
-    target_views: input.targetViews,
-    target_saves: input.targetSaves,
-    target_save_rate: input.targetSaveRate,
-    target_engagement_rate: input.targetEngagementRate,
-    memo: input.memo
   };
 }
 
@@ -588,6 +568,21 @@ export async function listAnalysesFromSupabase(postId: string) {
   return rows.map(mapAnalysis);
 }
 
+export async function createScoreHistoryInSupabase(input: AiScoreHistoryInput) {
+  const rows = await supabaseRequest<ScoreHistoryRow[]>("ai_score_history", {
+    method: "POST",
+    body: JSON.stringify(scoreHistoryToRow(input))
+  });
+  return mapScoreHistory(rows[0]);
+}
+
+export async function listScoreHistoryFromSupabase(postId?: string, limit = 100) {
+  const filters = ["select=*", "order=created_at.asc", `limit=${limit}`];
+  if (postId) filters.push(`post_id=eq.${encodeURIComponent(postId)}`);
+  const rows = await supabaseRequest<ScoreHistoryRow[]>(`ai_score_history?${filters.join("&")}`);
+  return rows.map(mapScoreHistory);
+}
+
 export async function createAnalysisInSupabase(postId: string, analysis: AiAnalysis) {
   const previous = await listAnalysesFromSupabase(postId);
   const scoreDelta = previous[0] ? analysis.score - previous[0].score : null;
@@ -595,7 +590,11 @@ export async function createAnalysisInSupabase(postId: string, analysis: AiAnaly
     method: "POST",
     body: JSON.stringify(analysisToRow(postId, analysis, scoreDelta))
   });
-  return mapAnalysis(rows[0]);
+  const saved = mapAnalysis(rows[0]);
+  await createScoreHistoryInSupabase(
+    scoreHistoryFromAnalysis(postId, saved.id, analysis)
+  );
+  return saved;
 }
 
 export async function listInsightSnapshotsFromSupabase(postId: string) {
@@ -628,13 +627,6 @@ export async function listSyncRunsFromSupabase() {
     "instagram_sync_runs?select=*&order=finished_at.desc&limit=20"
   );
   return rows.map(mapSyncRun);
-}
-
-export async function getLatestScheduledSyncRunFromSupabase() {
-  const rows = await supabaseRequest<SyncRunRow[]>(
-    "instagram_sync_runs?trigger_type=eq.scheduled&select=*&order=finished_at.desc&limit=1"
-  );
-  return rows[0] ? mapSyncRun(rows[0]) : null;
 }
 
 export async function getInstagramAccessTokenFromSupabase(provider = "instagram_graph_api") {
@@ -692,50 +684,4 @@ export async function createMonthlyReportInSupabase(report: MonthlyReport, accou
     body: JSON.stringify(monthlyReportToRow(report, accountId, accountName))
   });
   return mapMonthlyReport(rows[0]);
-}
-
-export async function listGoalsFromSupabase(accountId?: string | null, month?: string | null) {
-  const filters = ["select=*", "order=month.desc,updated_at.desc"];
-  if (month) filters.push(`month=eq.${encodeURIComponent(month)}`);
-  if (accountId && accountId !== "all") filters.push(`account_id=eq.${encodeURIComponent(accountId)}`);
-  if (accountId === "all") filters.push("account_id=is.null");
-  const rows = await supabaseRequest<GoalRow[]>(`instagram_monthly_goals?${filters.join("&")}`);
-  return rows.map(mapGoal);
-}
-
-export async function createGoalInSupabase(input: MonthlyGoalInput) {
-  const rows = await supabaseRequest<GoalRow[]>("instagram_monthly_goals", {
-    method: "POST",
-    body: JSON.stringify(goalToRow(input))
-  });
-  return mapGoal(rows[0]);
-}
-
-export async function updateGoalInSupabase(id: string, input: MonthlyGoalInput) {
-  const rows = await supabaseRequest<GoalRow[]>(`instagram_monthly_goals?id=eq.${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: JSON.stringify(goalToRow(input))
-  });
-  return rows[0] ? mapGoal(rows[0]) : null;
-}
-
-export async function deleteGoalFromSupabase(id: string) {
-  await supabaseRequest<void>(`instagram_monthly_goals?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
-export async function upsertGoalsInSupabase(goals: MonthlyGoal[]) {
-  const rows = goals.map((goal) => ({
-    id: goal.id,
-    ...goalToRow(goal),
-    created_at: goal.createdAt,
-    updated_at: goal.updatedAt
-  }));
-  const result = await supabaseRequest<GoalRow[]>("instagram_monthly_goals?on_conflict=id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=representation"
-    },
-    body: JSON.stringify(rows)
-  });
-  return result.map(mapGoal);
 }

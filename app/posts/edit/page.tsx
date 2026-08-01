@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, PageHeader, Panel } from "@/components/ui";
@@ -76,8 +77,8 @@ function EditPostContent() {
       <Panel>
         <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label>対象アカウント</label>
-            <select value={form.accountId ?? ""} onChange={(e) => setValue("accountId", e.target.value)}>
+            <label htmlFor="post-account">対象アカウント</label>
+            <select id="post-account" value={form.accountId ?? ""} onChange={(e) => setValue("accountId", e.target.value)}>
               <option value="">未選択</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.name}（@{account.username}）</option>
@@ -85,16 +86,16 @@ function EditPostContent() {
             </select>
           </div>
           <div>
-            <label>投稿日</label>
-            <input type="date" value={form.date} onChange={(e) => setValue("date", e.target.value)} required />
+            <label htmlFor="post-date">投稿日</label>
+            <input id="post-date" type="date" value={form.date} onChange={(e) => setValue("date", e.target.value)} required />
           </div>
           <div>
-            <label>データ登録日</label>
-            <input type="date" value={form.recordedDate} onChange={(e) => setValue("recordedDate", e.target.value)} required />
+            <label htmlFor="post-recorded-date">データ登録日</label>
+            <input id="post-recorded-date" type="date" value={form.recordedDate} onChange={(e) => setValue("recordedDate", e.target.value)} required />
           </div>
           <div>
-            <label>投稿タイプ</label>
-            <select value={form.type} onChange={(e) => setValue("type", e.target.value as PostType)}>
+            <label htmlFor="post-type">投稿タイプ</label>
+            <select id="post-type" value={form.type} onChange={(e) => setValue("type", e.target.value as PostType)}>
               <option value="image">画像</option>
               <option value="video">動画</option>
               <option value="reel">リール</option>
@@ -102,35 +103,44 @@ function EditPostContent() {
             </select>
           </div>
           <div>
-            <label>投稿画像・動画の枚数</label>
-            <input type="number" min={1} value={form.mediaCount} onChange={(e) => setValue("mediaCount", Number(e.target.value))} />
+            <label htmlFor="post-media-count">投稿画像・動画の枚数</label>
+            <input id="post-media-count" type="number" min={1} value={form.mediaCount} onChange={(e) => setValue("mediaCount", Number(e.target.value))} />
           </div>
           <div className="md:col-span-2">
-            <label>投稿URL</label>
-            <input value={form.url} onChange={(e) => setValue("url", e.target.value)} />
+            <label htmlFor="post-url">投稿URL</label>
+            <input id="post-url" value={form.url} onChange={(e) => setValue("url", e.target.value)} />
           </div>
           <div className="md:col-span-2">
-            <label>投稿コメント</label>
-            <textarea rows={5} value={form.caption} onChange={(e) => setValue("caption", e.target.value)} required />
+            <label htmlFor="post-caption">投稿コメント</label>
+            <textarea id="post-caption" rows={5} value={form.caption} onChange={(e) => setValue("caption", e.target.value)} required />
           </div>
           <div className="md:col-span-2">
-            <label>ハッシュタグ</label>
-            <textarea rows={3} value={form.hashtags} onChange={(e) => setValue("hashtags", e.target.value)} />
+            <label htmlFor="post-hashtags">ハッシュタグ</label>
+            <textarea id="post-hashtags" rows={3} value={form.hashtags} onChange={(e) => setValue("hashtags", e.target.value)} />
           </div>
           {(["likes", "comments", "saves", "shares", "views"] as const).map((key) => (
             <div key={key}>
-              <label>{labelMap[key]}</label>
-              <input type="number" min={0} value={form[key]} onChange={(e) => setValue(key, Number(e.target.value))} />
+              <label htmlFor={`post-${key}`}>{labelMap[key]}</label>
+              <input id={`post-${key}`} type="number" min={0} value={form[key]} onChange={(e) => setValue(key, Number(e.target.value))} />
             </div>
           ))}
           <div className="md:col-span-2">
-            <label>メモ</label>
-            <textarea rows={3} value={form.memo} onChange={(e) => setValue("memo", e.target.value)} />
+            <label htmlFor="post-memo">メモ</label>
+            <textarea id="post-memo" rows={3} value={form.memo} onChange={(e) => setValue("memo", e.target.value)} />
           </div>
           <div className="md:col-span-2">
-            <label>投稿画像スクショ</label>
-            <input type="file" accept="image/*" onChange={handleImage} />
-            {form.screenshot ? <img src={form.screenshot} alt="投稿画像プレビュー" className="mt-3 max-h-72 rounded-md border border-stone-200 object-contain" /> : null}
+            <label htmlFor="post-screenshot">投稿画像スクショ</label>
+            <input id="post-screenshot" type="file" accept="image/*" onChange={handleImage} />
+            {form.screenshot ? (
+              <Image
+                src={form.screenshot}
+                alt="投稿画像プレビュー"
+                width={960}
+                height={720}
+                unoptimized
+                className="mt-3 max-h-72 rounded-md border border-stone-200 object-contain"
+              />
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button type="submit">変更を保存</Button>

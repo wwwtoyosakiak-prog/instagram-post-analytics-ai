@@ -1,5 +1,5 @@
 import { createInstagramOperationLogInSupabase, getInstagramAccessTokenFromSupabase, getLatestInstagramOperationLogFromSupabase, isSupabaseConfigured, listInstagramOperationLogsFromSupabase, upsertInstagramAccessTokenInSupabase } from "@/lib/supabase-admin";
-import { InstagramAccessTokenRecord, InstagramAccessTokenStatus, InstagramAccessTokenStorage, InstagramOperationLog, InstagramOperationResult, InstagramWarningLevel } from "@/lib/types";
+import { InstagramAccessTokenRecord, InstagramAccessTokenStatus, InstagramAccessTokenStorage, InstagramOperationResult, InstagramWarningLevel } from "@/lib/types";
 
 const TOKEN_PROVIDER = "instagram_graph_api";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;

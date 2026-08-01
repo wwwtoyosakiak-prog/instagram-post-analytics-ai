@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
-import { getMetrics, postTypeLabels } from "@/lib/metrics";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
+import { normalizeAiAnalysis } from "@/lib/ai-analysis";
+import { buildAiAnalysisPrompt } from "@/lib/ai-analysis-prompt";
+import {
+  ApiRequestError,
+  apiErrorResponse,
+  fetchJsonWithTimeout,
+  isRecord,
+  readJsonObject,
+  readOpenAiOutput,
+  readUpstreamError,
+} from "@/lib/server-api";
 
 export async function POST(request: Request) {
-  const { post, account } = (await request.json()) as { post?: InstagramPost; account?: InstagramAccount | null };
-  if (!post) return NextResponse.json({ error: "投稿データがありません。" }, { status: 400 });
+  try {
+    const body = await readJsonObject(request);
+    const post = body.post as InstagramPost | undefined;
+    const account = body.account as InstagramAccount | null | undefined;
+    if (!isRecord(post) || typeof post.caption !== "string" || typeof post.date !== "string") {
+      throw new ApiRequestError("投稿データが正しくありません。", 400);
+    }
 
   const apiKeyEnvName = account?.openaiApiKeyEnvName?.trim();
   const apiKey = apiKeyEnvName ? process.env[apiKeyEnvName] : process.env.OPENAI_API_KEY;
@@ -17,58 +32,14 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
-  const metrics = getMetrics(post);
-  const prompt = `あなたは中小企業向けInstagram運用コンサルタントです。以下の投稿を分析し、JSONだけを返してください。
-
-投稿:
-- アカウント名: ${account?.name ?? "未設定"}
-- ユーザー名: ${account?.username ? `@${account.username}` : "未設定"}
-- 業種: ${account?.industry || "未設定"}
-- ターゲット: ${account?.targetAudience || "未設定"}
-- 運用目的: ${account?.goal || "未設定"}
-- アカウント専用の分析方針: ${account?.analysisInstructions || "未設定"}
-- 投稿日: ${post.date}
-- データ登録日: ${post.recordedDate ?? post.date}
-- 投稿URL: ${post.url || "なし"}
-- 投稿タイプ: ${postTypeLabels[post.type]}
-- 投稿画像・動画の枚数: ${post.mediaCount ?? 1}
-- 投稿コメント: ${post.caption}
-- ハッシュタグ: ${post.hashtags || "なし"}
-- いいね数: ${post.likes}
-- コメント数: ${post.comments}
-- 保存数: ${post.saves}
-- シェア数: ${post.shares}
-- 表示数: ${post.views}
-- エンゲージメント数: ${metrics.engagement}
-- エンゲージメント率: ${metrics.engagementRate.toFixed(2)}%
-- 保存率: ${metrics.saveRate.toFixed(2)}%
-- コメント率: ${metrics.commentRate.toFixed(2)}%
-- APIインサイト取得日時: ${post.latestInsight?.capturedAt ?? "未取得"}
-- APIリーチ: ${post.latestInsight?.reach ?? "未取得"}
-- API総インタラクション: ${post.latestInsight?.totalInteractions ?? "未取得"}
-- 数値データの出典: ${post.latestInsight ? "Instagram Graph APIの最新同期値" : "手入力値"}
-- メモ: ${post.memo || "なし"}
-
-返却形式:
-{
-  "firstImpression": "string",
-  "imageMessage": "string",
-  "captionClarity": "string",
-  "strengths": "string",
-  "weaknesses": "string",
-  "reason": "string",
-  "improvements": ["string"],
-  "nextIdeas": ["string"],
-  "hashtags": ["string"],
-  "score": 0
-}`;
+  const prompt = buildAiAnalysisPrompt(post, account);
 
   const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }];
   if (post.screenshot) {
     content.push({ type: "input_image", image_url: post.screenshot });
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const { response, data } = await fetchJsonWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -80,12 +51,19 @@ export async function POST(request: Request) {
       text: { format: { type: "json_object" } }
     })
   });
-
-  const data = await response.json();
   if (!response.ok) {
-    return NextResponse.json({ error: data.error?.message ?? "OpenAI APIの呼び出しに失敗しました。" }, { status: response.status });
+    return NextResponse.json({ error: readUpstreamError(data, "OpenAI APIの呼び出しに失敗しました。") }, { status: response.status });
   }
 
-  const raw = data.output_text ?? data.output?.flatMap((item: { content?: { text?: string }[] }) => item.content ?? []).map((item: { text?: string }) => item.text).join("");
-  return NextResponse.json({ analysis: JSON.parse(raw), model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
+  const raw = readOpenAiOutput(data);
+  try {
+    const analysis = normalizeAiAnalysis(JSON.parse(raw));
+    return NextResponse.json({ analysis, model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
+  } catch (error) {
+    console.error("[analyze-response-parse]", error);
+    return NextResponse.json({ error: "AI分析結果の形式が不正でした。もう一度分析してください。" }, { status: 502 });
+  }
+  } catch (error) {
+    return apiErrorResponse(error, "analyze-api");
+  }
 }

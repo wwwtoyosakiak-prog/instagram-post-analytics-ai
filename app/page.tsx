@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, Database, ListChecks, RefreshCcw, Sparkles, TrendingUp } from "lucide-react";
-import { ButtonLink, PageHeader, Panel } from "@/components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, CalendarDays, CheckCircle2, ClipboardList, FileText, KeyRound, ListChecks, User } from "lucide-react";
+import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
@@ -27,27 +27,20 @@ export default function Home() {
     const today = new Date();
     const todayKey = toDateKey(today);
     const currentMonth = todayKey.slice(0, 7);
-    const topPost = [...posts].sort((a, b) => getMetrics(b).engagementRate - getMetrics(a).engagementRate)[0];
     const latest = [...posts].sort((a, b) => new Date(b.recordedDate ?? b.date).getTime() - new Date(a.recordedDate ?? a.date).getTime())[0];
     const monthlyPosts = posts.filter((post) => post.date.startsWith(currentMonth));
-    const highScorePosts = posts
-      .map((post) => ({ post, analysis: latestAnalysisByPostId[post.id] }))
-      .filter((item): item is { post: InstagramPost; analysis: AiAnalysisRecord } => Boolean(item.analysis))
-      .sort((a, b) => b.analysis.score - a.analysis.score)
-      .slice(0, 3);
     const nextPostToCheck = posts
       .filter((post) => !latestAnalysisByPostId[post.id])
       .sort((a, b) => new Date(b.recordedDate ?? b.date).getTime() - new Date(a.recordedDate ?? a.date).getTime())[0]
       ?? [...posts].sort((a, b) => getMetrics(a).saveRate - getMetrics(b).saveRate)[0];
+
     return {
       totalViews: posts.reduce((sum, post) => sum + post.views, 0),
       averageEngagementRate: average(posts.map((post) => getMetrics(post).engagementRate)),
       monthlyPostCount: monthlyPosts.length,
       monthlyAverageSaveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
       screenshotCount: posts.filter((post) => Boolean(post.screenshot)).length,
-      highScorePosts,
       nextPostToCheck,
-      topPost,
       latest
     };
   }, [posts, latestAnalysisByPostId]);
@@ -55,95 +48,110 @@ export default function Home() {
   return (
     <div>
       <PageHeader
-        title="今日のInstagram運用を確認"
-        description="API同期した投稿の動きと、今見るべき数値をまとめて確認できます。"
+        title="今日、確認すること"
+        description="上から順に確認すれば、Instagram運用の状態と次の行動が分かります。"
       />
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
-        <QuickStat label="今月の投稿数" value={`${summary.monthlyPostCount}件`} tone="plum" />
-        <QuickStat label="今月の平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} tone="sky" />
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="今月の投稿" value={`${summary.monthlyPostCount}件`} note="今月公開した投稿数" />
+        <Stat label="平均反応率" value={formatPercent(summary.averageEngagementRate)} note="いいね・保存などの割合" />
+        <Stat label="今月の保存率" value={formatPercent(summary.monthlyAverageSaveRate)} note="あとで見たいと思われた割合" />
+        <Stat label="合計表示数" value={summary.totalViews.toLocaleString()} note="登録済み投稿の合計" />
       </div>
-      <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_380px]">
-        <Panel className="relative overflow-hidden">
-          <div className="absolute right-0 top-0 h-full w-1 bg-clay" />
-          <h2 className="flex items-center gap-2 font-semibold"><TrendingUp size={18} className="text-clay" />今日見るべきこと</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <ButtonLink href="/calendar">カレンダー</ButtonLink>
-            <ButtonLink href="/dashboard">成果を見る</ButtonLink>
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <Panel>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={20} className="text-emerald-700" />
+            <h2 className="text-lg font-semibold text-ink">3ステップで確認</h2>
           </div>
-          <div className="mt-5 grid gap-3 text-sm text-stone-700">
+          <p className="mt-1 text-sm text-stone-600">初めてでも、この順番で進めれば迷いません。</p>
+          <div className="mt-4 grid gap-3">
+            <StepLink
+              step="1"
+              href="/posts"
+              icon={<ListChecks size={18} />}
+              title="投稿を確認"
+              description="最新の投稿データと、未分析の投稿を確認します。"
+            />
+            <StepLink
+              step="2"
+              href="/dashboard"
+              icon={<BarChart3 size={18} />}
+              title="結果を分析"
+              description="表示数・保存率・反応率から、伸びた理由を確認します。"
+            />
+            <StepLink
+              step="3"
+              href="/reports"
+              icon={<FileText size={18} />}
+              title="次の方針を決める"
+              description="月次レポートを見て、次の投稿方針を決めます。"
+            />
+          </div>
+          <div className="mt-5">
             <WorkItem
-              icon={<ClipboardList size={17} />}
-              title="次に確認すべき投稿"
-              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date} / ${summary.nextPostToCheck.caption}` : "まだ投稿がありません。"}
-              href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/dashboard"}
+              icon={<ClipboardList size={16} />}
+              title="次に確認する投稿"
+              body={summary.nextPostToCheck ? `${summary.nextPostToCheck.date}の投稿を確認` : "まだ投稿がありません。"}
+              href={summary.nextPostToCheck ? `/posts/detail?id=${summary.nextPostToCheck.id}` : "/posts"}
             />
           </div>
         </Panel>
         <Panel>
-          <h2 className="flex items-center gap-2 font-semibold"><CheckCircle2 size={18} className="text-moss" />運用ステータス</h2>
+          <h2 className="text-lg font-semibold text-ink">いまの状態</h2>
           <div className="mt-4 grid gap-3 text-sm">
             <StatusRow label="投稿データ" value={posts.length ? `${posts.length}件同期済み` : "未同期"} active={posts.length > 0} />
-            <StatusRow label="画像スクショ" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
-            <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー保存" : "ブラウザ保存"} active={serverStorageEnabled} />
-            <StatusRow label="AI接続" value="分析・提案に利用可能" active />
+            <StatusRow label="画像" value={`${summary.screenshotCount}/${posts.length}件`} active={summary.screenshotCount > 0} />
+            <StatusRow label="保存先" value={serverStorageEnabled ? "サーバー" : "ブラウザ"} active={serverStorageEnabled} />
+            <StatusRow label="最新投稿" value={summary.latest ? summary.latest.date : "未登録"} active={Boolean(summary.latest)} />
           </div>
-          <div className="mt-5 rounded-md border border-stone-200/80 bg-fog/80 p-3">
-            <p className="text-sm font-semibold">同期の基本動線</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">普段はダッシュボードからInstagramデータを同期し、トークン管理ページで期限切れだけ監視すれば運用できます。</p>
-            <div className="mt-3">
-              <ButtonLink href="/token-management">トークン管理を見る</ButtonLink>
-            </div>
+          <div className="mt-5 rounded-md border border-stone-200 bg-stone-50 p-4">
+            <p className="text-sm font-medium text-ink">迷ったら</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">まず投稿を確認し、次に分析、最後にレポートを見れば十分です。</p>
           </div>
         </Panel>
       </div>
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
-        <Panel>
-          <h2 className="flex items-center gap-2 font-semibold"><Sparkles size={18} className="text-amber-700" />最近スコアが高かった投稿</h2>
-          <div className="mt-4 grid gap-2">
-            {summary.highScorePosts.map(({ post, analysis }) => (
-              <Link key={post.id} href={`/posts/detail?id=${post.id}`} className="rounded-md border border-stone-200 bg-white/80 p-3 text-sm hover:border-moss">
-                <span className="font-semibold text-ink">{analysis.score}点 / {post.date}</span>
-                <span className="mt-1 block truncate text-xs text-stone-600">{post.caption}</span>
-              </Link>
-            ))}
-            {!summary.highScorePosts.length ? <p className="rounded-md bg-fog p-4 text-sm text-stone-600">AI分析済みの投稿がありません。</p> : null}
-          </div>
-        </Panel>
-        <Panel>
-          <h2 className="flex items-center gap-2 font-semibold"><ListChecks size={18} className="text-moss" />今月の運用メモ</h2>
-          <div className="mt-4 grid gap-3 text-sm">
-            <StatusRow label="今月の投稿" value={`${summary.monthlyPostCount}件`} active={summary.monthlyPostCount > 0} />
-            <StatusRow label="平均保存率" value={formatPercent(summary.monthlyAverageSaveRate)} active={summary.monthlyAverageSaveRate > 0} />
-            <StatusRow label="全体平均ER" value={formatPercent(summary.averageEngagementRate)} active={posts.length > 0} />
-            <StatusRow label="合計表示数" value={summary.totalViews.toLocaleString()} active={posts.length > 0} />
-          </div>
-        </Panel>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Panel>
-          <RefreshCcw className="mb-4 text-clay" />
-          <h2 className="font-semibold">Instagram API同期</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">投稿、表示数、保存数、インサイト履歴はAPI同期を基本に扱います。手入力を前提にしない運用に寄せています。</p>
-        </Panel>
-        <Panel>
-          <Database className="mb-4 text-moss" />
-          <h2 className="font-semibold">Supabase保存</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">同期した投稿履歴、インサイト履歴、トークン更新履歴をまとめて保存します。継続運用の土台として使います。</p>
-        </Panel>
-        <Panel>
-          <Sparkles className="mb-4 text-amber-700" />
-          <h2 className="font-semibold">AI改善提案</h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600">OpenAI APIをサーバー側から呼び出し、投稿ごとの強み、弱み、改善案、ハッシュタグ、投稿スコアを出します。</p>
-        </Panel>
-      </div>
+      <Panel>
+        <h2 className="text-lg font-semibold text-ink">管理と連携</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <CategoryLink href="/calendar" icon={<CalendarDays size={18} />} title="カレンダー" description="投稿日と予定を確認" />
+          <CategoryLink href="/accounts" icon={<User size={18} />} title="プロフィール" description="アカウント情報を管理" />
+          <CategoryLink href="/token-management" icon={<KeyRound size={18} />} title="Instagram連携" description="連携状態と期限を確認" />
+        </div>
+      </Panel>
     </div>
+  );
+}
+
+function StepLink({ step, href, icon, title, description }: { step: string; href: string; icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <Link href={href} className="group flex items-center gap-4 rounded-lg border border-stone-200 bg-white p-4 transition hover:border-stone-400 hover:bg-stone-50">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">{step}</span>
+      <span className="text-stone-500">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-ink">{title}</span>
+        <span className="mt-1 block text-sm leading-5 text-stone-600">{description}</span>
+      </span>
+      <span className="text-stone-400 transition group-hover:translate-x-1" aria-hidden>→</span>
+    </Link>
+  );
+}
+
+function CategoryLink({ href, icon, title, description }: { href: string; icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <Link href={href} className="rounded-lg border border-stone-200 bg-white p-4 transition hover:bg-stone-50">
+      <div className="flex items-center gap-2 text-ink">
+        {icon}
+        <span className="font-medium">{title}</span>
+      </div>
+      <p className="mt-2 text-sm text-stone-600">{description}</p>
+    </Link>
   );
 }
 
 function WorkItem({ icon, title, body, href, urgent = false }: { icon: React.ReactNode; title: string; body: string; href: string; urgent?: boolean }) {
   return (
-    <Link href={href} className={`flex gap-3 rounded-md border p-3 transition hover:border-moss ${urgent ? "border-red-200 bg-red-50" : "border-stone-200/80 bg-fog/80"}`}>
-      <span className={urgent ? "text-red-700" : "text-moss"}>{icon}</span>
+    <Link href={href} className={`flex gap-3 rounded-md border p-3 transition hover:bg-stone-50 ${urgent ? "border-red-200 bg-red-50" : "border-stone-200 bg-white"}`}>
+      <span className={urgent ? "text-red-700" : "text-stone-500"}>{icon}</span>
       <span>
         <span className="block font-semibold text-ink">{title}</span>
         <span className="mt-1 line-clamp-2 block leading-6 text-stone-700">{body}</span>
@@ -154,9 +162,9 @@ function WorkItem({ icon, title, body, href, urgent = false }: { icon: React.Rea
 
 function StatusRow({ label, value, active }: { label: string; value: string; active: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-stone-200/80 bg-white/70 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-md border border-stone-200 bg-white px-3 py-2">
       <span className="font-medium text-stone-700">{label}</span>
-      <span className={`rounded-md px-2 py-1 text-xs font-semibold ${active ? "bg-skyglass text-ink" : "bg-stone-100 text-stone-500"}`}>{value}</span>
+      <span className={`rounded-md px-2 py-1 text-xs font-semibold ${active ? "bg-stone-100 text-ink" : "bg-stone-50 text-stone-500"}`}>{value}</span>
     </div>
   );
 }
@@ -166,20 +174,4 @@ function toDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function QuickStat({ label, value, tone }: { label: string; value: string; tone: "moss" | "clay" | "plum" | "sky" }) {
-  const toneClasses = {
-    moss: "bg-moss",
-    clay: "bg-clay",
-    plum: "bg-plum",
-    sky: "bg-skyglass"
-  };
-  return (
-    <div className="relative overflow-hidden rounded-lg border border-white/70 bg-white/78 p-4 shadow-panel backdrop-blur">
-      <span className={`absolute left-0 top-0 h-full w-1 ${toneClasses[tone]}`} />
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
-    </div>
-  );
 }

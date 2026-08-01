@@ -1,5 +1,6 @@
 'use client';
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -9,534 +10,85 @@ import {
 import { Button, PageHeader, Panel } from "@/components/ui";
 import {
   loadAllInsightData, loadAnalysesData,
-  loadGoalsData, loadPostsData,
+  loadPostsData,
   loadSyncRunsData,
 } from "@/lib/cloud-storage";
 import {
   InstagramInsightSnapshot,
-  InstagramPost, InstagramSyncRun, MonthlyGoal,
+  InstagramPost, InstagramSyncRun,
   PostType,
 } from "@/lib/types";
 import { average, getMetrics, postTypeLabels, weekdayJa } from "@/lib/metrics";
 import { calculateInsightGrowth } from "@/lib/insight-growth";
-import { mergePostMetrics, matchPostToMedia, type MetricSource, type ApiMedia, type ApiMediaInsights } from "@/lib/post-merge";
-
-// ── Graph API 型 ──────────────────────────────────────────
-
-interface DashboardAccount {
-  name: string;
-  username: string;
-  followers_count: number;
-  profile_picture_url: string;
-  last_synced_at: string;
-}
-
-interface DashboardTotals {
-  posts: number;
-  reach: number;
-  impressions: number;
-  likes: number;
-  comments: number;
-  saved: number;
-  shares: number;
-  views: number;
-}
-
-interface DashboardAccountInsightTrendRow {
-  date: string;
-  reach: number | null;
-  impressions: number | null;
-  profile_views: number | null;
-  website_clicks: number | null;
-  follower_count: number | null;
-}
-
-interface DashboardApiResponse {
-  account?: DashboardAccount | null;
-  totals?: DashboardTotals;
-  account_insights_trend?: DashboardAccountInsightTrendRow[];
-}
-
-type SyncHistoryRow =
-  | {
-      kind: "scheduled";
-      key: string;
-      plannedAt: string;
-      executedAt: string;
-      sortAtMs: number;
-      triggerLabel: "自動";
-      statusLabel: string;
-      fetchedPostsLabel: string;
-      savedPostsLabel: string;
-      savedSnapshotsLabel: string;
-      errorLabel: string;
-    }
-  | {
-      kind: "manual";
-      key: string;
-      plannedAt: "手動実行";
-      executedAt: string;
-      sortAtMs: number;
-      triggerLabel: "手動";
-      statusLabel: string;
-      fetchedPostsLabel: string;
-      savedPostsLabel: string;
-      savedSnapshotsLabel: string;
-      errorLabel: string;
-    };
-
-// ── Manual 型 ──────────────────────────────────────────────
-
-type GrowthAnalysis = {
-  summary: string;
-  openingPatterns: string[];
-  themes: string[];
-  formatPatterns: string[];
-  hashtagPatterns: string[];
-  nextActions: string[];
-};
-
-// ── 共通ユーティリティ ─────────────────────────────────────
-
-const fmt = (v: number | null | undefined) =>
-  v == null ? '–' : v.toLocaleString('ja-JP');
-
-// ── UI コンポーネント ─────────────────────────────────────
-
-function SourceBadge({ source }: { source: MetricSource }) {
-  return source === 'api'
-    ? <span className="inline-block text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">API</span>
-    : <span className="inline-block text-[9px] font-bold bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full leading-none">未取得</span>;
-}
-
-function GrowthPattern({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="border-l-2 border-clay pl-4">
-      <h4 className="text-sm font-semibold text-ink">{title}</h4>
-      <ul className="mt-2 grid gap-2 text-sm leading-6 text-stone-700">
-        {items.map((item) => <li key={item}>{item}</li>)}
-      </ul>
-    </section>
-  );
-}
-
-function GrowthSummaryPanel({ title, summary }: { title: string; summary: ReturnType<typeof calculateInsightGrowth> }) {
-  return (
-    <div className="rounded-md border border-stone-200 bg-white/80 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-semibold text-ink">{title}</h3>
-        <span className="text-xs text-stone-500">対象 {summary.syncedPosts}投稿</span>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Insight label="閲覧増加" value={`+${summary.viewsGrowth.toLocaleString()}`} />
-        <Insight label="成長率" value={`+${summary.viewsGrowthRate.toFixed(1)}%`} />
-        <Insight label="保存増加" value={`+${summary.savedGrowth.toLocaleString()}`} />
-        <Insight label="シェア増加" value={`+${summary.sharesGrowth.toLocaleString()}`} />
-      </div>
-      <div className="mt-4 grid gap-2">
-        {summary.topPosts.map((item, index) => (
-          <Link key={item.post.id} href={`/posts/detail?id=${item.post.id}`}
-            className="flex items-center justify-between gap-3 border-t border-stone-100 pt-2 text-sm hover:text-clay">
-            <span className="line-clamp-1">{index + 1}. {videoTitle(item.post)}</span>
-            <span className="shrink-0 font-semibold">+{item.viewsGrowth.toLocaleString()}</span>
-          </Link>
-        ))}
-        {!summary.topPosts.length ? <p className="text-sm text-stone-500">この期間の同期履歴はまだありません。</p> : null}
-      </div>
-    </div>
-  );
-}
-
-function Insight({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-base font-bold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function SyncInfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg bg-white/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-xs font-semibold text-stone-500">{label}</span>
-      <span className="text-sm font-semibold text-ink">{value}</span>
-    </div>
-  );
-}
-
-function CompareStat({
-  label, currentDay, previousDay, currentWeek, previousWeek, suffix = "", decimal = false
-}: {
-  label: string; currentDay: number; previousDay: number;
-  currentWeek: number; previousWeek: number; suffix?: string; decimal?: boolean;
-}) {
-  const renderValue = (value: number) => decimal ? `${value.toFixed(2)}${suffix}` : `${Math.round(value).toLocaleString()}${suffix}`;
-  return (
-    <div className="rounded-xl border border-stone-200/80 bg-fog/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</p>
-      <div className="mt-3 grid gap-3">
-        <div className="rounded-lg bg-white/80 p-3">
-          <p className="text-xs font-semibold text-stone-500">前日比</p>
-          <p className="mt-1 text-sm font-bold text-ink">{renderValue(currentDay)} / {renderValue(previousDay)}</p>
-          <p className="mt-1 text-xs text-stone-600">差分 {renderDelta(currentDay - previousDay, suffix, decimal)}</p>
-        </div>
-        <div className="rounded-lg bg-white/80 p-3">
-          <p className="text-xs font-semibold text-stone-500">前週比</p>
-          <p className="mt-1 text-sm font-bold text-ink">{renderValue(currentWeek)} / {renderValue(previousWeek)}</p>
-          <p className="mt-1 text-xs text-stone-600">差分 {renderDelta(currentWeek - previousWeek, suffix, decimal)}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function renderDelta(value: number, suffix = "", decimal = false) {
-  const prefix = value > 0 ? "+" : "";
-  return decimal ? `${prefix}${value.toFixed(2)}${suffix}` : `${prefix}${Math.round(value).toLocaleString()}${suffix}`;
-}
-
-function SectionLead({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">{eyebrow}</p>
-      <h2 className="mt-2 text-lg font-bold text-ink">{title}</h2>
-      <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
-    </div>
-  );
-}
-
-function HeroStat({ label, value, note, tone }: {
-  label: string; value: string; note: string; tone: "moss" | "clay" | "sky" | "plum";
-}) {
-  const toneClasses = {
-    moss: "from-moss/18 border-moss/20 text-moss",
-    clay: "from-clay/18 border-clay/20 text-clay",
-    sky: "from-skyglass border-skyglass/90 text-teal-800",
-    plum: "from-plum/16 border-plum/20 text-plum"
-  };
-  return (
-    <div className={`rounded-2xl border bg-gradient-to-br to-white/90 p-5 shadow-panel ${toneClasses[tone]}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-ink">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-stone-600">{note}</p>
-    </div>
-  );
-}
-
-function Progress({ label, actual, target, suffix, decimal = false }: {
-  label: string; actual: number; target: number; suffix: string; decimal?: boolean;
-}) {
-  const rate = target > 0 ? Math.min((actual / target) * 100, 999) : 0;
-  const actualText = decimal ? actual.toFixed(2) : Math.round(actual).toLocaleString();
-  const targetText = decimal ? target.toFixed(2) : Math.round(target).toLocaleString();
-  return (
-    <div className="rounded-md border border-stone-200/80 bg-fog/80 p-4">
-      <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
-      <p className="mt-2 text-lg font-bold text-ink">{target > 0 ? `${rate.toFixed(0)}%` : "未設定"}</p>
-      <p className="mt-1 text-xs text-stone-600">実績 {actualText}{suffix} / 目標 {targetText}{suffix}</p>
-      <div className="mt-3 h-2 rounded-full bg-white">
-        <div className="h-2 rounded-full bg-moss" style={{ width: `${Math.min(rate, 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function ChartPanel({ title, description, accent, children, className = "", chartHeightClassName = "h-72" }: {
-  title: string; description: string; accent: "moss" | "clay" | "sky" | "plum"; children: React.ReactElement;
-  className?: string; chartHeightClassName?: string;
-}) {
-  const accentClasses = { moss: "bg-moss", clay: "bg-clay", sky: "bg-teal-700", plum: "bg-plum" };
-  return (
-    <Panel className={`relative overflow-hidden ${className}`}>
-      <div className={`absolute left-0 top-0 h-full w-1 ${accentClasses[accent]}`} />
-      <div className="pl-3">
-        <h2 className="font-semibold">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
-      </div>
-      <div className={chartHeightClassName}>
-        <ResponsiveContainer width="100%" height="100%">
-          {children}
-        </ResponsiveContainer>
-      </div>
-    </Panel>
-  );
-}
-
-function DateWeekdayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
-  const raw = String(payload?.value ?? "");
-  const [dateLabel, weekdayLabel] = raw.split("|");
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={14} textAnchor="middle" fill="#57534e" fontSize={12}>
-        <tspan x={0}>{dateLabel}</tspan>
-        <tspan x={0} dy={14} fontSize={11} fill="#78716c">{weekdayLabel}</tspan>
-      </text>
-    </g>
-  );
-}
-
-function GraphPeriodTabs({
-  graphPeriod,
-  setGraphPeriod,
-}: {
-  graphPeriod: "1" | "7" | "30" | "90" | "365";
-  setGraphPeriod: (period: "1" | "7" | "30" | "90" | "365") => void;
-}) {
-  return (
-    <div className="grid grid-cols-5 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
-      {(["1", "7", "30", "90", "365"] as const).map((period) => (
-        <button
-          key={period}
-          type="button"
-          onClick={() => setGraphPeriod(period)}
-          className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
-        >
-          {period === "1" ? "一日" : period === "7" ? "一週間" : period === "30" ? "一ヶ月" : period === "90" ? "90日" : "一年"}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── ヘルパー関数 ──────────────────────────────────────────
-
-function videoTitle(post: InstagramPost) {
-  const firstLine = post.caption.split("\n").map((line) => line.trim()).find(Boolean);
-  return firstLine || `${post.date}の動画投稿`;
-}
-
-function getPostPreview(post: InstagramPost) {
-  return post.screenshot || post.thumbnailUrl || post.mediaUrl || "";
-}
-
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function toTokyoDateHour(iso: string) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", hourCycle: "h23"
-    }).formatToParts(new Date(iso)).map((part) => [part.type, part.value])
-  );
-  return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: parts.hour };
-}
-
-function toTokyoDateTimeParts(iso: string) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23"
-    }).formatToParts(new Date(iso)).map((part) => [part.type, part.value])
-  );
-  return {
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    hour: Number(parts.hour),
-    minute: Number(parts.minute)
-  };
-}
-
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
-function toTokyoDateKey(date: Date) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric", month: "2-digit", day: "2-digit"
-    }).formatToParts(date).map((part) => [part.type, part.value])
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-function filterPostsByPeriod(posts: InstagramPost[], period: "1" | "7" | "30" | "90" | "365", todayKey: string) {
-  const end = new Date(`${todayKey}T00:00:00+09:00`);
-  const start = new Date(end);
-  start.setDate(start.getDate() - (Number(period) - 1));
-  const startKey = toTokyoDateKey(start);
-  return posts.filter((post) => post.date >= startKey && post.date <= todayKey);
-}
-
-function getNextScheduledSyncTime(now: Date) {
-  const slots = [0, 6, 12, 18];
-  const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-  const next = new Date(jstNow);
-  next.setSeconds(0, 0);
-
-  const currentMinutes = next.getHours() * 60 + next.getMinutes();
-  const nextSlot = slots.find((hour) => currentMinutes < (hour * 60 + 17));
-
-  if (typeof nextSlot === "number") {
-    next.setHours(nextSlot, 17, 0, 0);
-  } else {
-    next.setDate(next.getDate() + 1);
-    next.setHours(slots[0], 17, 0, 0);
-  }
-
-  return new Date(next.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-}
-
-function getLatestExpectedScheduledTime(now: Date) {
-  const slots = [0, 6, 12, 18];
-  const jstNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-  const expected = new Date(jstNow);
-  expected.setSeconds(0, 0);
-
-  const currentMinutes = expected.getHours() * 60 + expected.getMinutes();
-  const pastSlots = slots.filter((hour) => currentMinutes >= (hour * 60 + 17));
-
-  if (pastSlots.length) {
-    expected.setHours(pastSlots[pastSlots.length - 1], 17, 0, 0);
-  } else {
-    expected.setDate(expected.getDate() - 1);
-    expected.setHours(slots[slots.length - 1], 17, 0, 0);
-  }
-
-  return new Date(expected.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-}
-
-function getSyncMonitor(now: Date, latestScheduledFinishedAt?: string) {
-  const expectedScheduledAt = getLatestExpectedScheduledTime(now);
-  const nextScheduledAt = getNextScheduledSyncTime(now);
-  const latestScheduledAtMs = latestScheduledFinishedAt ? new Date(latestScheduledFinishedAt).getTime() : 0;
-  const expectedAtMs = expectedScheduledAt.getTime();
-  const graceMs = 15 * 60 * 1000;
-  const isDelayed = now.getTime() >= expectedAtMs + graceMs && latestScheduledAtMs < expectedAtMs;
-  return { expectedScheduledAt, nextScheduledAt, isDelayed };
-}
-
-function shiftTokyoDateKey(dateKey: string, offsetDays: number) {
-  const base = new Date(`${dateKey}T00:00:00+09:00`);
-  base.setDate(base.getDate() + offsetDays);
-  return toTokyoDateKey(base);
-}
-
-function getDateRangeKeys(startKey: string, endKey: string) {
-  const keys: string[] = [];
-  let currentKey = startKey;
-  while (currentKey <= endKey) {
-    keys.push(currentKey);
-    currentKey = shiftTokyoDateKey(currentKey, 1);
-  }
-  return keys;
-}
-
-function getPreviousRangeKeys(todayKey: string, days: number) {
-  const end = shiftTokyoDateKey(todayKey, -days);
-  const start = shiftTokyoDateKey(todayKey, -(days * 2) + 1);
-  return { start, end };
-}
-
-function formatDateTimeJst(value: string) {
-  return new Date(value).toLocaleString("ja-JP", {
-    timeZone: "Asia/Tokyo", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit"
-  });
-}
-
-function formatTimeJst(value: string) {
-  return new Date(value).toLocaleTimeString("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-
-function getScheduledSlotTime(dateKey: string, hour: number) {
-  return new Date(`${dateKey}T${String(hour).padStart(2, "0")}:17:00+09:00`);
-}
-
-function getScheduledPlannedLabel(iso: string) {
-  const parts = toTokyoDateTimeParts(iso);
-  const currentMinutes = parts.hour * 60 + parts.minute;
-  const plannedHour = [...SCHEDULED_SYNC_HOURS].reverse().find((hour) => currentMinutes >= (hour * 60 + 17));
-  const targetDateKey = typeof plannedHour === "number" ? parts.date : shiftTokyoDateKey(parts.date, -1);
-  const targetHour = typeof plannedHour === "number" ? plannedHour : SCHEDULED_SYNC_HOURS[SCHEDULED_SYNC_HOURS.length - 1];
-  return `${targetDateKey} ${String(targetHour).padStart(2, "0")}:17`;
-}
-
-function getScheduledPlannedAtFromStartedAt(iso: string) {
-  const parts = toTokyoDateTimeParts(iso);
-  const currentMinutes = parts.hour * 60 + parts.minute;
-  const plannedHour = [...SCHEDULED_SYNC_HOURS].reverse().find((hour) => currentMinutes >= (hour * 60 + 17));
-  const targetDateKey = typeof plannedHour === "number" ? parts.date : shiftTokyoDateKey(parts.date, -1);
-  const targetHour = typeof plannedHour === "number" ? plannedHour : SCHEDULED_SYNC_HOURS[SCHEDULED_SYNC_HOURS.length - 1];
-  return getScheduledSlotTime(targetDateKey, targetHour);
-}
-
-function formatDelayMinutes(totalMinutes: number) {
-  if (totalMinutes < 60) return `${totalMinutes}分`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes === 0 ? `${hours}時間` : `${hours}時間${minutes}分`;
-}
-
-function formatOptionalMetric(value: number | null | undefined) {
-  return value == null ? "未取得" : value.toLocaleString("ja-JP");
-}
-
-function formatUnavailableMetric(value: number | null | undefined, fallbackText = "この期間は未取得") {
-  return value == null ? fallbackText : value.toLocaleString("ja-JP");
-}
-
-const SCHEDULED_SYNC_TIMES_LABEL = "毎日 00:17 / 06:17 / 12:17 / 18:17";
-const SCHEDULED_SYNC_HOURS = [0, 6, 12, 18] as const;
-
-function syncStatusLabel(status: InstagramSyncRun["status"]) {
-  if (status === "success") return "成功";
-  if (status === "partial") return "一部失敗";
-  return "失敗";
-}
-
-function syncCountLabel(value: number, apiMode: string) {
-  if (apiMode === "github_actions") return "未取得";
-  return `${value.toLocaleString()}件`;
-}
+import { mergePostMetrics, matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
+import type {
+  DashboardAccount,
+  DashboardAccountInsightTrendRow,
+  DashboardApiResponse,
+  GraphPeriod,
+  GrowthAnalysis,
+  SyncHistoryRow,
+} from "@/components/dashboard/types";
+import {
+  ChartPanel,
+  CompareStat,
+  DateWeekdayTick,
+  GraphPeriodTabs,
+  GrowthPattern,
+  GrowthSummaryPanel,
+  HeroStat,
+  Insight,
+  MiniMetric,
+  SectionLead,
+  SourceBadge,
+  SyncInfoRow,
+} from "@/components/dashboard/widgets";
+import {
+  SCHEDULED_SYNC_TIMES_LABEL,
+  SCHEDULED_SYNC_HOURS,
+  currentMonth,
+  filterPostsByPeriod,
+  fmt,
+  formatDateTimeJst,
+  formatDelayMinutes,
+  formatOptionalMetric,
+  formatTimeJst,
+  getDateRangeKeys,
+  getPostPreview,
+  getPreviousRangeKeys,
+  getScheduledPlannedAtFromStartedAt,
+  getScheduledPlannedLabel,
+  getScheduledSlotTime,
+  getSyncMonitor,
+  shiftTokyoDateKey,
+  syncCountLabel,
+  syncStatusLabel,
+  toTokyoDateHour,
+  toTokyoDateKey,
+  toTokyoDateTimeParts,
+  videoTitle,
+} from "@/components/dashboard/utils";
 
 // ── メインページ（統合ダッシュボード） ────────────────────
 
 export default function DashboardPage() {
   // ── 手入力データ state ──
   const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [insightHistory, setInsightHistory] = useState<InstagramInsightSnapshot[]>([]);
   const [insightDate, setInsightDate] = useState("");
-  const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [syncRuns, setSyncRuns] = useState<InstagramSyncRun[]>([]);
 
   // ── Graph API state ──
   const [apiMedia, setApiMedia] = useState<ApiMedia[]>([]);
   const [dashAccount, setDashAccount] = useState<DashboardAccount | null>(null);
-  const [dashTotals, setDashTotals] = useState<DashboardTotals | null>(null);
   const [accountInsightsTrend, setAccountInsightsTrend] = useState<DashboardAccountInsightTrendRow[]>([]);
+  const [apiConnectionMessage, setApiConnectionMessage] = useState("Instagram連携を確認中...");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
   // ── UI state ──
   const [videoPeriod, setVideoPeriod] = useState<"day" | "week" | "month">("day");
-  const [graphPeriod, setGraphPeriod] = useState<"1" | "7" | "30" | "90" | "365">("30");
+  const [graphPeriod, setGraphPeriod] = useState<GraphPeriod>("30");
   const [growthAnalysis, setGrowthAnalysis] = useState<GrowthAnalysis | null>(null);
   const [growthAnalysisLoading, setGrowthAnalysisLoading] = useState(false);
   const [growthAnalysisError, setGrowthAnalysisError] = useState("");
@@ -544,19 +96,16 @@ export default function DashboardPage() {
   const [syncErrorMessage, setSyncErrorMessage] = useState("");
 
   const refreshDashboard = async () => {
-    const [loadedPosts, loadedGoals, loadedInsights, loadedSyncRuns] = await Promise.all([
-      loadPostsData(), loadGoalsData(),
+    const [loadedPosts, loadedInsights, loadedSyncRuns] = await Promise.all([
+      loadPostsData(),
       loadAllInsightData(), loadSyncRunsData()
     ]);
     setPosts(loadedPosts);
-    setGoals(loadedGoals);
     setInsightHistory(loadedInsights);
     setSyncRuns(loadedSyncRuns);
     const latestInsight = [...loadedInsights].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())[0];
     if (latestInsight) setInsightDate(toTokyoDateHour(latestInsight.capturedAt).date);
-    Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then((scores) => {
-      setLatestScoreByPostId(Object.fromEntries(scores.filter(([, score]) => typeof score === "number")));
-    });
+    Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]?.score] as const)).then(() => undefined);
   };
 
   const refreshApiData = async () => {
@@ -566,11 +115,18 @@ export default function DashboardPage() {
         fetch('/api/instagram/dashboard').then(r => r.ok ? r.json() : null),
       ]);
       setApiMedia((mediaRes as { data: ApiMedia[] }).data ?? []);
-      setDashAccount((dashRes as DashboardApiResponse | null)?.account ?? null);
-      setDashTotals((dashRes as DashboardApiResponse | null)?.totals ?? null);
-      setAccountInsightsTrend((dashRes as DashboardApiResponse | null)?.account_insights_trend ?? []);
+      const dashboard = dashRes as DashboardApiResponse | null;
+      setDashAccount(dashboard?.account ?? null);
+      setAccountInsightsTrend(dashboard?.account_insights_trend ?? []);
+      setApiConnectionMessage(
+        dashboard?.configured === false
+          ? dashboard.message ?? "Instagramデータベースが未接続です。"
+          : dashboard?.account
+            ? ""
+            : "Instagramデータはまだありません。同期してください。",
+      );
     } catch {
-      // 無視
+      setApiConnectionMessage("Instagramデータを取得できませんでした。しばらくしてから再度お試しください。");
     }
   };
 
@@ -646,19 +202,6 @@ export default function DashboardPage() {
       const m = mergePostMetrics(post, matched?.latest_insights);
       return { ...post, views: m.views, likes: m.likes, saves: m.saves, comments: m.comments, shares: m.shares };
     });
-  }, [posts, apiMedia]);
-
-  // APIマッチ件数のカウント（サマリー表示用）
-  // views > 0（動画）または reach > 0（画像含む全タイプ）があればAPIマッチとみなす
-  const mergeStats = useMemo(() => {
-    let apiCount = 0;
-    for (const post of posts) {
-      const matched = matchPostToMedia(post, apiMedia);
-      const ins = matched?.latest_insights;
-      const hasApiData = (ins?.views != null && ins.views > 0) || (ins?.reach != null && ins.reach > 0);
-      if (hasApiData) apiCount++;
-    }
-    return { apiCount, manualCount: posts.length - apiCount, total: posts.length };
   }, [posts, apiMedia]);
 
   // ── 派生データ ────────────────────────────────────────
@@ -743,9 +286,9 @@ export default function DashboardPage() {
   const data = useMemo(() => {
     const targetPosts = effectivePosts;
     const todayKey = toTokyoDateKey(new Date());
-    const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, todayKey);
+    const graphEndKey = graphPeriod === "1" ? shiftTokyoDateKey(todayKey, -1) : todayKey;
+    const graphPosts = filterPostsByPeriod(targetPosts, graphPeriod, graphEndKey);
     const currentMonthKey = currentMonth();
-    const monthlyPosts = targetPosts.filter((post) => post.date.startsWith(currentMonthKey));
     const todayPosts = targetPosts.filter((post) => post.date === todayKey);
     const yesterdayKey = shiftTokyoDateKey(todayKey, -1);
     const previousDayPosts = targetPosts.filter((post) => post.date === yesterdayKey);
@@ -757,20 +300,12 @@ export default function DashboardPage() {
       if (byUpdated !== 0) return byUpdated;
       return a.date < b.date ? 1 : -1;
     })[0];
-    const monthlyActual = {
-      posts: monthlyPosts.length,
-      views: monthlyPosts.reduce((sum, post) => sum + post.views, 0),
-      saves: monthlyPosts.reduce((sum, post) => sum + post.saves, 0),
-      saveRate: average(monthlyPosts.map((post) => getMetrics(post).saveRate)),
-      engagementRate: average(monthlyPosts.map((post) => getMetrics(post).engagementRate))
-    };
-    const selectedGoal = goals.find((goal) => goal.month === currentMonthKey && goal.accountId == null) ?? goals.find((goal) => goal.month === currentMonthKey) ?? null;
     const dailyViewsMap = graphPosts.reduce((daily, post) => {
       daily.set(post.date, (daily.get(post.date) ?? 0) + post.views);
       return daily;
     }, new Map<string, number>());
-    const graphRangeStart = shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
-    const graphRangeEnd = todayKey;
+    const graphRangeStart = shiftTokyoDateKey(graphEndKey, -(Number(graphPeriod) - 1));
+    const graphRangeEnd = graphEndKey;
     const dailyViews = getDateRangeKeys(graphRangeStart, graphRangeEnd)
       .map((date) => ({
         axisLabel: `${date.slice(5).replace("-", "/")}|${weekdayJa(date)}`,
@@ -807,13 +342,14 @@ export default function DashboardPage() {
       bestType: [...typeData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       bestWeekday: [...weekdayData].sort((a, b) => b.averageEngagementRate - a.averageEngagementRate)[0],
       mostSavedPost: [...targetPosts].sort((a, b) => b.saves - a.saves)[0],
-      currentMonthKey, monthlyActual, selectedGoal,
+      currentMonthKey,
       count: targetPosts.length, graphCount: graphPosts.length,
       graphApiCount, graphManualCount,
       graphTotalViews: graphPosts.reduce((sum, post) => sum + post.views, 0),
       graphAverageEngagementRate: average(graphPosts.map((post) => getMetrics(post).engagementRate)),
       graphAverageSaves: average(graphPosts.map((post) => post.saves)),
-      graphPeriodLabel: graphPeriod === "1" ? "一日" : graphPeriod === "7" ? "一週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
+      graphPeriodLabel: graphPeriod === "1" ? "前日" : graphPeriod === "7" ? "一週間" : graphPeriod === "14" ? "二週間" : graphPeriod === "30" ? "一ヶ月" : graphPeriod === "90" ? "90日" : "一年",
+      graphEndKey,
 
       todayPosts, todayViews: todayPosts.reduce((sum, post) => sum + post.views, 0),
       todaySaves: todayPosts.reduce((sum, post) => sum + post.saves, 0),
@@ -829,13 +365,14 @@ export default function DashboardPage() {
       previous7Saves: previous7Posts.reduce((sum, post) => sum + post.saves, 0),
       previous7EngagementRate: average(previous7Posts.map((post) => getMetrics(post).engagementRate))
     };
-  }, [effectivePosts, goals, latestScoreByPostId, graphPeriod, posts]);
+  }, [effectivePosts, graphPeriod, apiMedia]);
 
   const accountInsightSummary = useMemo(() => {
     const todayKey = toTokyoDateKey(new Date());
-    const graphRangeStart = shiftTokyoDateKey(todayKey, -(Number(graphPeriod) - 1));
-    const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= todayKey);
-    const sourceTrend = filteredTrend.length ? filteredTrend : accountInsightsTrend;
+    const graphEndKey = graphPeriod === "1" ? shiftTokyoDateKey(todayKey, -1) : todayKey;
+    const graphRangeStart = shiftTokyoDateKey(graphEndKey, -(Number(graphPeriod) - 1));
+    const filteredTrend = accountInsightsTrend.filter((row) => row.date >= graphRangeStart && row.date <= graphEndKey);
+    const sourceTrend = filteredTrend;
     const latestRow = sourceTrend[sourceTrend.length - 1] ?? null;
     const sumField = (key: keyof DashboardAccountInsightTrendRow) => {
       const values = sourceTrend
@@ -849,12 +386,13 @@ export default function DashboardPage() {
     const reach = sumField("reach");
     const profileViews = sumField("profile_views");
     const websiteClicks = sumField("website_clicks");
+    const periodScopeLabel = `${data.graphPeriodLabel}分`;
     const primaryValue = impressions ?? reach;
     const primaryLabel = impressions != null ? "閲覧" : reach != null ? "リーチ" : "閲覧";
     const primaryDescription = impressions != null
-      ? `${data.graphPeriodLabel}のビュー`
+      ? `${periodScopeLabel}の閲覧数です`
       : reach != null
-        ? `${data.graphPeriodLabel}は閲覧未取得のため、リーチを表示`
+        ? `${periodScopeLabel}のリーチ数です`
         : "アカウント全体インサイトはまだ未取得です";
 
     return {
@@ -1077,8 +615,14 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {dashAccount?.profile_picture_url && (
-              <img src={dashAccount.profile_picture_url} alt="profile"
-                className="w-12 h-12 rounded-full object-cover border border-stone-200 shrink-0" />
+              <Image
+                src={dashAccount.profile_picture_url}
+                alt="profile"
+                width={48}
+                height={48}
+                unoptimized
+                className="h-12 w-12 shrink-0 rounded-full border border-stone-200 object-cover"
+              />
             )}
             <div>
               {dashAccount ? (
@@ -1090,7 +634,7 @@ export default function DashboardPage() {
                   )}
                 </>
               ) : (
-                <p className="text-sm text-stone-500">アカウント情報を読み込み中...</p>
+                <p className="text-sm text-stone-500">{apiConnectionMessage}</p>
               )}
             </div>
           </div>
@@ -1116,75 +660,47 @@ export default function DashboardPage() {
       </div>
 
       <Panel className="mb-6 border-stone-200/80 bg-white/92">
-        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-clay">Account Insights</p>
-            <h2 className="mt-2 text-2xl font-bold text-ink">アカウントのインサイト</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              {accountInsightSummary.periodLabel}のアカウント全体の反応をまとめています。投稿単位ではなく、期間全体の流れを見るための欄です。
-            </p>
-            <div className="mt-6 rounded-2xl bg-ink px-6 py-7 text-white shadow-panel">
-              <p className="text-sm font-semibold tracking-[0.2em] text-white/70">{accountInsightSummary.primaryLabel}</p>
-              <p className="mt-4 text-5xl font-bold leading-none">
-                {formatOptionalMetric(accountInsightSummary.primaryValue)}
-              </p>
-              <p className="mt-3 text-sm text-white/72">
-                {accountInsightSummary.primaryDescription}
-                {accountInsightSummary.latestDate ? ` / 最新日 ${accountInsightSummary.latestDate}` : ""}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            <div className="rounded-2xl border border-stone-200/80 bg-fog/72 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-base font-semibold text-ink">内訳サマリー</p>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-stone-600">
-                  {accountInsightSummary.periodLabel}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3">
-                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">リーチしたアカウント数</span>
-                  <span className="text-2xl font-bold text-ink">{formatOptionalMetric(accountInsightSummary.reach)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">プロフィール閲覧</span>
-                  <span className="text-xl font-bold text-ink">{formatUnavailableMetric(accountInsightSummary.profileViews)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-b border-stone-200/80 pb-3">
-                  <span className="text-sm text-stone-600">ウェブサイトクリック</span>
-                  <span className="text-xl font-bold text-ink">{formatUnavailableMetric(accountInsightSummary.websiteClicks)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-stone-600">現在のフォロワー数</span>
-                  <span className="text-xl font-bold text-ink">{fmt(accountInsightSummary.followerCount)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-stone-600">
-              <p className="font-semibold text-ink">今はまだ出していない項目</p>
-              <p className="mt-1">
-                フォロワー / 非フォロワーの割合は、現在の保存データには入っていないため、この欄ではまだ表示していません。
-              </p>
-              {accountInsightSummary.impressions == null && accountInsightSummary.reach != null ? (
-                <p className="mt-2 text-stone-700">
-                  今回は「閲覧」は返らず、「リーチ」は取得できています。大きいカードは自動でリーチ表示に切り替えています。
-                </p>
-              ) : null}
-              {!accountInsightSummary.hasInsightMetrics ? (
-                <p className="mt-2 text-red-700">
-                  現在の連携設定では、アカウント全体インサイト自体も未取得です。`facebook_login` 連携へ切り替えると取得できる可能性があります。
-                </p>
-              ) : null}
-            </div>
-          </div>
+        <SectionLead
+          eyebrow="Overview"
+          title="この期間の要点"
+          description={`${accountInsightSummary.periodLabel}のアカウント全体の数字と、同じ期間の投稿集計をまとめて見られます。`}
+        />
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <HeroStat
+            label="届いたアカウント数"
+            value={formatOptionalMetric(accountInsightSummary.primaryValue)}
+            note={`${accountInsightSummary.primaryDescription}${accountInsightSummary.latestDate ? ` / 最新取得日 ${accountInsightSummary.latestDate}` : ""}`}
+            tone="moss"
+          />
+          <HeroStat
+            label="現在のフォロワー数"
+            value={fmt(accountInsightSummary.followerCount)}
+            note="アカウント全体の現在値"
+            tone="clay"
+          />
+          {accountInsightSummary.profileViews != null ? (
+            <HeroStat
+              label="プロフィール閲覧"
+              value={fmt(accountInsightSummary.profileViews)}
+              note={`${accountInsightSummary.periodLabel}のアカウント全体`}
+              tone="sky"
+            />
+          ) : null}
+          {accountInsightSummary.websiteClicks != null ? (
+            <HeroStat
+              label="サイトクリック"
+              value={fmt(accountInsightSummary.websiteClicks)}
+              note={`${accountInsightSummary.periodLabel}のアカウント全体`}
+              tone="plum"
+            />
+          ) : null}
         </div>
-      </Panel>
-
-      {/* サマリーカード（統合後の実効値） */}
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {!accountInsightSummary.hasInsightMetrics ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white/75 p-4 text-sm leading-6 text-red-700">
+            アカウント全体の数字はまだ取得できていません。
+          </div>
+        ) : null}
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <HeroStat
           label="対象投稿"
           value={`${data.graphCount}件`}
@@ -1211,7 +727,8 @@ export default function DashboardPage() {
           note={data.graphCount > 0 ? `${data.graphPeriodLabel}の平均値` : "対象データなし"}
           tone="plum"
         />
-      </div>
+        </div>
+      </Panel>
 
       {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。</p></Panel> : null}
 
@@ -1389,6 +906,11 @@ export default function DashboardPage() {
             </Panel>
           </div>
 
+          <details className="rounded-lg border border-stone-200 bg-white">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-stone-700">
+              詳しい分析を開く
+            </summary>
+            <div className="border-t border-stone-200 px-4 py-5">
           {/* 同期履歴 */}
           <Panel className="mb-6">
             <SectionLead eyebrow="History" title="同期履歴一覧" description="直近5回の実行結果を確認できます。" />
@@ -1452,7 +974,14 @@ export default function DashboardPage() {
                     className="grid gap-3 border-b border-stone-200 px-2 py-4 transition hover:bg-white/60 md:grid-cols-[52px_64px_1fr_auto] md:items-center">
                     <span className="text-2xl font-bold text-clay">{index + 1}</span>
                     {getPostPreview(item.post) ? (
-                      <img src={getPostPreview(item.post)} alt="投稿サムネイル" className="h-16 w-16 rounded-md object-cover" />
+                      <Image
+                        src={getPostPreview(item.post)}
+                        alt="投稿サムネイル"
+                        width={64}
+                        height={64}
+                        unoptimized
+                        className="h-16 w-16 rounded-md object-cover"
+                      />
                     ) : (
                       <span className="flex h-16 w-16 items-center justify-center rounded-md bg-fog text-[10px] text-stone-500">画像なし</span>
                     )}
@@ -1505,21 +1034,8 @@ export default function DashboardPage() {
             </div>
           </Panel>
 
-          {/* 目標達成率 */}
-          <Panel className="mb-6">
-            <SectionLead eyebrow="Goals" title="今月の目標達成率" description="今月の実績と目標値の差を指標ごとに比較します。" />
-            {data.selectedGoal ? (
-              <div className="mt-4 grid gap-3 md:grid-cols-5">
-                <Progress label="投稿数" actual={data.monthlyActual.posts} target={data.selectedGoal.targetPosts} suffix="件" />
-                <Progress label="表示数" actual={data.monthlyActual.views} target={data.selectedGoal.targetViews} suffix="" />
-                <Progress label="保存数" actual={data.monthlyActual.saves} target={data.selectedGoal.targetSaves} suffix="" />
-                <Progress label="平均保存率" actual={data.monthlyActual.saveRate} target={data.selectedGoal.targetSaveRate} suffix="%" decimal />
-                <Progress label="平均ER" actual={data.monthlyActual.engagementRate} target={data.selectedGoal.targetEngagementRate} suffix="%" decimal />
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-stone-600">{data.currentMonthKey} の目標は未設定です。目標管理ページで設定できます。</p>
-            )}
-          </Panel>
+            </div>
+          </details>
         </>
       ) : null}
 
@@ -1527,8 +1043,7 @@ export default function DashboardPage() {
       <section className="mt-8">
         <SectionLead eyebrow="Charts" title="推移と比較" description="時系列の流れ、投稿タイプ差、カテゴリ差を横断して確認できるグラフ群です。" />
         <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm text-stone-600">{data.graphPeriodLabel}の投稿 {data.graphCount}件をもとに集計しています。</p>
-          <GraphPeriodTabs graphPeriod={graphPeriod} setGraphPeriod={setGraphPeriod} />
+          <p className="text-sm text-stone-600">{data.graphPeriodLabel}の投稿 {data.graphCount}件をもとに集計しています。期間切替は上のタブと共通です。</p>
         </div>
       </section>
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
@@ -1582,7 +1097,12 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={hourlyInsightData}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" /><YAxis />
-                <Tooltip formatter={(value: number, name: string) => [Number(value).toLocaleString(), name]} />
+                <Tooltip
+  formatter={(value, name) => [
+    Number(value ?? 0).toLocaleString(),
+    String(name),
+  ]}
+/>
                 <Legend />
                 <Line type="monotone" dataKey="views" name="合計閲覧数" stroke="#b55d3e" strokeWidth={2} />
                 <Line type="monotone" dataKey="growth" name="前回からの増加" stroke="#2f766d" strokeWidth={2} />

@@ -10,20 +10,13 @@ import {
   fetchAccountInsights,
   fetchFollowerSnapshot,
   getMetric,
-  isReel,
   type ApiError,
 } from '@/lib/instagram-graph-api';
-import { createClient } from '@supabase/supabase-js';
 import type { InstagramSyncRun } from '@/lib/types';
+import { logServerIssue } from '@/lib/safe-logging';
+import { isSupabaseServerConfigured, requireSupabaseServerClient } from '@/lib/supabase-server';
 
 export const maxDuration = 180;
-
-function supabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase 環境変数が未設定です');
-  return createClient(url, key);
-}
 
 type ExistingAccountRow = {
   id: string;
@@ -46,7 +39,7 @@ function isAuthorizedCronRequest(request: Request) {
 type SyncTriggerType = "manual" | "scheduled";
 
 async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
-  const db = supabase();
+  const db = requireSupabaseServerClient();
   const { error } = await db.from('instagram_sync_runs').insert({
     trigger_type: run.triggerType,
     status: run.status,
@@ -72,7 +65,7 @@ async function safeSaveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
   try {
     await saveScheduledSyncRun(run);
   } catch (error) {
-    console.error('[full-sync-run-save]', error);
+    logServerIssue('full-sync-run-save', error);
   }
 }
 
@@ -123,7 +116,16 @@ export async function GET(request: Request) {
 }
 
 async function handler(triggerType: SyncTriggerType) {
-  const db = supabase();
+  if (!isSupabaseServerConfigured()) {
+    return NextResponse.json({
+      ok: false,
+      status: "failed",
+      error: "Instagramデータベースが未接続です。",
+      errors: ["Supabaseの環境設定を確認してください。"],
+    }, { status: 503 });
+  }
+
+  const db = requireSupabaseServerClient();
   const startedAt = new Date().toISOString();
   const results = {
     account: null as unknown,
@@ -139,7 +141,6 @@ async function handler(triggerType: SyncTriggerType) {
   try {
     // 1. アカウント情報取得
     const account = await fetchAccountInfo();
-    console.log('[full-sync] account:', account.username ?? '(username unavailable)', account.id);
     results.account = { username: account.username ?? null, id: account.id };
 
     const syncedAt = new Date().toISOString();
@@ -212,7 +213,7 @@ async function handler(triggerType: SyncTriggerType) {
     }
 
     if (accErr) {
-      console.error('[full-sync] account upsert error:', accErr);
+      logServerIssue('full-sync-account-save', accErr);
       results.errors.push(`アカウント保存エラー: ${accErr.message}`);
       if (triggerType === "scheduled") {
         await safeSaveScheduledSyncRun({
@@ -237,7 +238,6 @@ async function handler(triggerType: SyncTriggerType) {
     // 2. 投稿一覧取得
     const mediaList = await fetchMediaList(account.id);
     results.media_fetched = mediaList.length;
-    console.log(`[full-sync] media: ${mediaList.length} 件`);
 
     // 3. 各投稿を保存 + インサイト取得
     for (const media of mediaList) {
@@ -262,7 +262,7 @@ async function handler(triggerType: SyncTriggerType) {
         }, { onConflict: 'id' });
 
       if (mediaErr) {
-        console.warn(`[full-sync] media upsert error ${media.id}:`, mediaErr.message);
+        logServerIssue('full-sync-media-save', mediaErr, { mediaType: media.media_type });
         results.errors.push(`投稿保存エラー ${media.id}: ${mediaErr.message}`);
       } else {
         results.media_saved++;
@@ -293,14 +293,14 @@ async function handler(triggerType: SyncTriggerType) {
           });
 
         if (insErr) {
-          console.warn(`[full-sync] insights insert error ${media.id}:`, insErr.message);
+          logServerIssue('full-sync-insights-save', insErr, { mediaType: media.media_type });
           results.insights_failed++;
         } else {
           results.insights_fetched++;
         }
       } catch (e) {
         results.insights_failed++;
-        console.warn(`[full-sync] insights exception ${media.id}:`, e);
+        logServerIssue('full-sync-insights', e, { mediaType: media.media_type });
       }
     }
 
@@ -329,13 +329,13 @@ async function handler(triggerType: SyncTriggerType) {
         }, { onConflict: 'account_id,date' });
 
       if (aiErr) {
-        console.warn('[full-sync] account insights error:', aiErr.message);
+        logServerIssue('full-sync-account-insights-save', aiErr);
         results.errors.push(`アカウントインサイトエラー: ${aiErr.message}`);
       } else {
         results.account_insights = 'ok';
       }
     } catch (e) {
-      console.warn('[full-sync] account insights exception:', e);
+      logServerIssue('full-sync-account-insights', e);
       results.errors.push(e instanceof Error ? `アカウントインサイトエラー: ${e.message}` : 'アカウントインサイトエラーが発生しました。');
       results.account_insights = 'failed';
     }
@@ -356,7 +356,7 @@ async function handler(triggerType: SyncTriggerType) {
 
       results.snapshot_saved = !snapErr;
     } catch (e) {
-      console.warn('[full-sync] snapshot exception:', e);
+      logServerIssue('full-sync-snapshot', e);
     }
 
     const finishedAt = new Date().toISOString();
@@ -422,9 +422,6 @@ async function handler(triggerType: SyncTriggerType) {
         ok: false,
         error: err.message ?? String(e),
         type: err.type ?? 'unknown',
-        // DEBUG: 原因調査用（確認後に削除）
-        debug_url: err.debug_url ?? null,
-        raw_api_error: err.raw ?? null,
       },
       { status }
     );
