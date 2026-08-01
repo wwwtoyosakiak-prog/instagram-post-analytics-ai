@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { PageHeader, Panel } from "@/components/ui";
+import { ActionError, PageHeader, Panel } from "@/components/ui";
 import {
   InstagramInsightSnapshot,
   PostType,
@@ -543,7 +543,7 @@ export default function DashboardPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             {syncMsg && <p className="text-xs text-stone-600">{syncMsg}</p>}
             {syncMessage && <p className="text-xs text-emerald-700">{syncMessage}</p>}
-            {syncErrorMessage && <p className="text-xs text-red-700">{syncErrorMessage}</p>}
+            {syncErrorMessage && <ActionError message={syncErrorMessage} actionLabel="もう一度取得" onAction={() => { void handleFullSync(); }} className="w-full" />}
           </div>
         )}
       </Panel>

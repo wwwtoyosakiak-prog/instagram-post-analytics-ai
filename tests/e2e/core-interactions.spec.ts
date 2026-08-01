@@ -204,6 +204,7 @@ test("Instagram同期の失敗理由を表示する", async ({ page }) => {
 
   await page.getByRole("button", { name: "Instagramデータを同期", exact: true }).click();
 
-  await expect(page.getByText("Instagram接続を確認してください。", { exact: true })).toBeVisible();
+  await expect(page.getByText("Instagramのデータを取得できませんでした。接続状態を確認して、もう一度お試しください。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "もう一度取得", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Instagramデータを同期", exact: true })).toBeEnabled();
 });

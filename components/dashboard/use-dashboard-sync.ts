@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { requestJson } from "@/lib/client-api";
+import { toUserFacingError } from "@/lib/user-facing-error";
 
 type RefreshDashboard = () => Promise<void>;
 
@@ -60,10 +61,10 @@ export function useDashboardSync(
           ? `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。一部でエラーがありました。`
           : `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。`,
       );
-      if (isPartial) setSyncErrorMessage(firstError);
+      if (isPartial) setSyncErrorMessage(toUserFacingError(firstError, "sync"));
     } catch (error) {
       setSyncMsg("");
-      setSyncErrorMessage(error instanceof Error ? error.message : "❌ 通信エラーが発生しました");
+      setSyncErrorMessage(toUserFacingError(error, "sync"));
     } finally {
       setSyncing(false);
     }
