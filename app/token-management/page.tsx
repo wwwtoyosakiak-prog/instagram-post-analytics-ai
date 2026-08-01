@@ -1,9 +1,10 @@
 "use client";
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
-import { Button, PageHeader, Panel, Stat } from "@/components/ui";
+import { ActionError, Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { InstagramAccessTokenRecord, InstagramOperationLog } from "@/lib/types";
 import { requestJson } from "@/lib/client-api";
+import { toUserFacingError } from "@/lib/user-facing-error";
 
 type RefreshResponse = {
   ok: boolean;
@@ -113,7 +114,7 @@ export default function TokenManagementPage() {
         setMessage("最新のトークン状態を確認しました。");
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "トークン状態の取得に失敗しました。");
+      setError(toUserFacingError(caught, "token"));
     } finally {
       setLoading(false);
       setChecking(false);
@@ -139,7 +140,7 @@ export default function TokenManagementPage() {
       setMessage(data.message);
       await loadStatus();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "トークン更新に失敗しました。");
+      setError(toUserFacingError(caught, "token"));
       await loadStatus();
     } finally {
       setRefreshing(false);
@@ -210,12 +211,12 @@ export default function TokenManagementPage() {
         {!loading && token?.lastError ? (
           <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             <p className="font-semibold">最終エラー</p>
-            <p className="mt-1 whitespace-pre-wrap">{token.lastError}</p>
+            <p className="mt-1">{toUserFacingError(token.lastError, "token")}</p>
           </div>
         ) : null}
 
         {message ? <p className="mt-4 rounded-md bg-skyglass px-4 py-3 text-sm text-ink">{message}</p> : null}
-        {error ? <p className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
+        {error ? <ActionError message={error} actionLabel="もう一度確認" onAction={() => { void loadStatus("check"); }} className="mt-4" /> : null}
       </Panel>
 
       <Panel className="mt-6">

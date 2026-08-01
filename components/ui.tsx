@@ -1,3 +1,4 @@
+import { AlertCircle } from "lucide-react";
 import { ReactNode } from "react";
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
@@ -34,6 +35,30 @@ export function Stat({ label, value, note }: { label: string; value: string | nu
       <p className="text-xs font-semibold uppercase text-stone-500">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
       {note ? <p className="mt-1 text-[11px] text-stone-400">{note}</p> : null}
+    </div>
+  );
+}
+
+export function ActionError({ message, actionLabel, onAction, className = "" }: {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  className?: string;
+}) {
+  return (
+    <div role="alert" className={`rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 ${className}`}>
+      <div className="flex gap-3">
+        <AlertCircle size={19} className="mt-0.5 shrink-0" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">操作を完了できませんでした</p>
+          <p className="mt-1 leading-6 text-red-800">{message}</p>
+          {actionLabel && onAction ? (
+            <button type="button" onClick={onAction} className="mt-3 rounded-md border border-red-300 bg-white px-3 py-2 font-semibold text-red-900 transition hover:bg-red-100">
+              {actionLabel}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
