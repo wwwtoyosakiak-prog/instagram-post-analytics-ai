@@ -37,4 +37,27 @@ describe("Supabase server connection", () => {
       }),
     );
   });
+
+  it("rejects requests when configuration is missing", async () => {
+    vi.stubEnv("SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+
+    await expect(supabaseRestRequest("items")).rejects.toThrow("Supabase環境変数が設定されていません。");
+  });
+
+  it("handles an empty 204 response", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+
+    await expect(supabaseRestRequest("items", { method: "DELETE" })).resolves.toBeUndefined();
+  });
+
+  it("reports a failed database response", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("database unavailable", { status: 503 })));
+
+    await expect(supabaseRestRequest("items")).rejects.toThrow("database unavailable");
+  });
 });
