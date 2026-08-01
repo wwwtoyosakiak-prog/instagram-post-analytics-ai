@@ -13,6 +13,14 @@ body {
   min-height: 100vh;
 }
 
+.skip-link {
+  @apply fixed left-4 top-3 z-50 -translate-y-20 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform focus:translate-y-0;
+}
+
+:where(a, button, summary, [tabindex]):focus-visible {
+  @apply outline-none ring-2 ring-clay ring-offset-2 ring-offset-white;
+}
+
 @layer components {
   .nav-primary {
     @apply inline-flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-stone-600 transition hover:bg-stone-100 hover:text-ink;
@@ -47,6 +55,17 @@ td {
 
 tbody tr {
   @apply transition hover:bg-stone-50;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media print {

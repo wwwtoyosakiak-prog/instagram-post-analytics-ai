@@ -61,12 +61,12 @@ export function AppNavigation() {
 
         </div>
       </header>
-      <div className="border-b border-stone-200 bg-stone-50">
+      <nav aria-label="現在位置" className="border-b border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-6xl px-4 py-2 text-xs text-stone-500">
           <Link href="/" className="hover:text-ink">ホーム</Link>
           {pathname !== "/" ? <><span className="mx-2">/</span><span className="font-medium text-stone-700">{currentName}</span></> : null}
         </div>
-      </div>
+      </nav>
     </>
   );
 }

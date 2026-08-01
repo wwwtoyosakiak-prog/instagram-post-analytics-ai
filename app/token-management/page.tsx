@@ -222,6 +222,7 @@ export default function TokenManagementPage() {
 
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full border-separate border-spacing-y-2 text-sm">
+            <caption className="sr-only">Instagramトークンの更新履歴</caption>
             <thead>
               <tr className="text-left text-stone-500">
                 <th className="px-3 py-2">実行日時</th>

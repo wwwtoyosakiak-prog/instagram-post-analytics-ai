@@ -193,11 +193,12 @@ export function GraphPeriodTabs({ graphPeriod, setGraphPeriod }: {
   setGraphPeriod: (period: GraphPeriod) => void;
 }) {
   return (
-    <div className="grid grid-cols-6 gap-1 rounded-md border border-stone-200 bg-white/80 p-1">
+    <div className="grid grid-cols-6 gap-1 rounded-md border border-stone-200 bg-white/80 p-1" aria-label="分析期間">
       {(["1", "7", "14", "30", "90", "365"] as const).map((period) => (
         <button
           key={period}
           type="button"
+          aria-pressed={graphPeriod === period}
           onClick={() => setGraphPeriod(period)}
           className={`rounded px-3 py-2 text-sm font-semibold transition ${graphPeriod === period ? "bg-ink text-white" : "text-stone-600 hover:bg-fog"}`}
         >
