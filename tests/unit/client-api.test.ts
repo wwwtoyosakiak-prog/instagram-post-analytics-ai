@@ -25,6 +25,17 @@ describe("client API", () => {
     });
   });
 
+  it("画面固有の代替メッセージを使用する", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), { status: 503 }),
+    ));
+
+    await expect(requestJson("/api/test", {}, "プロフィールを取得できませんでした。")).rejects.toMatchObject({
+      message: "プロフィールを取得できませんでした。",
+      status: 503,
+    });
+  });
+
   it("JSONでない応答を共通エラーにする", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("invalid", { status: 502 })));
 
