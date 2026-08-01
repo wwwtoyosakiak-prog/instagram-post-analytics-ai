@@ -68,31 +68,50 @@ async function mockCoreData(page: Page) {
   await page.route("**/api/instagram/dashboard**", (route) =>
     route.fulfill({ json: { configured: false, account: null, account_insights_trend: [] } }),
   );
+  await page.route("**/api/instagram/token/status", (route) =>
+    route.fulfill({ json: { status: "active" } }),
+  );
 }
 
 test.beforeEach(async ({ page }) => {
   await mockCoreData(page);
 });
 
-test("メインメニューから主要画面へ移動できる", async ({ page }) => {
-  const destinations = [
-    { link: "投稿", path: "/posts", heading: "投稿一覧" },
-    { link: "分析", path: "/dashboard", heading: "ダッシュボード" },
-    { link: "レポート", path: "/reports", heading: "月次レポート" },
-    { link: "カレンダー", path: "/calendar", heading: "投稿カレンダー" },
-    { link: "プロフィール", path: "/accounts", heading: "プロフィール" },
-    { link: "Instagram連携", path: "/token-management", heading: "トークン管理" },
-  ];
+test("投稿がないときに初期設定の順番を案内する", async ({ page }) => {
+  await page.unroute("**/api/data/posts**");
+  await page.route("**/api/data/posts**", (route) => route.fulfill({ json: { posts: [] } }));
+  await page.route("**/api/instagram/token/status", (route) =>
+    route.fulfill({ json: { status: "missing" } }),
+  );
 
-  for (const destination of destinations) {
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Instagramのデータを表示する準備" })).toBeVisible();
+  await expect(page.getByText("Instagramを接続", { exact: true })).toBeVisible();
+  await expect(page.getByText("最初のデータを取得", { exact: true })).toBeVisible();
+  await expect(page.getByText("投稿結果を確認", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "接続を始める" })).toHaveAttribute("href", "/token-management");
+});
+
+const menuDestinations = [
+  { link: "投稿", path: "/posts", heading: "投稿一覧" },
+  { link: "分析", path: "/dashboard", heading: "ダッシュボード" },
+  { link: "レポート", path: "/reports", heading: "月次レポート" },
+  { link: "カレンダー", path: "/calendar", heading: "投稿カレンダー" },
+  { link: "プロフィール", path: "/accounts", heading: "プロフィール" },
+  { link: "Instagram連携", path: "/token-management", heading: "トークン管理" },
+];
+
+for (const destination of menuDestinations) {
+  test(`メインメニューから${destination.link}へ移動できる`, async ({ page }) => {
     await page.goto("/");
     await page.getByRole("navigation", { name: "メインメニュー" })
       .getByRole("link", { name: destination.link, exact: true })
       .click();
     await expect(page).toHaveURL(new RegExp(`${destination.path}$`));
     await expect(page.getByRole("heading", { name: destination.heading, exact: true })).toBeVisible();
-  }
-});
+  });
+}
 
 test("投稿タイプで一覧を絞り込める", async ({ page }) => {
   await page.goto("/posts");

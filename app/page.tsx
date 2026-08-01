@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarDays, CheckCircle2, ClipboardList, FileText, KeyRound, ListChecks, User } from "lucide-react";
+import { BarChart3, CalendarDays, Check, CheckCircle2, ClipboardList, FileText, KeyRound, ListChecks, User } from "lucide-react";
 import { PageHeader, Panel, Stat } from "@/components/ui";
 import { getServerStorageStatus, loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
+import { requestJsonOr } from "@/lib/client-api";
 import { AiAnalysisRecord, InstagramPost } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 
@@ -12,13 +13,21 @@ export default function Home() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [latestAnalysisByPostId, setLatestAnalysisByPostId] = useState<Record<string, AiAnalysisRecord>>({});
   const [serverStorageEnabled, setServerStorageEnabled] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadPostsData(), getServerStorageStatus()]).then(([loadedPosts, status]) => {
+    Promise.all([
+      loadPostsData(),
+      getServerStorageStatus(),
+      requestJsonOr<{ status?: string } | null>("/api/instagram/token/status", null),
+    ]).then(([loadedPosts, status, token]) => {
       setPosts(loadedPosts);
       setServerStorageEnabled(status.serverStorageEnabled);
+      setTokenStatus(token?.status ?? null);
       Promise.all(loadedPosts.map(async (post) => [post.id, (await loadAnalysesData(post.id))[0]] as const)).then((analyses) => {
         setLatestAnalysisByPostId(Object.fromEntries(analyses.filter(([, analysis]) => Boolean(analysis))));
+        setLoaded(true);
       });
     });
   }, []);
@@ -51,6 +60,7 @@ export default function Home() {
         title="今日、確認すること"
         description="上から順に確認すれば、Instagram運用の状態と次の行動が分かります。"
       />
+      {loaded && posts.length === 0 ? <InitialSetup tokenStatus={tokenStatus} /> : null}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="今月の投稿" value={`${summary.monthlyPostCount}件`} note="今月公開した投稿数" />
         <Stat label="平均反応率" value={formatPercent(summary.averageEngagementRate)} note="いいね・保存などの割合" />
@@ -118,6 +128,72 @@ export default function Home() {
           <CategoryLink href="/token-management" icon={<KeyRound size={18} />} title="Instagram連携" description="連携状態と期限を確認" />
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function InitialSetup({ tokenStatus }: { tokenStatus: string | null }) {
+  const connected = Boolean(tokenStatus && tokenStatus !== "missing" && tokenStatus !== "expired");
+
+  return (
+    <Panel className="mb-6 border-stone-300">
+      <p className="text-sm font-semibold text-stone-500">はじめに</p>
+      <h2 className="mt-1 text-xl font-semibold text-ink">Instagramのデータを表示する準備</h2>
+      <p className="mt-2 text-sm leading-6 text-stone-600">上から順に進めれば、投稿と分析結果が自動で表示されます。</p>
+      <div className="mt-5 grid gap-3">
+        <SetupStep
+          number="1"
+          title="Instagramを接続"
+          description={connected ? "接続情報を確認できました。" : "Instagram連携画面で接続状態を確認します。"}
+          href="/token-management"
+          actionLabel={connected ? "接続を確認" : "接続を始める"}
+          completed={connected}
+          current={!connected}
+        />
+        <SetupStep
+          number="2"
+          title="最初のデータを取得"
+          description="Instagramから投稿と反応データを取り込みます。"
+          href="/dashboard"
+          actionLabel="データを取得"
+          completed={false}
+          current={connected}
+        />
+        <SetupStep
+          number="3"
+          title="投稿結果を確認"
+          description="データ取得後、投稿ごとの結果を確認できます。"
+          href="/posts"
+          actionLabel="投稿を見る"
+          completed={false}
+          current={false}
+        />
+      </div>
+    </Panel>
+  );
+}
+
+function SetupStep({ number, title, description, href, actionLabel, completed, current }: {
+  number: string;
+  title: string;
+  description: string;
+  href: string;
+  actionLabel: string;
+  completed: boolean;
+  current: boolean;
+}) {
+  return (
+    <div className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center ${current ? "border-stone-400 bg-stone-50" : "border-stone-200 bg-white"}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${completed ? "bg-emerald-700 text-white" : current ? "bg-ink text-white" : "bg-stone-100 text-stone-500"}`}>
+        {completed ? <Check size={17} aria-label="完了" /> : number}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-ink">{title}</span>
+        <span className="mt-1 block text-sm text-stone-600">{description}</span>
+      </span>
+      <Link href={href} className={`shrink-0 rounded-md px-4 py-2 text-center text-sm font-semibold transition ${current ? "bg-ink text-white hover:bg-stone-700" : "border border-stone-200 text-stone-700 hover:bg-stone-50"}`}>
+        {actionLabel}
+      </Link>
     </div>
   );
 }
