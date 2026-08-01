@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { User } from "lucide-react";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, PageLoading } from "@/components/ui";
 import { loadAccountsData } from "@/lib/cloud-storage";
 import { InstagramAccount } from "@/lib/types";
 
@@ -65,7 +65,7 @@ export default function AccountPage() {
     });
   }, []);
 
-  if (loading) return <PageHeader title="プロフィール" description="読み込み中..." />;
+  if (loading) return <PageLoading title="プロフィール" description="Instagramプロフィールを準備しています。" layout="profile" />;
 
   const displayName = graphAccount?.name || account?.name || "アカウント未登録";
   const displayUsername = graphAccount?.username || account?.username;

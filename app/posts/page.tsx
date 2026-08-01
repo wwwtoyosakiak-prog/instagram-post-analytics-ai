@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { PageHeader, Stat } from "@/components/ui";
+import { PageHeader, PageLoading, Stat } from "@/components/ui";
 import { loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics } from "@/lib/metrics";
@@ -238,7 +238,7 @@ export default function PostsPage() {
       });
   }, [unifiedList, typeFilter, sortKey]);
 
-  if (loading) return <div><PageHeader title="投稿一覧" description="読み込み中..." /></div>;
+  if (loading) return <PageLoading title="投稿一覧" description="投稿と最新の数値を準備しています。" cards={5} />;
 
   const apiMatchCount = unifiedList.filter((e) => e.post && e.hasApi).length;
   const supplementOnlyCount = unifiedList.filter((e) => e.post && !e.hasApi).length;
