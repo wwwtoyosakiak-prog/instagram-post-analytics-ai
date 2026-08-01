@@ -28,3 +28,8 @@ export function logServerIssue(
     message: safeErrorMessage(error),
   });
 }
+
+export function logClientIssue(scope: string, error: unknown) {
+  if (process.env.NODE_ENV !== "development") return;
+  console.warn(`[${scope}] ${safeErrorMessage(error)}`);
+}

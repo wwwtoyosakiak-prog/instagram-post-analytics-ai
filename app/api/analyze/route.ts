@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
 import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 import { buildAiAnalysisPrompt } from "@/lib/ai-analysis-prompt";
+import { logServerIssue } from "@/lib/safe-logging";
 import {
   ApiRequestError,
   apiErrorResponse,
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     const analysis = normalizeAiAnalysis(JSON.parse(raw));
     return NextResponse.json({ analysis, model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
   } catch (error) {
-    console.error("[analyze-response-parse]", error);
+    logServerIssue("analyze-response-parse", error);
     return NextResponse.json({ error: "AI分析結果の形式が不正でした。もう一度分析してください。" }, { status: 502 });
   }
   } catch (error) {
