@@ -29,6 +29,41 @@ body {
   .nav-primary-active {
     @apply bg-ink text-white hover:bg-stone-800 hover:text-white;
   }
+
+  .mobile-bottom-nav {
+    @apply fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-stone-200 bg-white/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur;
+  }
+
+  .mobile-bottom-nav a {
+    @apply flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md text-[11px] font-medium text-stone-500;
+  }
+
+  .mobile-bottom-nav a.mobile-nav-active {
+    @apply bg-stone-100 text-ink;
+  }
+}
+
+button,
+a,
+select {
+  touch-action: manipulation;
+}
+
+@media (max-width: 767px) {
+  button,
+  input,
+  select {
+    min-height: 44px;
+  }
+
+  table {
+    font-size: 0.75rem;
+  }
+
+  th,
+  td {
+    padding: 0.625rem 0.5rem;
+  }
 }
 
 input,

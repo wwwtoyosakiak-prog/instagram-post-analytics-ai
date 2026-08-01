@@ -14,7 +14,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <a href="#main-content" className="skip-link">本文へ移動</a>
         <div className="min-h-screen bg-base">
           <AppNavigation />
-          <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8 md:py-10">{children}</main>
+          <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 pb-24 md:py-10 md:pb-10">{children}</main>
         </div>
       </body>
     </html>

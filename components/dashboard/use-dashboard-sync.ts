@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { requestJson } from "@/lib/client-api";
+import { ClientApiError, requestJson } from "@/lib/client-api";
 import { toUserFacingError } from "@/lib/user-facing-error";
+import { withRetry } from "@/lib/retry";
 
 type RefreshDashboard = () => Promise<void>;
 
@@ -33,11 +34,18 @@ export function useDashboardSync(
     setSyncErrorMessage("");
 
     try {
-      const result = await requestJson<FullSyncResponse>(
-        "/api/instagram/full-sync",
-        { method: "POST" },
-        "同期に失敗しました。",
-        120_000,
+      const result = await withRetry(
+        () => requestJson<FullSyncResponse>(
+          "/api/instagram/full-sync",
+          { method: "POST" },
+          "同期に失敗しました。",
+          120_000,
+        ),
+        {
+          attempts: 3,
+          shouldRetry: (error) => !(error instanceof ClientApiError) || error.status === 408 || error.status === 429 || error.status >= 500,
+          onRetry: (attempt) => setSyncMsg(`通信を再確認しています（${attempt}/3）...`),
+        },
       );
       const firstError = result.error ?? result.errors?.[0] ?? "同期に失敗しました。";
 
