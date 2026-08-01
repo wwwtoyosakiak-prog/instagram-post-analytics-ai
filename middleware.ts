@@ -6,6 +6,26 @@ const cronProtectedPaths = [
   "/api/instagram/full-sync",
   "/api/instagram/sync",
 ];
+const authenticatedUserHeader = "x-app-authenticated-user";
+
+function constantTimeEqual(actual: string, expected: string) {
+  const length = Math.max(actual.length, expected.length);
+  let difference = actual.length ^ expected.length;
+
+  for (let index = 0; index < length; index += 1) {
+    difference |= (actual.charCodeAt(index) || 0) ^ (expected.charCodeAt(index) || 0);
+  }
+
+  return difference === 0;
+}
+
+function nextWithAuthenticatedUser(request: NextRequest, username?: string) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete(authenticatedUserHeader);
+  if (username) requestHeaders.set(authenticatedUserHeader, username);
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
 
 function isCronRequest(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -34,14 +54,14 @@ function readBasicCredentials(request: NextRequest) {
 
 export function middleware(request: NextRequest) {
   if (publicPaths.has(request.nextUrl.pathname) || isCronRequest(request)) {
-    return NextResponse.next();
+    return nextWithAuthenticatedUser(request);
   }
 
   const expectedUsername = process.env.APP_ACCESS_USER;
   const expectedPassword = process.env.APP_ACCESS_PASSWORD;
 
   if (!expectedUsername && !expectedPassword) {
-    return NextResponse.next();
+    return nextWithAuthenticatedUser(request);
   }
 
   if (!expectedUsername || !expectedPassword) {
@@ -49,8 +69,12 @@ export function middleware(request: NextRequest) {
   }
 
   const credentials = readBasicCredentials(request);
-  if (credentials?.username === expectedUsername && credentials.password === expectedPassword) {
-    return NextResponse.next();
+  if (
+    credentials
+    && constantTimeEqual(credentials.username, expectedUsername)
+    && constantTimeEqual(credentials.password, expectedPassword)
+  ) {
+    return nextWithAuthenticatedUser(request, expectedUsername);
   }
 
   return new NextResponse("Authentication required.", {
