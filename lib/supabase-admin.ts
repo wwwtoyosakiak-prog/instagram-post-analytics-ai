@@ -1,6 +1,7 @@
 import { AiAnalysis, AiAnalysisRecord, AiScoreHistory, AiScoreHistoryInput, InstagramAccessTokenStorage, InstagramAccount, InstagramAccountInput, InstagramInsightSnapshot, InstagramOperationDomain, InstagramOperationLog, InstagramOperationResult, InstagramOperationType, InstagramPost, InstagramPostInput, InstagramSyncRun, MonthlyReport, MonthlyReportRecord, PostType } from "@/lib/types";
 import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 import { scoreHistoryFromAnalysis } from "@/lib/score-history";
+import { supabaseRestRequest } from "@/lib/supabase-server";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -176,28 +177,7 @@ function assertConfigured() {
 
 async function supabaseRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   assertConfigured();
-  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: serviceRoleKey!,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...(init.headers ?? {})
-    },
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Supabase request failed: ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return supabaseRestRequest<T>(path, init);
 }
 
 function mapAccount(row: AccountRow): InstagramAccount {

@@ -2,10 +2,24 @@ import { NextResponse } from "next/server";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
 import { normalizeAiAnalysis } from "@/lib/ai-analysis";
 import { buildAiAnalysisPrompt } from "@/lib/ai-analysis-prompt";
+import {
+  ApiRequestError,
+  apiErrorResponse,
+  fetchJsonWithTimeout,
+  isRecord,
+  readJsonObject,
+  readOpenAiOutput,
+  readUpstreamError,
+} from "@/lib/server-api";
 
 export async function POST(request: Request) {
-  const { post, account } = (await request.json()) as { post?: InstagramPost; account?: InstagramAccount | null };
-  if (!post) return NextResponse.json({ error: "投稿データがありません。" }, { status: 400 });
+  try {
+    const body = await readJsonObject(request);
+    const post = body.post as InstagramPost | undefined;
+    const account = body.account as InstagramAccount | null | undefined;
+    if (!isRecord(post) || typeof post.caption !== "string" || typeof post.date !== "string") {
+      throw new ApiRequestError("投稿データが正しくありません。", 400);
+    }
 
   const apiKeyEnvName = account?.openaiApiKeyEnvName?.trim();
   const apiKey = apiKeyEnvName ? process.env[apiKeyEnvName] : process.env.OPENAI_API_KEY;
@@ -25,7 +39,7 @@ export async function POST(request: Request) {
     content.push({ type: "input_image", image_url: post.screenshot });
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const { response, data } = await fetchJsonWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -37,18 +51,19 @@ export async function POST(request: Request) {
       text: { format: { type: "json_object" } }
     })
   });
-
-  const data = await response.json();
   if (!response.ok) {
-    return NextResponse.json({ error: data.error?.message ?? "OpenAI APIの呼び出しに失敗しました。" }, { status: response.status });
+    return NextResponse.json({ error: readUpstreamError(data, "OpenAI APIの呼び出しに失敗しました。") }, { status: response.status });
   }
 
-  const raw = data.output_text ?? data.output?.flatMap((item: { content?: { text?: string }[] }) => item.content ?? []).map((item: { text?: string }) => item.text).join("");
+  const raw = readOpenAiOutput(data);
   try {
     const analysis = normalizeAiAnalysis(JSON.parse(raw));
     return NextResponse.json({ analysis, model, apiKeyEnvName: apiKeyEnvName || "OPENAI_API_KEY" });
   } catch (error) {
     console.error("[analyze-response-parse]", error);
     return NextResponse.json({ error: "AI分析結果の形式が不正でした。もう一度分析してください。" }, { status: 502 });
+  }
+  } catch (error) {
+    return apiErrorResponse(error, "analyze-api");
   }
 }
