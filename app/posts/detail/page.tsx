@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Button, PageHeader, Panel, Stat } from "@/components/ui";
+import { Button, LoadingBlock, PageHeader, PageLoading, Panel, Stat } from "@/components/ui";
 import { AiAnalysis, AiAnalysisRecord, InstagramInsightSnapshot, InstagramPost } from "@/lib/types";
 import { formatPercent, postTypeLabels } from "@/lib/metrics";
 import type { ApiMedia } from "@/lib/post-merge";
@@ -13,7 +13,7 @@ import { usePostDetail } from "@/components/posts/use-post-detail";
 
 export default function PostDetailPage() {
   return (
-    <Suspense fallback={<PageHeader title="投稿詳細" description="投稿データを読み込んでいます。" />}>
+    <Suspense fallback={<PageLoading title="投稿詳細" description="投稿データと分析履歴を準備しています。" layout="detail" />}>
       <PostDetailContent />
     </Suspense>
   );
@@ -39,6 +39,10 @@ function PostDetailContent() {
     analyze,
     removePost,
   } = usePostDetail(id);
+
+  if (!post && insightLoading) {
+    return <PageLoading title="投稿詳細" description="投稿データと分析履歴を準備しています。" layout="detail" />;
+  }
 
   if (!post) {
     return <PageHeader title="投稿が見つかりません" description="一覧から投稿を選び直してください。" />;
@@ -240,7 +244,9 @@ function LatestInsightSection({
         {insight ? <p className="text-xs font-semibold text-stone-500">取得日時: {formatDateTime(insight.capturedAt)}</p> : null}
       </div>
       {loading ? (
-        <p className="text-sm text-stone-600">インサイトを読み込んでいます。</p>
+        <div role="status" aria-label="インサイトを読み込み中" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => <LoadingBlock key={index} className="h-24" />)}
+        </div>
       ) : insight ? (
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
