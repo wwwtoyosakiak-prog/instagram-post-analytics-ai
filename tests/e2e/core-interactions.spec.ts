@@ -121,6 +121,22 @@ test("カレンダーとレポートの期間を表示名から操作できる",
   await expect(page.getByLabel("年度の開始月")).toHaveValue("1");
 });
 
+test("カレンダーの読み込み完了後も選択した月を維持する", async ({ page }) => {
+  await page.unroute("**/api/data/posts**");
+  await page.route("**/api/data/posts**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({ json: { posts: fixturePosts } });
+  });
+
+  const postsResponse = page.waitForResponse("**/api/data/posts**");
+  await page.goto("/calendar");
+  await page.getByLabel("表示月").fill("2026-06");
+  await postsResponse;
+
+  await expect(page.getByLabel("表示月")).toHaveValue("2026-06");
+  await expect(page.getByRole("heading", { name: "2026年6月" })).toBeVisible();
+});
+
 test("投稿詳細から編集して保存できる", async ({ page }) => {
   await page.goto("/posts/detail?id=post-video");
   await expect(page.getByRole("heading", { name: "投稿詳細・AI分析", exact: true })).toBeVisible();
