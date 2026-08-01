@@ -7,6 +7,7 @@ import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadMonthlyRepo
 import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
 import { calculateInsightGrowth, InsightGrowthSummary } from "@/lib/insight-growth";
+import { requestJson } from "@/lib/client-api";
 
 export default function ReportsPage() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -108,13 +109,11 @@ export default function ReportsPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/report", {
+      const data = await requestJson<{ summary: string }>("/api/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ report, account, posts: posts.filter((post) => post.date.startsWith(month)).filter((post) => accountId === "all" || post.accountId === accountId) })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "AI総評の作成に失敗しました。");
+      }, "AI総評の作成に失敗しました。");
       setAiSummary(data.summary);
       setSelectedReport(null);
     } catch (event) {

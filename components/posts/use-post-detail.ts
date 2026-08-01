@@ -19,6 +19,7 @@ import type {
 } from "@/lib/types";
 import { getMetrics } from "@/lib/metrics";
 import { matchPostToMedia, type ApiMedia } from "@/lib/post-merge";
+import { requestJson, requestJsonOr } from "@/lib/client-api";
 
 export function usePostDetail(id: string) {
   const router = useRouter();
@@ -44,9 +45,7 @@ export function usePostDetail(id: string) {
       loadAccountsData(),
       loadAnalysesData(id),
       loadInsightData(id),
-      fetch("/api/instagram/media?limit=200")
-        .then((response) => response.ok ? response.json() : { data: [] })
-        .catch(() => ({ data: [] })),
+      requestJsonOr<{ data?: ApiMedia[] }>("/api/instagram/media?limit=200", { data: [] }),
     ]).then(([posts, accounts, analyses, insightData, mediaJson]) => {
       if (!active) return;
       const foundPost = posts.find((item) => item.id === id) ?? null;
@@ -71,13 +70,11 @@ export function usePostDetail(id: string) {
     setAnalyzing(true);
     setError("");
     try {
-      const response = await fetch("/api/analyze", {
+      const data = await requestJson<{ analysis: AiAnalysis }>("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ post, account }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "分析に失敗しました。");
+      }, "分析に失敗しました。");
       setAnalysis(data.analysis);
       setSavingAnalysis(true);
       const saved = await saveAnalysisData(post.id, data.analysis);
