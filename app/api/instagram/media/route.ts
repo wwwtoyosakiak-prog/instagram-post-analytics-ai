@@ -3,13 +3,7 @@
  * Supabaseから投稿一覧と最新インサイトを返す
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function supabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return url && key ? createClient(url, key) : null;
-}
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -17,7 +11,7 @@ export async function GET(req: NextRequest) {
   const mediaType = searchParams.get('media_type'); // IMAGE / VIDEO / CAROUSEL_ALBUM
   const limit = parseInt(searchParams.get('limit') ?? '50');
 
-  const db = supabase();
+  const db = getSupabaseServerClient();
   if (!db) {
     return NextResponse.json({
       configured: false,

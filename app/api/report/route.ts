@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
 import { getMetrics } from "@/lib/metrics";
 import { InstagramAccount, InstagramPost, MonthlyReport } from "@/lib/types";
+import {
+  ApiRequestError,
+  apiErrorResponse,
+  fetchJsonWithTimeout,
+  isRecord,
+  readJsonObject,
+  readOpenAiOutput,
+  readUpstreamError,
+} from "@/lib/server-api";
 
 export async function POST(request: Request) {
-  const { report, posts, account } = (await request.json()) as { report?: MonthlyReport; posts?: InstagramPost[]; account?: InstagramAccount | null };
-  if (!report || !posts) return NextResponse.json({ error: "レポートデータがありません。" }, { status: 400 });
+  try {
+  const body = await readJsonObject(request);
+  const report = body.report as MonthlyReport | undefined;
+  const posts = body.posts as InstagramPost[] | undefined;
+  const account = body.account as InstagramAccount | null | undefined;
+  if (!isRecord(report) || !Array.isArray(posts) || posts.some((post) => !isRecord(post))) {
+    throw new ApiRequestError("レポートデータが正しくありません。", 400);
+  }
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: ".env.local に OPENAI_API_KEY を設定してください。APIキーなしの場合はサンプル総評を使えます。" }, { status: 400 });
   }
@@ -24,7 +39,7 @@ ${posts.map((post) => `- ${post.date} type=${post.type} views=${post.views} like
 
 400字以内で、良かった点、課題、来月の方針を含めてください。`;
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const { response, data } = await fetchJsonWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -35,8 +50,10 @@ ${posts.map((post) => `- ${post.date} type=${post.type} views=${post.views} like
       input: prompt
     })
   });
-  const data = await response.json();
-  if (!response.ok) return NextResponse.json({ error: data.error?.message ?? "OpenAI APIの呼び出しに失敗しました。" }, { status: response.status });
-  const summary = data.output_text ?? data.output?.flatMap((item: { content?: { text?: string }[] }) => item.content ?? []).map((item: { text?: string }) => item.text).join("");
+  if (!response.ok) return NextResponse.json({ error: readUpstreamError(data, "OpenAI APIの呼び出しに失敗しました。") }, { status: response.status });
+  const summary = readOpenAiOutput(data);
   return NextResponse.json({ summary });
+  } catch (error) {
+    return apiErrorResponse(error, "report-api");
+  }
 }
