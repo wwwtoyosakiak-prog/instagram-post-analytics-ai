@@ -87,7 +87,7 @@ test("分析結果を投稿ごとではなく一度に読み込む", async ({ pa
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "3ステップで確認" })).toBeVisible();
-  expect(analysisRequestCount).toBe(1);
+  await expect.poll(() => analysisRequestCount).toBe(1);
 });
 
 test("投稿がないときに初期設定の順番を案内する", async ({ page }) => {

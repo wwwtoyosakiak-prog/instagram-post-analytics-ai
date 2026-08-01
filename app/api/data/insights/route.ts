@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, listAllInsightSnapshotsFromSupabase, listInsightSnapshotsFromSupabase } from "@/lib/supabase-admin";
+import { getAuthenticatedUser } from "@/lib/authenticated-user";
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured) {
@@ -7,7 +8,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (request.nextUrl.searchParams.get("all") === "true") {
-    const insights = await listAllInsightSnapshotsFromSupabase();
+    const insights = await listAllInsightSnapshotsFromSupabase(getAuthenticatedUser(request));
     return NextResponse.json({ insights });
   }
 
@@ -16,6 +17,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "postId is required." }, { status: 400 });
   }
 
-  const insights = await listInsightSnapshotsFromSupabase(postId);
+  const insights = await listInsightSnapshotsFromSupabase(postId, getAuthenticatedUser(request));
   return NextResponse.json({ insight: insights[0] ?? null, insights });
 }

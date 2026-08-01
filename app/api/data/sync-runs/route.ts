@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, listSyncRunsFromSupabase } from "@/lib/supabase-admin";
 import type { InstagramSyncRun } from "@/lib/types";
+import { getAuthenticatedUser } from "@/lib/authenticated-user";
 
 export const dynamic = "force-dynamic";
 
@@ -141,12 +142,12 @@ async function loadGitHubScheduledRuns() {
   return mappedRuns;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: "Server storage is not configured." }, { status: 501 });
   }
 
-  const syncRuns = await listSyncRunsFromSupabase();
+  const syncRuns = await listSyncRunsFromSupabase(getAuthenticatedUser(request));
   let mergedRuns = syncRuns;
 
   try {
