@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Button, PageHeader, Panel, Stat } from "@/components/ui";
 import { InstagramAccessTokenRecord, InstagramOperationLog } from "@/lib/types";
+import { requestJson } from "@/lib/client-api";
 
 type RefreshResponse = {
   ok: boolean;
@@ -102,9 +103,11 @@ export default function TokenManagementPage() {
     }
     setError("");
     try {
-      const response = await fetch("/api/instagram/token/status", { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "トークン状態の取得に失敗しました。");
+      const data = await requestJson<InstagramAccessTokenRecord>(
+        "/api/instagram/token/status",
+        { cache: "no-store" },
+        "トークン状態の取得に失敗しました。",
+      );
       setToken(data);
       if (mode === "check") {
         setMessage("最新のトークン状態を確認しました。");
@@ -126,9 +129,12 @@ export default function TokenManagementPage() {
     setMessage("");
     setError("");
     try {
-      const response = await fetch("/api/instagram/token/refresh", { method: "POST" });
-      const data = await response.json() as RefreshResponse;
-      if (!response.ok || (!data.ok && !data.skipped)) throw new Error(data.message || "トークン更新に失敗しました。");
+      const data = await requestJson<RefreshResponse>(
+        "/api/instagram/token/refresh",
+        { method: "POST" },
+        "トークン更新に失敗しました。",
+      );
+      if (!data.ok && !data.skipped) throw new Error(data.message || "トークン更新に失敗しました。");
       if (data.token) setToken(data.token);
       setMessage(data.message);
       await loadStatus();

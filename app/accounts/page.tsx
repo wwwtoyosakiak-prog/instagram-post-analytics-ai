@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { PageHeader, PageLoading } from "@/components/ui";
 import { loadAccountsData } from "@/lib/cloud-storage";
+import { requestJsonOr } from "@/lib/client-api";
 import { InstagramAccount } from "@/lib/types";
 
 interface GraphApiAccount {
@@ -35,24 +36,23 @@ export default function AccountPage() {
   useEffect(() => {
     Promise.all([
       loadAccountsData(),
-      fetch("/api/instagram/dashboard").then((r) => r.ok ? r.json() : null).catch(() => null)
+      requestJsonOr<DashboardResponse | null>("/api/instagram/dashboard", null)
     ]).then(([accounts, dashData]) => {
       const list = Array.isArray(accounts) ? accounts : [];
       const acc = list[0] ?? null;
       setAccount(acc);
       if (dashData?.account) {
-        type Snap = { followers_count?: number | null; follows_count?: number | null; media_count?: number | null };
-        const snaps: Snap[] = dashData.follower_snapshots ?? [];
+        const snaps = dashData.follower_snapshots ?? [];
         const lastSnap = snaps[snaps.length - 1];
-        const followers  = dashData.account.followers_count  || lastSnap?.followers_count  || null;
-        const follows    = dashData.account.follows_count    || lastSnap?.follows_count    || null;
-        const mediaCount = dashData.account.media_count      || lastSnap?.media_count      || (dashData.totals?.posts ?? null);
+        const followers = dashData.account.followers_count ?? lastSnap?.followers_count ?? null;
+        const follows = dashData.account.follows_count ?? lastSnap?.follows_count ?? null;
+        const mediaCount = dashData.account.media_count ?? lastSnap?.media_count ?? dashData.totals?.posts ?? null;
         setGraphAccount({
           ...dashData.account,
           followers_count: followers,
-          follows_count:   follows,
-          media_count:     mediaCount,
-        } as GraphApiAccount);
+          follows_count: follows,
+          media_count: mediaCount,
+        });
       }
       setConnectionMessage(
         dashData?.configured === false
@@ -158,6 +158,18 @@ export default function AccountPage() {
       )}
     </div>
   );
+}
+
+interface DashboardResponse {
+  configured?: boolean;
+  message?: string;
+  account?: GraphApiAccount | null;
+  follower_snapshots?: Array<{
+    followers_count?: number | null;
+    follows_count?: number | null;
+    media_count?: number | null;
+  }>;
+  totals?: { posts?: number | null };
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

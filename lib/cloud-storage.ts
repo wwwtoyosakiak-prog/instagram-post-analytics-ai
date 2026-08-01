@@ -9,6 +9,7 @@ import {
   updatePost,
   upsertManyPosts,
 } from "@/lib/storage";
+import { ClientApiError, requestJson } from "@/lib/client-api";
 import { InstagramAccount, InstagramInsightSnapshot, InstagramPost, InstagramPostInput, InstagramSyncRun } from "@/lib/types";
 import { AiAnalysis, AiAnalysisRecord, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 
@@ -17,23 +18,22 @@ type ServerStatus = {
   serverStorageEnabled: boolean;
 };
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {})
+async function requestStorageJson<T>(url: string, init?: RequestInit): Promise<T> {
+  try {
+    return await requestJson<T>(url, {
+      ...init,
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {})
+      }
+    });
+  } catch (error) {
+    if (error instanceof ClientApiError && error.status === 501) {
+      throw new Error("SERVER_STORAGE_DISABLED");
     }
-  });
-
-  if (response.status === 501) {
-    throw new Error("SERVER_STORAGE_DISABLED");
+    throw error;
   }
-  if (!response.ok) {
-    throw new Error(await response.text());
-  }
-  return response.json() as Promise<T>;
 }
 
 function isServerStorageDisabled(error: unknown) {
@@ -42,7 +42,7 @@ function isServerStorageDisabled(error: unknown) {
 
 export async function getServerStorageStatus(): Promise<ServerStatus> {
   try {
-    return await requestJson<ServerStatus>("/api/data/status");
+    return await requestStorageJson<ServerStatus>("/api/data/status");
   } catch {
     return { mode: "local", serverStorageEnabled: false };
   }
@@ -50,7 +50,7 @@ export async function getServerStorageStatus(): Promise<ServerStatus> {
 
 export async function loadAccountsData() {
   try {
-    const data = await requestJson<{ accounts: InstagramAccount[] }>("/api/data/accounts");
+    const data = await requestStorageJson<{ accounts: InstagramAccount[] }>("/api/data/accounts");
     saveAccounts(data.accounts);
     return data.accounts;
   } catch (error) {
@@ -61,7 +61,7 @@ export async function loadAccountsData() {
 
 export async function loadPostsData() {
   try {
-    const data = await requestJson<{ posts: InstagramPost[] }>("/api/data/posts");
+    const data = await requestStorageJson<{ posts: InstagramPost[] }>("/api/data/posts");
     savePosts(data.posts);
     return data.posts;
   } catch (error) {
@@ -72,7 +72,7 @@ export async function loadPostsData() {
 
 export async function updatePostData(id: string, input: InstagramPostInput) {
   try {
-    const data = await requestJson<{ post: InstagramPost | null }>("/api/data/posts", {
+    const data = await requestStorageJson<{ post: InstagramPost | null }>("/api/data/posts", {
       method: "PUT",
       body: JSON.stringify({ id, post: input })
     });
@@ -86,7 +86,7 @@ export async function updatePostData(id: string, input: InstagramPostInput) {
 
 export async function deletePostData(id: string) {
   try {
-    await requestJson<{ ok: true }>(`/api/data/posts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    await requestStorageJson<{ ok: true }>(`/api/data/posts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     deletePost(id);
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
@@ -96,7 +96,7 @@ export async function deletePostData(id: string) {
 
 export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord[]> {
   try {
-    const data = await requestJson<{ analyses: AiAnalysisRecord[] }>(`/api/data/analyses?postId=${encodeURIComponent(postId)}`);
+    const data = await requestStorageJson<{ analyses: AiAnalysisRecord[] }>(`/api/data/analyses?postId=${encodeURIComponent(postId)}`);
     return data.analyses;
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
@@ -106,7 +106,7 @@ export async function loadAnalysesData(postId: string): Promise<AiAnalysisRecord
 
 export async function loadInsightData(postId: string): Promise<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }> {
   try {
-    return await requestJson<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }>(`/api/data/insights?postId=${encodeURIComponent(postId)}`);
+    return await requestStorageJson<{ insight: InstagramInsightSnapshot | null; insights: InstagramInsightSnapshot[] }>(`/api/data/insights?postId=${encodeURIComponent(postId)}`);
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
     return { insight: null, insights: [] };
@@ -115,7 +115,7 @@ export async function loadInsightData(postId: string): Promise<{ insight: Instag
 
 export async function loadAllInsightData(): Promise<InstagramInsightSnapshot[]> {
   try {
-    const data = await requestJson<{ insights: InstagramInsightSnapshot[] }>("/api/data/insights?all=true");
+    const data = await requestStorageJson<{ insights: InstagramInsightSnapshot[] }>("/api/data/insights?all=true");
     return data.insights;
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
@@ -125,7 +125,7 @@ export async function loadAllInsightData(): Promise<InstagramInsightSnapshot[]> 
 
 export async function loadSyncRunsData(): Promise<InstagramSyncRun[]> {
   try {
-    const data = await requestJson<{ syncRuns: InstagramSyncRun[] }>("/api/data/sync-runs");
+    const data = await requestStorageJson<{ syncRuns: InstagramSyncRun[] }>("/api/data/sync-runs");
     return data.syncRuns;
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
@@ -135,7 +135,7 @@ export async function loadSyncRunsData(): Promise<InstagramSyncRun[]> {
 
 export async function saveAnalysisData(postId: string, analysis: AiAnalysis): Promise<AiAnalysisRecord | null> {
   try {
-    const data = await requestJson<{ analysis: AiAnalysisRecord }>("/api/data/analyses", {
+    const data = await requestStorageJson<{ analysis: AiAnalysisRecord }>("/api/data/analyses", {
       method: "POST",
       body: JSON.stringify({ postId, analysis })
     });
@@ -151,7 +151,7 @@ export async function loadMonthlyReportsData(accountId?: string, month?: string)
   if (accountId) params.set("accountId", accountId);
   if (month) params.set("month", month);
   try {
-    const data = await requestJson<{ reports: MonthlyReportRecord[] }>(`/api/data/monthly-reports?${params.toString()}`);
+    const data = await requestStorageJson<{ reports: MonthlyReportRecord[] }>(`/api/data/monthly-reports?${params.toString()}`);
     return data.reports;
   } catch (error) {
     if (!isServerStorageDisabled(error)) console.warn(error);
@@ -161,7 +161,7 @@ export async function loadMonthlyReportsData(accountId?: string, month?: string)
 
 export async function saveMonthlyReportData(report: MonthlyReport, accountId: string | null, accountName: string): Promise<MonthlyReportRecord | null> {
   try {
-    const data = await requestJson<{ report: MonthlyReportRecord }>("/api/data/monthly-reports", {
+    const data = await requestStorageJson<{ report: MonthlyReportRecord }>("/api/data/monthly-reports", {
       method: "POST",
       body: JSON.stringify({ report, accountId, accountName })
     });
