@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { PageHeader, Panel, Stat } from "@/components/ui";
+import { EmptyState, PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramAccount, InstagramPost } from "@/lib/types";
 import { postTypeLabels } from "@/lib/metrics";
@@ -104,6 +104,16 @@ export default function CalendarPage() {
         <Stat label="投稿がある日" value={`${postingDaysThisMonth}日`} />
         <Stat label="最終投稿日" value={latestPostThisMonth ? latestPostThisMonth.date : "未登録"} note={reelPostsThisMonth ? `リール ${reelPostsThisMonth}件` : undefined} />
       </div>
+
+      {monthlyPosts.length === 0 ? (
+        <EmptyState
+          title={`${formatMonthLabel(month)}の投稿はまだありません`}
+          description="投稿データを取得すると、公開日ごとにこのカレンダーへ自動表示されます。"
+          actionLabel={posts.length === 0 ? "Instagramデータを取得" : "投稿一覧を見る"}
+          actionHref={posts.length === 0 ? "/dashboard" : "/posts"}
+          className="mb-6"
+        />
+      ) : null}
 
       <Panel>
         <div className="mb-4 flex items-center gap-2">

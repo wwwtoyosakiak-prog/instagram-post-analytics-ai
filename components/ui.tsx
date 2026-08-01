@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import Link from "next/link";
 import { ReactNode } from "react";
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
@@ -59,6 +60,25 @@ export function ActionError({ message, actionLabel, onAction, className = "" }: 
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+export function EmptyState({ title, description, actionLabel, actionHref, onAction, className = "" }: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionHref?: string;
+  onAction?: () => void;
+  className?: string;
+}) {
+  const actionClass = "mt-4 inline-flex h-10 items-center justify-center rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-stone-800";
+  return (
+    <div className={`rounded-lg border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-center ${className}`}>
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-stone-600">{description}</p>
+      {actionHref ? <Link href={actionHref} className={actionClass}>{actionLabel}</Link> : null}
+      {!actionHref && onAction ? <button type="button" onClick={onAction} className={actionClass}>{actionLabel}</button> : null}
     </div>
   );
 }
