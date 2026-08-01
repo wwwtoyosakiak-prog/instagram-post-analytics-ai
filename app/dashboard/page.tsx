@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ActionError, PageHeader, Panel } from "@/components/ui";
+import { ActionError, EmptyState, PageHeader, Panel } from "@/components/ui";
 import {
   InstagramInsightSnapshot,
   PostType,
@@ -624,7 +624,14 @@ export default function DashboardPage() {
         </div>
       </Panel>
 
-      {!data.count ? <Panel><p className="text-sm text-stone-600">対象の投稿データがありません。</p></Panel> : null}
+      {!data.count ? (
+        <EmptyState
+          title="分析する投稿データはまだありません"
+          description="Instagramからデータを取得すると、表示数・保存率・反応率の分析が始まります。"
+          actionLabel={syncing ? "取得中..." : "Instagramデータを取得"}
+          onAction={() => { if (!syncing) void handleFullSync(); }}
+        />
+      ) : null}
 
       {data.count ? (
         <>

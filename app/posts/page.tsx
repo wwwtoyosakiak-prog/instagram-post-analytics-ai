@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { PageHeader, PageLoading, Stat } from "@/components/ui";
+import { EmptyState, PageHeader, PageLoading, Stat } from "@/components/ui";
 import { loadAnalysesData, loadPostsData } from "@/lib/cloud-storage";
 import { InstagramPost } from "@/lib/types";
 import { formatPercent, getMetrics } from "@/lib/metrics";
@@ -301,9 +301,16 @@ export default function PostsPage() {
           />
         ))}
         {filteredList.length === 0 && (
-          <p className="py-8 text-center text-sm text-stone-500 md:col-span-2 xl:col-span-3">
-            投稿がありません。
-          </p>
+          <EmptyState
+            title={unifiedList.length === 0 ? "投稿データはまだありません" : "条件に合う投稿がありません"}
+            description={unifiedList.length === 0
+              ? "Instagramから最初のデータを取得すると、投稿ごとの表示数や保存数を確認できます。"
+              : "投稿タイプを「すべて」に戻すと、登録済みの投稿を確認できます。"}
+            actionLabel={unifiedList.length === 0 ? "Instagramデータを取得" : "絞り込みを解除"}
+            actionHref={unifiedList.length === 0 ? "/dashboard" : undefined}
+            onAction={unifiedList.length === 0 ? undefined : () => setTypeFilter("")}
+            className="md:col-span-2 xl:col-span-3"
+          />
         )}
       </div>
     </div>

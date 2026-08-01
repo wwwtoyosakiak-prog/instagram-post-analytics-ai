@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button, PageHeader, Panel, Stat } from "@/components/ui";
+import { Button, EmptyState, PageHeader, Panel, Stat } from "@/components/ui";
 import { loadAccountsData, loadAllInsightData, loadAnalysesData, loadMonthlyReportsData, loadPostsData, saveMonthlyReportData } from "@/lib/cloud-storage";
 import { AiAnalysisRecord, InstagramAccount, InstagramInsightSnapshot, InstagramPost, MonthlyReport, MonthlyReportRecord } from "@/lib/types";
 import { average, formatPercent, getMetrics } from "@/lib/metrics";
@@ -159,6 +159,16 @@ export default function ReportsPage() {
   return (
     <div>
       <PageHeader title="月次レポート" description="登録済み投稿を月別に集計し、伸びた投稿と改善が必要な投稿を確認します。" />
+
+      {!posts.length ? (
+        <EmptyState
+          title="レポートを作るための投稿がありません"
+          description="Instagramデータを取得すると、月ごとの結果と伸びた投稿を自動でまとめます。"
+          actionLabel="Instagramデータを取得"
+          actionHref="/dashboard"
+          className="mb-6 print-hide"
+        />
+      ) : null}
 
       {/* 設定エリア */}
       <Panel className="mb-6">

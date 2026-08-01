@@ -93,6 +93,26 @@ test("投稿がないときに初期設定の順番を案内する", async ({ pa
   await expect(page.getByRole("link", { name: "接続を始める" })).toHaveAttribute("href", "/token-management");
 });
 
+test("データがない主要画面から次の操作へ進める", async ({ page }) => {
+  await page.unroute("**/api/data/posts**");
+  await page.route("**/api/data/posts**", (route) => route.fulfill({ json: { posts: [] } }));
+
+  await page.goto("/posts");
+  await expect(page.getByRole("heading", { name: "投稿データはまだありません" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Instagramデータを取得" })).toHaveAttribute("href", "/dashboard");
+
+  await page.goto("/calendar");
+  await expect(page.getByRole("heading", { name: /の投稿はまだありません/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Instagramデータを取得" })).toHaveAttribute("href", "/dashboard");
+
+  await page.goto("/reports");
+  await expect(page.getByRole("heading", { name: "レポートを作るための投稿がありません" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Instagramデータを取得" })).toHaveAttribute("href", "/dashboard");
+
+  await page.goto("/dashboard");
+  await expect(page.getByRole("heading", { name: "分析する投稿データはまだありません" })).toBeVisible();
+});
+
 const menuDestinations = [
   { link: "投稿", path: "/posts", heading: "投稿一覧" },
   { link: "分析", path: "/dashboard", heading: "ダッシュボード" },
@@ -155,7 +175,7 @@ test("カレンダーの読み込み完了後も選択した月を維持する",
   await postsResponse;
 
   await expect(page.getByLabel("表示月")).toHaveValue("2026-06");
-  await expect(page.getByRole("heading", { name: "2026年6月" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "2026年6月", exact: true })).toBeVisible();
 });
 
 test("投稿詳細から編集して保存できる", async ({ page }) => {
