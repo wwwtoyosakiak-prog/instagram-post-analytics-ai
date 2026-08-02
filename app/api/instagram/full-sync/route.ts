@@ -40,6 +40,11 @@ function isAuthorizedCronRequest(request: Request) {
 
 type SyncTriggerType = "manual" | "scheduled";
 
+function isUnsupportedAccountInsights(error: unknown) {
+  return error instanceof Error
+    && error.message.includes('現在の連携方式ではアカウント全体インサイトを取得できません');
+}
+
 async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">, ownerId = "owner") {
   const db = requireSupabaseServerClient();
   const { error } = await db.from('instagram_sync_runs').insert({
@@ -342,9 +347,14 @@ async function handler(triggerType: SyncTriggerType, ownerId: string) {
         results.account_insights = 'ok';
       }
     } catch (e) {
-      logServerIssue('full-sync-account-insights', e);
-      results.errors.push(e instanceof Error ? `アカウントインサイトエラー: ${e.message}` : 'アカウントインサイトエラーが発生しました。');
-      results.account_insights = 'failed';
+      if (isUnsupportedAccountInsights(e)) {
+        // Instagramログイン方式の仕様上、取得対象外。投稿同期の失敗にはしない。
+        results.account_insights = 'unsupported';
+      } else {
+        logServerIssue('full-sync-account-insights', e);
+        results.errors.push(e instanceof Error ? `アカウントインサイトエラー: ${e.message}` : 'アカウントインサイトエラーが発生しました。');
+        results.account_insights = 'failed';
+      }
     }
 
     // 5. デイリースナップショット（フォロワー推移）

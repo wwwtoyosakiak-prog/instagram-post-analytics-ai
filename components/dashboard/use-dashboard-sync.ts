@@ -66,10 +66,9 @@ export function useDashboardSync(
       );
       setSyncMessage(
         isPartial
-          ? `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。一部でエラーがありました。`
+          ? `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。一部の指標は取得対象外です。`
           : `${savedPosts}件の投稿と${savedInsights}件の履歴を保存しました。`,
       );
-      if (isPartial) setSyncErrorMessage(toUserFacingError(firstError, "sync"));
     } catch (error) {
       setSyncMsg("");
       setSyncErrorMessage(toUserFacingError(error, "sync"));
