@@ -288,6 +288,12 @@ APP_SESSION_SECRET=十分に長いランダムな文字列
 
 従来の `APP_ACCESS_USER` と `APP_ACCESS_PASSWORD` はそのまま利用でき、その場合は既存の `owner` データを表示します。追加ユーザーには既存のInstagram連携情報を公開せず、個別のInstagram連携を設定するまでは手入力データとAI分析だけを利用できます。
 
+### 管理画面からユーザーを追加する
+
+Supabase SQL Editorで `supabase/add-user-management-and-recovery.sql` を1回実行すると、管理者用の「ユーザー管理」画面が有効になります。管理者はユーザー追加、利用停止、権限変更、パスワード再設定を行えます。パスワードはPBKDF2でハッシュ化され、元の文字列は保存しません。`owner` は管理者、追加ユーザーは一般ユーザーとして扱われます。
+
+一般ユーザーは自分の投稿・分析・Instagram連携だけを利用できます。ユーザー管理とバックアップ復元は管理者だけが操作できます。
+
 追加ユーザーのInstagram連携情報は、Vercelの環境変数にユーザーごとに設定します。トークンは画面やGitHubへ保存されません。
 
 ```env
@@ -296,7 +302,27 @@ INSTAGRAM_USER_CONFIGS={"teammate":{"accessToken":"追加ユーザーのトー�
 
 Facebookログイン方式では、同じユーザー設定に `"mode":"facebook_login"` と `"businessAccountId":"InstagramビジネスアカウントID"` を追加します。
 
+各ユーザーが画面からInstagram連携を完了する場合は、MetaアプリにコールバックURLを登録し、Vercelへ次の値を設定します。
+
+```env
+INSTAGRAM_OAUTH_CLIENT_ID=MetaアプリID
+INSTAGRAM_OAUTH_CLIENT_SECRET=Metaアプリシークレット
+INSTAGRAM_OAUTH_REDIRECT_URI=https://サイトのドメイン/api/instagram/oauth/callback
+```
+
+設定後は「Instagram連携」画面の「Instagramと連携」から、トークンを手入力せずにユーザー自身が認証できます。
+
 同期失敗を外部の通知先へ送る場合は、Slack互換のWebhook URLを設定します。全ユーザー共通は `SYNC_FAILURE_WEBHOOK_URL`、ユーザー別は `SYNC_FAILURE_WEBHOOK_URLS={"teammate":"https://..."}` を使用できます。通知にはトークンや投稿内容を含めません。
+
+### バックアップと大量投稿
+
+プロフィール画面を開くと、1日1回の復旧用バックアップが自動保存されます。保存内容は `BACKUP_ENCRYPTION_KEY`（未設定時は `APP_SESSION_SECRET`）で暗号化され、復元直前にも巻き戻し用バックアップを作成します。復元前には件数を表示して管理者の確認を求めます。
+
+```env
+BACKUP_ENCRYPTION_KEY=十分に長いランダムな文字列
+```
+
+投稿APIとInstagramメディアAPIは `page` と `pageSize` に対応し、必要な範囲だけSupabaseから取得できます。`pageSize` は最大100件です。
 
 ## 将来のAPI・データベース連携
 

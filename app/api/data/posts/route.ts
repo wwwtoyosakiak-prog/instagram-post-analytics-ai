@@ -9,6 +9,7 @@ import {
 } from "@/lib/supabase-admin";
 import { InstagramPost, InstagramPostInput } from "@/lib/types";
 import { getAuthenticatedUser } from "@/lib/authenticated-user";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 function disabledResponse() {
   return NextResponse.json({ error: "Server storage is not configured." }, { status: 501 });
@@ -16,8 +17,20 @@ function disabledResponse() {
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured) return disabledResponse();
-  const posts = await listPostsFromSupabase(getAuthenticatedUser(request));
-  return NextResponse.json({ posts });
+  const ownerId = getAuthenticatedUser(request);
+  const requestedPage = Number(request.nextUrl.searchParams.get("page") ?? 1);
+  const requestedPageSize = Number(request.nextUrl.searchParams.get("pageSize") ?? 100);
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const pageSize = Number.isFinite(requestedPageSize) ? Math.min(100, Math.max(1, Math.floor(requestedPageSize))) : 100;
+  const paginationRequested = request.nextUrl.searchParams.has("page") || request.nextUrl.searchParams.has("pageSize");
+  const accountId = request.nextUrl.searchParams.get("account_id") ?? undefined;
+  const posts = await listPostsFromSupabase(ownerId, paginationRequested ? { limit: pageSize, offset: (page - 1) * pageSize, accountId } : undefined);
+  if (!paginationRequested) return NextResponse.json({ posts });
+  let countQuery = getSupabaseServerClient()!.from("instagram_posts").select("id", { count: "exact", head: true });
+  if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") countQuery = countQuery.eq("owner_id", ownerId);
+  if (accountId) countQuery = countQuery.eq("account_id", accountId);
+  const { count } = await countQuery;
+  return NextResponse.json({ posts, page, pageSize, total: count ?? posts.length });
 }
 
 export async function POST(request: NextRequest) {

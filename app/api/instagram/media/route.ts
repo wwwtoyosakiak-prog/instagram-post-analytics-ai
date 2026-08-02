@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('account_id');
   const mediaType = searchParams.get('media_type'); // IMAGE / VIDEO / CAROUSEL_ALBUM
-  const limit = parseInt(searchParams.get('limit') ?? '50');
+  const rawLimit = parseInt(searchParams.get('pageSize') ?? searchParams.get('limit') ?? '50');
+  const rawPage = parseInt(searchParams.get('page') ?? '1');
+  const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
+  const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
 
   const db = getSupabaseServerClient();
   const ownerId = getAuthenticatedUser(req);
@@ -32,6 +35,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ configured: true, data: [] });
     }
   }
+  let countQuery = db.from('instagram_media').select('id', { count: 'exact', head: true });
+  if (accountId) countQuery = countQuery.eq('account_id', accountId);
+  else if (allowedAccountIds) countQuery = countQuery.in('account_id', allowedAccountIds);
+  if (mediaType) countQuery = countQuery.eq('media_type', mediaType);
+  const { count } = await countQuery;
+
   let query = db
     .from('instagram_media')
     .select(`
@@ -44,7 +53,7 @@ export async function GET(req: NextRequest) {
       )
     `)
     .order('timestamp', { ascending: false })
-    .limit(limit);
+    .range((page - 1) * limit, page * limit - 1);
 
   if (accountId) query = query.eq('account_id', accountId);
   else if (allowedAccountIds) query = query.in('account_id', allowedAccountIds);
@@ -63,5 +72,5 @@ export async function GET(req: NextRequest) {
     return { ...m, latest_insights: latest, instagram_media_insights: undefined };
   });
 
-  return NextResponse.json({ configured: true, data: result });
+  return NextResponse.json({ configured: true, data: result, page, pageSize: limit, total: count ?? result.length });
 }

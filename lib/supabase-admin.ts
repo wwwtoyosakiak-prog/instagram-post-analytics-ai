@@ -518,9 +518,11 @@ export async function upsertAccountsInSupabase(accounts: InstagramAccount[], own
   return result.map(mapAccount);
 }
 
-export async function listPostsFromSupabase(ownerId = DEFAULT_DATA_OWNER) {
+export async function listPostsFromSupabase(ownerId = DEFAULT_DATA_OWNER, pagination?: { limit: number; offset: number; accountId?: string }) {
+  const paginationFilter = pagination ? `&limit=${pagination.limit}&offset=${pagination.offset}` : "";
+  const accountFilter = pagination?.accountId ? `&account_id=eq.${encodeURIComponent(pagination.accountId)}` : "";
   const [rows, latestInsights] = await Promise.all([
-    supabaseRequest<PostRow[]>(`instagram_posts?${withOwnerFilter(ownerId, "select=*&order=date.desc")}`),
+    supabaseRequest<PostRow[]>(`instagram_posts?${withOwnerFilter(ownerId, "select=*&order=date.desc")}${accountFilter}${paginationFilter}`),
     listLatestInsightSnapshotsFromSupabase(ownerId)
   ]);
   const insightByPostId = new Map(latestInsights.map((insight) => [insight.postId, insight]));

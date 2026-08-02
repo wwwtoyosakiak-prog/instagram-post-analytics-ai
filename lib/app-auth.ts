@@ -1,7 +1,8 @@
 export const SESSION_COOKIE = "instagram_ai_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 14;
 
-type AppUser = { username: string; password: string; ownerId: string };
+export type AppRole = "admin" | "member";
+type AppUser = { username: string; password: string; ownerId: string; role: AppRole };
 
 export function readAppUsers(): AppUser[] | null {
   const configuredUsers = process.env.APP_ACCESS_USERS;
@@ -16,7 +17,7 @@ export function readAppUsers(): AppUser[] | null {
       if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return null;
       const users = Object.entries(parsed)
         .filter((entry): entry is [string, string] => Boolean(entry[0]) && typeof entry[1] === "string" && Boolean(entry[1]))
-        .map(([username, password]) => ({ username, password, ownerId: username }));
+        .map(([username, password]) => ({ username, password, ownerId: username, role: username === "owner" ? "admin" : "member" as AppRole }));
       return users.length ? users : null;
     } catch {
       return null;
@@ -26,7 +27,7 @@ export function readAppUsers(): AppUser[] | null {
   const password = process.env.APP_ACCESS_PASSWORD;
   if (!username && !password) return [];
   if (!username || !password) return null;
-  return [{ username, password, ownerId: "owner" }];
+  return [{ username, password, ownerId: "owner", role: "admin" }];
 }
 
 function constantTimeEqual(actual: string, expected: string) {
@@ -43,7 +44,7 @@ export function authenticateAppUser(username: string, password: string) {
   if (!users) return { status: "invalid_configuration" as const };
   const user = users.find((candidate) =>
     constantTimeEqual(candidate.username, username) && constantTimeEqual(candidate.password, password));
-  return user ? { status: "authenticated" as const, ownerId: user.ownerId } : { status: "invalid_credentials" as const };
+  return user ? { status: "authenticated" as const, ownerId: user.ownerId, role: user.role } : { status: "invalid_credentials" as const };
 }
 
 function toBase64Url(value: Uint8Array | string) {
@@ -56,22 +57,26 @@ async function sign(value: string, secret: string) {
   return toBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
 }
 
-export async function createSession(ownerId: string) {
+export async function createSession(ownerId: string, role: AppRole = ownerId === "owner" ? "admin" : "member") {
   const secret = process.env.APP_SESSION_SECRET;
   if (!secret) throw new Error("APP_SESSION_SECRET is not configured.");
-  const payload = toBase64Url(JSON.stringify({ ownerId, expiresAt: Math.floor(Date.now() / 1000) + SESSION_SECONDS }));
+  const payload = toBase64Url(JSON.stringify({ ownerId, role, expiresAt: Math.floor(Date.now() / 1000) + SESSION_SECONDS }));
   return `${payload}.${await sign(payload, secret)}`;
 }
 
 export async function readSession(value?: string | null) {
+  return (await readSessionDetails(value))?.ownerId ?? null;
+}
+
+export async function readSessionDetails(value?: string | null) {
   const secret = process.env.APP_SESSION_SECRET;
   if (!secret || !value) return null;
   const [payload, signature] = value.split(".");
   if (!payload || !signature || !constantTimeEqual(signature, await sign(payload, secret))) return null;
   try {
-    const decoded = JSON.parse(atob(payload.replaceAll("-", "+").replaceAll("_", "/"))) as { ownerId?: string; expiresAt?: number };
+    const decoded = JSON.parse(atob(payload.replaceAll("-", "+").replaceAll("_", "/"))) as { ownerId?: string; role?: AppRole; expiresAt?: number };
     if (!decoded.ownerId || !decoded.expiresAt || decoded.expiresAt <= Date.now() / 1000) return null;
-    return decoded.ownerId;
+    return { ownerId: decoded.ownerId, role: decoded.role === "admin" ? "admin" as const : "member" as const };
   } catch {
     return null;
   }

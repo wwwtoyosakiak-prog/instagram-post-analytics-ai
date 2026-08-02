@@ -94,19 +94,26 @@ export default function PostsPage() {
   const [typeFilter, setTypeFilter] = useState<UTypeFilter>("");
   const [page, setPage] = useState(1);
   const [videoDurationByUrl, setVideoDurationByUrl] = useState<Record<string, number | null>>({});
+  const [serverTotal, setServerTotal] = useState(0);
 
   useEffect(() => {
+    setLoading(true);
+    const useServerPaging = sortKey === "date" && !typeFilter;
+    const postsUrl = useServerPaging ? `/api/data/posts?page=${page}&pageSize=${POSTS_PER_PAGE}` : "/api/data/posts";
+    const mediaUrl = useServerPaging ? `/api/instagram/media?page=${page}&pageSize=${POSTS_PER_PAGE}` : "/api/instagram/media?limit=100";
     Promise.all([
-      loadPostsData(),
-      requestJsonOr<{ data: ApiMedia[] }>(withSelectedAccount("/api/instagram/media?limit=100"), { data: [] }),
+      requestJsonOr<{ posts: InstagramPost[]; total?: number }>(withSelectedAccount(postsUrl), { posts: [], total: 0 }),
+      requestJsonOr<{ data: ApiMedia[]; total?: number }>(withSelectedAccount(mediaUrl), { data: [], total: 0 }),
       loadLatestAnalysesData(),
-    ]).then(([loadedPosts, mediaJson, analyses]) => {
+    ]).then(async ([postsJson, mediaJson, analyses]) => {
+      const loadedPosts = postsJson.posts.length || postsJson.total ? postsJson.posts : page === 1 ? await loadPostsData() : [];
       setPosts(loadedPosts);
-      setApiMedia((mediaJson as { data: ApiMedia[] }).data ?? []);
+      setApiMedia(mediaJson.data ?? []);
+      setServerTotal(useServerPaging ? Math.max(postsJson.total ?? 0, mediaJson.total ?? 0) : 0);
       setLatestScoreByPostId(Object.fromEntries(analyses.map((analysis) => [analysis.postId, analysis.score])));
       setLoading(false);
     });
-  }, []);
+  }, [page, sortKey, typeFilter]);
 
   // ── 統合リスト ─────────────────────────────────────────────
 
@@ -199,9 +206,9 @@ export default function PostsPage() {
       });
   }, [unifiedList, typeFilter, sortKey]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredList.length / POSTS_PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(Math.max(filteredList.length, serverTotal) / POSTS_PER_PAGE));
   const currentPage = Math.min(page, pageCount);
-  const visibleList = filteredList.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
+  const visibleList = serverTotal > POSTS_PER_PAGE ? filteredList.slice(0, POSTS_PER_PAGE) : filteredList.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
 
   useEffect(() => {
     const pendingUrls = visibleList

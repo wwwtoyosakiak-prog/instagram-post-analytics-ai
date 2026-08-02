@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateAppUser, readAppUsers, readSession, SESSION_COOKIE } from "@/lib/app-auth";
-import { hasInstagramConnection } from "@/lib/instagram-user-config";
+import { authenticateAppUser, readAppUsers, readSessionDetails, SESSION_COOKIE, type AppRole } from "@/lib/app-auth";
 
-const publicPaths = new Set(["/api/health", "/login", "/api/auth/login"]);
+const publicPaths = new Set(["/api/health", "/login", "/api/auth/login", "/api/instagram/oauth/callback"]);
 const cronProtectedPaths = [
   "/api/cron/",
   "/api/instagram/full-sync",
   "/api/instagram/sync",
 ];
 const authenticatedUserHeader = "x-app-authenticated-user";
+const authenticatedRoleHeader = "x-app-authenticated-role";
 
-function nextWithAuthenticatedUser(request: NextRequest, username?: string) {
+function nextWithAuthenticatedUser(request: NextRequest, username?: string, role?: AppRole) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.delete(authenticatedUserHeader);
+  requestHeaders.delete(authenticatedRoleHeader);
   if (username) requestHeaders.set(authenticatedUserHeader, username);
+  if (role) requestHeaders.set(authenticatedRoleHeader, role);
 
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
@@ -59,13 +61,11 @@ export async function middleware(request: NextRequest) {
 
   const credentials = readBasicCredentials(request);
   const basicAuthentication = credentials ? authenticateAppUser(credentials.username, credentials.password) : null;
-  const sessionOwner = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
-  const ownerId = basicAuthentication?.status === "authenticated" ? basicAuthentication.ownerId : sessionOwner;
+  const session = await readSessionDetails(request.cookies.get(SESSION_COOKIE)?.value);
+  const ownerId = basicAuthentication?.status === "authenticated" ? basicAuthentication.ownerId : session?.ownerId;
+  const role = basicAuthentication?.status === "authenticated" ? basicAuthentication.role : session?.role;
   if (ownerId) {
-    if (!hasInstagramConnection(ownerId) && request.nextUrl.pathname.startsWith("/api/instagram/")) {
-      return NextResponse.json({ error: "このユーザーのInstagram連携はまだ設定されていません。" }, { status: 403 });
-    }
-    return nextWithAuthenticatedUser(request, ownerId);
+    return nextWithAuthenticatedUser(request, ownerId, role);
   }
 
   if (process.env.APP_SESSION_SECRET) {

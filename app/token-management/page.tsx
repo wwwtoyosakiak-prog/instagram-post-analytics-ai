@@ -148,6 +148,7 @@ export default function TokenManagementPage() {
   };
 
   const warningMessage = useMemo(() => getWarningMessage(token), [token]);
+  const connected = token?.status !== "missing";
 
   return (
     <div>
@@ -165,6 +166,17 @@ export default function TokenManagementPage() {
           </div>
         }
       />
+
+      <Panel className="mb-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="mr-auto">
+            <h2 className="font-semibold">Instagramアカウント接続</h2>
+            <p className="mt-1 text-sm text-stone-600">各ユーザーが自分のInstagramで認証します。アクセストークンを手入力する必要はありません。</p>
+          </div>
+          {connected ? <button type="button" className="btn-secondary" onClick={async () => { if (!window.confirm("Instagram連携を解除しますか？")) return; await fetch("/api/instagram/oauth/disconnect", { method: "POST" }); await loadStatus(); }}>連携を解除</button>
+            : <a className="btn-primary" href="/api/instagram/oauth/start">Instagramと連携</a>}
+        </div>
+      </Panel>
 
       {token?.warningLevel === "danger_7_days" || token?.warningLevel === "expired" ? (
         <div className={`mb-5 rounded-lg px-4 py-4 text-sm font-medium ${warningStyles[token.warningLevel]}`}>

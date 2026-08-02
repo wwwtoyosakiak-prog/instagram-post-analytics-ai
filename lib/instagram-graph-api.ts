@@ -7,6 +7,7 @@ import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager"
 import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
 import { fetchJsonWithTimeout } from "@/lib/server-api";
 import { getInstagramUserConfig } from "@/lib/instagram-user-config";
+import { getStoredInstagramConnection } from "@/lib/instagram-connection-store";
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
@@ -108,7 +109,12 @@ export type ApiError =
 // ── ヘルパー ─────────────────────────────────────────────
 
 async function getToken(ownerId = "owner"): Promise<string> {
-  return getInstagramUserConfig(ownerId)?.accessToken ?? getInstagramAccessTokenForServer();
+  const configured = getInstagramUserConfig(ownerId)?.accessToken;
+  if (configured) return configured;
+  const stored = await getStoredInstagramConnection(ownerId);
+  if (stored?.access_token) return stored.access_token;
+  if (ownerId !== "owner") throw new Error("このユーザーのInstagram連携はまだ設定されていません。");
+  return getInstagramAccessTokenForServer();
 }
 
 function getTokyoDateKey(date: Date) {
