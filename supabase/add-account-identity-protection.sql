@@ -1,7 +1,14 @@
 -- Run once to merge duplicate Instagram profiles and prevent recurrence.
 begin;
 
+-- Older installations may predate user-scoped ownership. Add the column safely
+-- before grouping duplicates by site user.
+alter table public.instagram_accounts
+  add column if not exists owner_id text not null default 'owner';
 alter table public.instagram_accounts add column if not exists identity_key text;
+
+create index if not exists instagram_accounts_owner_idx
+  on public.instagram_accounts (owner_id, created_at desc);
 
 create or replace function public.set_instagram_account_identity_key()
 returns trigger as $$
