@@ -165,6 +165,13 @@ export async function fetchAccountInfo(igUserId?: string, ownerId = "owner"): Pr
   return data;
 }
 
+export async function fetchConnectionIdentity(ownerId = "owner") {
+  const token = await getToken(ownerId);
+  const uid = getUid(undefined, ownerId);
+  const url = `${getApiBase(ownerId)}/${uid}?fields=id,username&access_token=${token}`;
+  return await igFetch(url) as { id: string; username?: string };
+}
+
 // ── インサイトヘルパー ────────────────────────────────────
 
 export function getMetric(
