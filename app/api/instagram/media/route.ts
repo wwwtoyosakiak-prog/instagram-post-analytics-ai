@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getAuthenticatedUser } from '@/lib/authenticated-user';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -12,12 +13,24 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get('limit') ?? '50');
 
   const db = getSupabaseServerClient();
+  const ownerId = getAuthenticatedUser(req);
   if (!db) {
     return NextResponse.json({
       configured: false,
       data: [],
       message: 'Instagramデータベースが未接続です。',
     });
+  }
+  let allowedAccountIds: string[] | null = null;
+  if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") {
+    const { data: ownedAccounts } = await db.from('instagram_accounts').select('id').eq('owner_id', ownerId);
+    allowedAccountIds = (ownedAccounts ?? []).map((account) => String(account.id));
+    if (accountId && !allowedAccountIds.includes(accountId)) {
+      return NextResponse.json({ configured: true, data: [] });
+    }
+    if (!accountId && allowedAccountIds.length === 0) {
+      return NextResponse.json({ configured: true, data: [] });
+    }
   }
   let query = db
     .from('instagram_media')
@@ -34,6 +47,7 @@ export async function GET(req: NextRequest) {
     .limit(limit);
 
   if (accountId) query = query.eq('account_id', accountId);
+  else if (allowedAccountIds) query = query.in('account_id', allowedAccountIds);
   if (mediaType) query = query.eq('media_type', mediaType);
 
   const { data, error } = await query;

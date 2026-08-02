@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Download, ShieldCheck, Upload, User } from "lucide-react";
 import { Button, PageHeader, PageLoading, Panel } from "@/components/ui";
 import { loadAccountsData, loadPostsData, saveAccountsData, savePostsData } from "@/lib/cloud-storage";
-import { requestJsonOr } from "@/lib/client-api";
+import { ClientApiError, requestJson, requestJsonOr } from "@/lib/client-api";
 import { InstagramAccount } from "@/lib/types";
 import { getSelectedAccountId, withSelectedAccount } from "@/lib/account-preference";
 import { createBackup, parseBackup } from "@/lib/data-backup";
@@ -175,15 +175,25 @@ function DataProtectionPanel() {
     setMessage("");
     setError("");
     try {
-      const [accounts, posts] = await Promise.all([loadAccountsData(), loadPostsData()]);
-      const backup = createBackup(accounts, posts);
+      let backup: unknown;
+      let summary: string;
+      try {
+        const fullBackup = await requestJson<{ data: Record<string, unknown[]> }>("/api/data/backup");
+        backup = fullBackup;
+        summary = "プロフィール、投稿、AI分析、インサイト、レポートを書き出しました。";
+      } catch (requestError) {
+        if (!(requestError instanceof ClientApiError) || requestError.status !== 501) throw requestError;
+        const [accounts, posts] = await Promise.all([loadAccountsData(), loadPostsData()]);
+        backup = createBackup(accounts, posts);
+        summary = `${accounts.length}件のプロフィールと${posts.length}件の投稿を書き出しました。`;
+      }
       const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
       const link = document.createElement("a");
       link.href = url;
       link.download = `instagram-analysis-backup-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      setMessage(`${accounts.length}件のプロフィールと${posts.length}件の投稿を書き出しました。`);
+      setMessage(summary);
     } catch {
       setError("データを書き出せませんでした。時間をおいて再度お試しください。");
     } finally {
@@ -196,10 +206,21 @@ function DataProtectionPanel() {
     setMessage("");
     setError("");
     try {
-      const backup = parseBackup(await file.text());
-      await saveAccountsData(backup.accounts);
-      await savePostsData(backup.posts);
-      setMessage(`${backup.accounts.length}件のプロフィールと${backup.posts.length}件の投稿を復元しました。`);
+      const text = await file.text();
+      const raw = JSON.parse(text) as { version?: number };
+      if (raw.version === 2) {
+        const result = await requestJson<{ restoredRows: number }>("/api/data/backup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: text,
+        });
+        setMessage(`${result.restoredRows}件のデータを復元しました。`);
+      } else {
+        const backup = parseBackup(text);
+        await saveAccountsData(backup.accounts);
+        await savePostsData(backup.posts);
+        setMessage(`${backup.accounts.length}件のプロフィールと${backup.posts.length}件の投稿を復元しました。`);
+      }
     } catch {
       setError("このファイルは復元できません。サイトから書き出したバックアップを選んでください。");
     } finally {
@@ -213,7 +234,7 @@ function DataProtectionPanel() {
         <ShieldCheck size={22} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden />
         <div>
           <h2 className="font-semibold text-ink">データを保護</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-600">プロフィールと投稿を1つのファイルに保存し、必要なときに戻せます。</p>
+          <p className="mt-1 text-sm leading-6 text-stone-600">プロフィール、投稿、AI分析、インサイト、レポートを1つのファイルに保存し、必要なときに戻せます。</p>
         </div>
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">

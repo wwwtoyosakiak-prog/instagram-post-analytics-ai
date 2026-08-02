@@ -15,6 +15,8 @@ import {
 import type { InstagramSyncRun } from '@/lib/types';
 import { logServerIssue } from '@/lib/safe-logging';
 import { isSupabaseServerConfigured, requireSupabaseServerClient } from '@/lib/supabase-server';
+import { getAuthenticatedUser } from '@/lib/authenticated-user';
+import { notifySyncFailure } from '@/lib/sync-failure-notification';
 
 export const maxDuration = 180;
 
@@ -38,9 +40,10 @@ function isAuthorizedCronRequest(request: Request) {
 
 type SyncTriggerType = "manual" | "scheduled";
 
-async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
+async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">, ownerId = "owner") {
   const db = requireSupabaseServerClient();
   const { error } = await db.from('instagram_sync_runs').insert({
+    ...(process.env.USER_DATA_OWNERSHIP_ENABLED === "true" ? { owner_id: ownerId } : {}),
     trigger_type: run.triggerType,
     status: run.status,
     started_at: run.startedAt,
@@ -61,9 +64,9 @@ async function saveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
   }
 }
 
-async function safeSaveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">) {
+async function safeSaveScheduledSyncRun(run: Omit<InstagramSyncRun, "id">, ownerId = "owner") {
   try {
-    await saveScheduledSyncRun(run);
+    await saveScheduledSyncRun(run, ownerId);
   } catch (error) {
     logServerIssue('full-sync-run-save', error);
   }
@@ -91,7 +94,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: auth.message, type: 'unauthorized' }, { status: auth.status });
     }
   }
-  return handler(isScheduled ? "scheduled" : "manual");
+  return handler(isScheduled ? "scheduled" : "manual", isScheduled ? "owner" : getAuthenticatedUser(request));
 }
 export async function GET(request: Request) {
   const auth = isAuthorizedCronRequest(request);
@@ -112,10 +115,10 @@ export async function GET(request: Request) {
     });
     return NextResponse.json({ ok: false, error: auth.message, type: 'unauthorized' }, { status: auth.status });
   }
-  return handler("scheduled");
+  return handler("scheduled", "owner");
 }
 
-async function handler(triggerType: SyncTriggerType) {
+async function handler(triggerType: SyncTriggerType, ownerId: string) {
   if (!isSupabaseServerConfigured()) {
     return NextResponse.json({
       ok: false,
@@ -140,7 +143,7 @@ async function handler(triggerType: SyncTriggerType) {
 
   try {
     // 1. アカウント情報取得
-    const account = await fetchAccountInfo();
+    const account = await fetchAccountInfo(undefined, ownerId);
     results.account = { username: account.username ?? null, id: account.id };
 
     const syncedAt = new Date().toISOString();
@@ -148,35 +151,39 @@ async function handler(triggerType: SyncTriggerType) {
 
     // 既存の手動登録アカウントを優先的に再利用して、同期先が増殖しないようにする。
     let existingAccount: ExistingAccountRow | null = null;
-    const { data: linkedAccount } = await db
+    let linkedAccountQuery = db
       .from('instagram_accounts')
       .select('id')
       .eq('ig_user_id', account.id)
-      .limit(1)
-      .maybeSingle<ExistingAccountRow>();
+      .limit(1);
+    if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") linkedAccountQuery = linkedAccountQuery.eq('owner_id', ownerId);
+    const { data: linkedAccount } = await linkedAccountQuery.maybeSingle<ExistingAccountRow>();
     existingAccount = linkedAccount ?? null;
 
     if (!existingAccount && normalizedUsername) {
-      const { data: apiUsernameLinked } = await db
+      let apiUsernameQuery = db
         .from('instagram_accounts')
         .select('id')
         .eq('instagram_api_username', normalizedUsername)
-        .limit(1)
-        .maybeSingle<ExistingAccountRow>();
+        .limit(1);
+      if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") apiUsernameQuery = apiUsernameQuery.eq('owner_id', ownerId);
+      const { data: apiUsernameLinked } = await apiUsernameQuery.maybeSingle<ExistingAccountRow>();
       existingAccount = apiUsernameLinked ?? null;
     }
 
     if (!existingAccount && normalizedUsername) {
-      const { data: usernameLinked } = await db
+      let usernameQuery = db
         .from('instagram_accounts')
         .select('id')
         .eq('username', normalizedUsername)
-        .limit(1)
-        .maybeSingle<ExistingAccountRow>();
+        .limit(1);
+      if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") usernameQuery = usernameQuery.eq('owner_id', ownerId);
+      const { data: usernameLinked } = await usernameQuery.maybeSingle<ExistingAccountRow>();
       existingAccount = usernameLinked ?? null;
     }
 
     const accountPayload = {
+      ...(process.env.USER_DATA_OWNERSHIP_ENABLED === "true" ? { owner_id: ownerId } : {}),
       ig_user_id: account.id,
       username: normalizedUsername,
       instagram_api_username: normalizedUsername,
@@ -236,7 +243,7 @@ async function handler(triggerType: SyncTriggerType) {
     const accountId = (accountRow as { id: string }).id;
 
     // 2. 投稿一覧取得
-    const mediaList = await fetchMediaList(account.id);
+    const mediaList = await fetchMediaList(account.id, 50, ownerId);
     results.media_fetched = mediaList.length;
 
     // 3. 各投稿を保存 + インサイト取得
@@ -271,7 +278,7 @@ async function handler(triggerType: SyncTriggerType) {
       // インサイト保存（fetchMediaList でフィールド展開済み）
       try {
         const ins = media.insights ?? null;
-        const detailedInsights = await fetchMediaInsights(media.id, media.media_type, media.media_product_type);
+        const detailedInsights = await fetchMediaInsights(media.id, media.media_type, media.media_product_type, ownerId);
         const { error: insErr } = await db
           .from('instagram_media_insights')
           .insert({
@@ -306,7 +313,7 @@ async function handler(triggerType: SyncTriggerType) {
 
     // 4. アカウント全体インサイト取得
     try {
-      const accInsights = await fetchAccountInsights(account.id);
+      const accInsights = await fetchAccountInsights(account.id, ownerId);
       const targetDate = accInsights.date ?? new Date().toISOString().slice(0, 10);
       const { error: aiErr } = await db
         .from('instagram_account_insights')
@@ -342,7 +349,7 @@ async function handler(triggerType: SyncTriggerType) {
 
     // 5. デイリースナップショット（フォロワー推移）
     try {
-      const snap = await fetchFollowerSnapshot(account.id);
+      const snap = await fetchFollowerSnapshot(account.id, ownerId);
       const today = new Date().toISOString().slice(0, 10);
       const { error: snapErr } = await db
         .from('instagram_daily_snapshots')
@@ -385,7 +392,11 @@ async function handler(triggerType: SyncTriggerType) {
         stage: index === 0 && results.account_insights === 'failed' ? "account_insights" : "full_sync",
         message,
       })),
-    });
+    }, ownerId);
+
+    if (fullSyncStatus !== "success") {
+      await notifySyncFailure(ownerId, results.errors[0] ?? "一部のデータを同期できませんでした。");
+    }
 
     return NextResponse.json(
       { ok: fullSyncStatus === "success", status: fullSyncStatus, ...results },
@@ -415,8 +426,9 @@ async function handler(triggerType: SyncTriggerType) {
           subcode: errMeta.subcode,
           traceId: errMeta.trace_id,
         }],
-      });
+      }, ownerId);
     }
+    await notifySyncFailure(ownerId, err.message ?? String(e));
     return NextResponse.json(
       {
         ok: false,

@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getAuthenticatedUser } from '@/lib/authenticated-user';
 
 function emptyDashboard() {
   return {
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('account_id');
   const db = getSupabaseServerClient();
+  const ownerId = getAuthenticatedUser(req);
   if (!db) {
     return NextResponse.json({
       configured: false,
@@ -39,10 +41,11 @@ export async function GET(req: NextRequest) {
     .order('last_synced_at', { ascending: false, nullsFirst: false })
     .order('updated_at', { ascending: false })
     .limit(1);
+  if (process.env.USER_DATA_OWNERSHIP_ENABLED === "true") accountQuery = accountQuery.eq('owner_id', ownerId);
   if (accountId) accountQuery = accountQuery.eq('id', accountId);
   const { data: accounts } = await accountQuery;
   const account = accounts?.[0] ?? null;
-  const activeAccountId = accountId ?? account?.id ?? null;
+  const activeAccountId = account?.id ?? null;
 
   // 投稿 + 最新インサイト
   let mediaQuery = db

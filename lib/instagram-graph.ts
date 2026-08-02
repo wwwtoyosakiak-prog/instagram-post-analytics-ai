@@ -9,14 +9,16 @@ export type InstagramGraphConfig = {
 };
 
 import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
+import { getInstagramUserConfig } from "@/lib/instagram-user-config";
 
-export async function getInstagramGraphConfig(): Promise<InstagramGraphConfig> {
-  const accessToken = await getInstagramAccessTokenForServer();
+export async function getInstagramGraphConfig(ownerId = "owner"): Promise<InstagramGraphConfig> {
+  const userConfig = getInstagramUserConfig(ownerId);
+  const accessToken = userConfig?.accessToken ?? await getInstagramAccessTokenForServer();
   const version = process.env.INSTAGRAM_GRAPH_API_VERSION || "v23.0";
-  const mode = process.env.INSTAGRAM_GRAPH_API_MODE === "instagram_login"
+  const mode = userConfig?.mode ?? (process.env.INSTAGRAM_GRAPH_API_MODE === "instagram_login"
     ? "instagram_login"
-    : "facebook_login";
-  const accountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+    : "facebook_login");
+  const accountId = userConfig?.businessAccountId ?? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
   if (mode === "facebook_login" && !accountId) {
     throw new Error("従来方式では INSTAGRAM_BUSINESS_ACCOUNT_ID が必要です。");
