@@ -24,6 +24,16 @@ describe("account preference", () => {
 
     expect(uniqueAccountOptions(accounts, "selected").map((account) => account.id)).toEqual(["selected"]);
   });
+
+  it("ユーザー名が未保存の旧項目と正式表示名を1件にまとめる", () => {
+    const base = { username: "", instagramApiUsername: "", profileUrl: "", industry: "", targetAudience: "", goal: "", openaiApiKeyEnvName: "", openaiModel: "", analysisInstructions: "", memo: "", createdAt: "", updatedAt: "" };
+    const accounts = [
+      { ...base, id: "legacy", name: "tamaenergycircle" },
+      { ...base, id: "profile", name: "ペパポン班（多摩大学新西ゼミ）" },
+    ];
+
+    expect(uniqueAccountOptions(accounts).map((account) => account.id)).toEqual(["profile"]);
+  });
   it("uses all accounts by default", () => {
     expect(getSelectedAccountId()).toBe("all");
     expect(withSelectedAccount("/api/instagram/dashboard")).toBe("/api/instagram/dashboard");
