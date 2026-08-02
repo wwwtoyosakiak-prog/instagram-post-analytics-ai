@@ -136,6 +136,9 @@ describe("access protection", () => {
 
     expect((await middleware(request("/api/health"))).headers.get("x-middleware-next")).toBe("1");
     expect((await middleware(request("/api/instagram/sync", "Bearer cron-secret"))).headers.get("x-middleware-next")).toBe("1");
+    expect((await middleware(request("/api/instagram/deauthorize"))).headers.get("x-middleware-next")).toBe("1");
+    expect((await middleware(request("/api/instagram/data-deletion"))).headers.get("x-middleware-next")).toBe("1");
+    expect((await middleware(request("/data-deletion/status?code=test"))).headers.get("x-middleware-next")).toBe("1");
   });
 
   it("uses the dedicated login page when session login is enabled", async () => {

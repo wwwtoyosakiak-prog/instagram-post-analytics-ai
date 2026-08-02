@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateAppUser, readAppUsers, readSessionDetails, SESSION_COOKIE, type AppRole } from "@/lib/app-auth";
 
-const publicPaths = new Set(["/api/health", "/login", "/api/auth/login", "/api/instagram/oauth/callback"]);
+const publicPaths = new Set([
+  "/api/health",
+  "/login",
+  "/api/auth/login",
+  "/api/instagram/oauth/callback",
+  "/api/instagram/deauthorize",
+  "/api/instagram/data-deletion",
+  "/api/instagram/data-deletion/status",
+  "/data-deletion/status",
+]);
 const cronProtectedPaths = [
   "/api/cron/",
   "/api/instagram/full-sync",

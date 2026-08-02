@@ -14,6 +14,11 @@ create table if not exists public.app_data_backups (
   kind text not null check (kind in ('daily', 'pre_restore')), encrypted_payload text not null,
   row_count integer not null default 0, created_at timestamptz not null default now(), unique (owner_id, backup_date, kind)
 );
+create table if not exists public.instagram_data_deletion_requests (
+  id uuid primary key default gen_random_uuid(), confirmation_code text not null unique,
+  instagram_user_id text, status text not null default 'processing' check (status in ('processing', 'completed', 'failed')),
+  requested_at timestamptz not null default now(), completed_at timestamptz
+);
 
 create table if not exists public.instagram_accounts (
   id text primary key default gen_random_uuid()::text,
