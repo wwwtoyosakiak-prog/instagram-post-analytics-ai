@@ -10,10 +10,13 @@ export type InstagramGraphConfig = {
 
 import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
 import { getInstagramUserConfig } from "@/lib/instagram-user-config";
+import { getStoredInstagramConnection } from "@/lib/instagram-connection-store";
 
 export async function getInstagramGraphConfig(ownerId = "owner"): Promise<InstagramGraphConfig> {
   const userConfig = getInstagramUserConfig(ownerId);
-  const accessToken = userConfig?.accessToken ?? await getInstagramAccessTokenForServer();
+  const storedConnection = userConfig ? null : await getStoredInstagramConnection(ownerId);
+  const accessToken = userConfig?.accessToken ?? storedConnection?.access_token ?? (ownerId === "owner" ? await getInstagramAccessTokenForServer() : null);
+  if (!accessToken) throw new Error("このユーザーのInstagram連携はまだ設定されていません。");
   const version = process.env.INSTAGRAM_GRAPH_API_VERSION || "v23.0";
   const mode = userConfig?.mode ?? (process.env.INSTAGRAM_GRAPH_API_MODE === "instagram_login"
     ? "instagram_login"

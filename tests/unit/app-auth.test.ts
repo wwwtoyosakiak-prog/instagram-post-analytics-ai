@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { authenticateAppUser, createSession, readSession } from "@/lib/app-auth";
+import { authenticateAppUser, createSession, readSession, readSessionDetails } from "@/lib/app-auth";
 
 const originalUser = process.env.APP_ACCESS_USER;
 const originalPassword = process.env.APP_ACCESS_PASSWORD;
@@ -22,7 +22,7 @@ describe("app session authentication", () => {
     delete process.env.APP_ACCESS_USERS;
     process.env.APP_ACCESS_USER = "owner";
     process.env.APP_ACCESS_PASSWORD = "secret-password";
-    expect(authenticateAppUser("owner", "secret-password")).toEqual({ status: "authenticated", ownerId: "owner" });
+    expect(authenticateAppUser("owner", "secret-password")).toEqual({ status: "authenticated", ownerId: "owner", role: "admin" });
     expect(authenticateAppUser("owner", "wrong").status).toBe("invalid_credentials");
   });
 
@@ -30,6 +30,7 @@ describe("app session authentication", () => {
     process.env.APP_SESSION_SECRET = "test-session-secret-that-is-long-enough";
     const session = await createSession("teammate");
     expect(await readSession(session)).toBe("teammate");
+    expect(await readSessionDetails(session)).toEqual(expect.objectContaining({ ownerId: "teammate", role: "member" }));
     expect(await readSession(`${session.slice(0, -1)}x`)).toBeNull();
   });
 });

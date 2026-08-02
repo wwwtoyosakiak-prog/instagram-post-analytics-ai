@@ -170,6 +170,8 @@ function DataProtectionPanel() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => { void fetch("/api/data/backup?automatic=true", { cache: "no-store" }); }, []);
+
   const exportBackup = async () => {
     setBusy(true);
     setMessage("");
@@ -209,6 +211,8 @@ function DataProtectionPanel() {
       const text = await file.text();
       const raw = JSON.parse(text) as { version?: number };
       if (raw.version === 2) {
+        const preview = await requestJson<{ totalRows: number }>("/api/data/backup?preview=true", { method: "POST", headers: { "Content-Type": "application/json" }, body: text });
+        if (!window.confirm(`${preview.totalRows}件のデータを復元します。現在のデータは復元前バックアップとして保存されます。続けますか？`)) return;
         const result = await requestJson<{ restoredRows: number }>("/api/data/backup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

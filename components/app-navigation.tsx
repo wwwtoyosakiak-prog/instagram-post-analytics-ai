@@ -11,6 +11,7 @@ import {
   KeyRound,
   ListChecks,
   LogOut,
+  Users,
   User,
 } from "lucide-react";
 import { loadAccountsData } from "@/lib/cloud-storage";
@@ -29,6 +30,7 @@ const primaryNav = [
 ];
 
 const pageNames: Record<string, string> = {
+  admin: "ユーザー管理",
   accounts: "プロフィール",
   analysis: "分析",
   calendar: "カレンダー",
@@ -45,13 +47,14 @@ export function AppNavigation() {
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [selectedAccountId, setSelectedAccount] = useState("all");
   const [sessionLoginEnabled, setSessionLoginEnabled] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (pathname === "/login") return;
     setSelectedAccount(getSelectedAccountId());
     loadAccountsData().then(setAccounts);
-    requestJsonOr<{ sessionLoginEnabled: boolean }>("/api/auth/session", { sessionLoginEnabled: false })
-      .then((result) => setSessionLoginEnabled(result.sessionLoginEnabled));
+    requestJsonOr<{ sessionLoginEnabled: boolean; role?: string }>("/api/auth/session", { sessionLoginEnabled: false })
+      .then((result) => { setSessionLoginEnabled(result.sessionLoginEnabled); setIsAdmin(result.role === "admin"); });
   }, [pathname]);
 
   if (pathname === "/login") return null;
@@ -96,6 +99,8 @@ export function AppNavigation() {
               );
             })}
           </nav>
+
+          {isAdmin ? <Link href="/admin/users" aria-label="ユーザー管理" title="ユーザー管理" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-ink"><Users size={17} aria-hidden /></Link> : null}
 
           {sessionLoginEnabled ? (
             <button

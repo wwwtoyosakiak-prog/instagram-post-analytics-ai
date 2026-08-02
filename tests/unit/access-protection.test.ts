@@ -58,11 +58,13 @@ describe("access protection", () => {
     const teammate = await middleware(request("/", `Basic ${btoa("teammate:team-password")}`));
 
     expect(owner.headers.get("x-middleware-request-x-app-authenticated-user")).toBe("owner");
+    expect(owner.headers.get("x-middleware-request-x-app-authenticated-role")).toBe("admin");
     expect(teammate.headers.get("x-middleware-request-x-app-authenticated-user")).toBe("teammate");
+    expect(teammate.headers.get("x-middleware-request-x-app-authenticated-role")).toBe("member");
     expect((await middleware(request("/", `Basic ${btoa("teammate:owner-password")}`))).status).toBe(401);
   });
 
-  it("keeps the primary Instagram connection private from additional users", async () => {
+  it("allows scoped Instagram screens without exposing the primary credential", async () => {
     process.env.APP_ACCESS_USERS = JSON.stringify({ owner: "owner-password", teammate: "team-password" });
     process.env.USER_DATA_OWNERSHIP_ENABLED = "true";
     process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -70,7 +72,7 @@ describe("access protection", () => {
 
     const teammateCredentials = `Basic ${btoa("teammate:team-password")}`;
     expect((await middleware(request("/api/data/posts", teammateCredentials))).headers.get("x-middleware-next")).toBe("1");
-    expect((await middleware(request("/api/instagram/dashboard", teammateCredentials))).status).toBe(403);
+    expect((await middleware(request("/api/instagram/dashboard", teammateCredentials))).headers.get("x-middleware-next")).toBe("1");
   });
 
   it("fails closed when the multi-user setting is invalid", async () => {
