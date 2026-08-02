@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { loadAccountsData } from "@/lib/cloud-storage";
 import type { InstagramAccount } from "@/lib/types";
-import { getSelectedAccountId, setSelectedAccountId } from "@/lib/account-preference";
+import { getSelectedAccountId, setSelectedAccountId, uniqueAccountOptions } from "@/lib/account-preference";
 import { requestJsonOr } from "@/lib/client-api";
 
 const primaryNav = [
@@ -48,6 +48,7 @@ export function AppNavigation() {
   const [selectedAccountId, setSelectedAccount] = useState("all");
   const [sessionLoginEnabled, setSessionLoginEnabled] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const accountOptions = uniqueAccountOptions(accounts, selectedAccountId);
 
   useEffect(() => {
     if (pathname === "/login") return;
@@ -68,7 +69,7 @@ export function AppNavigation() {
             <span className="hidden sm:inline">Instagram投稿分析AI</span>
           </Link>
 
-          {accounts.length > 1 ? (
+          {accountOptions.length > 1 ? (
             <label className="flex min-w-0 items-center gap-2 text-xs text-stone-500">
               <span className="hidden lg:inline">表示中</span>
               <select
@@ -82,7 +83,7 @@ export function AppNavigation() {
                 }}
               >
                 <option value="all">すべて</option>
-                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                {accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
               </select>
             </label>
           ) : null}
