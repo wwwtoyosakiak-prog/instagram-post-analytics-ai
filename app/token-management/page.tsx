@@ -198,7 +198,7 @@ export default function TokenManagementPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="mr-auto">
             <h2 className="font-semibold">Instagramアカウント接続</h2>
-            <p className="mt-1 text-sm text-stone-600">各ユーザーが自分のInstagramで認証します。アクセストークンを手入力する必要はありません。</p>
+            <p className="mt-1 text-sm text-stone-600">各ユーザーが自分のInstagramで認証します。連携時に、接続したいInstagramアカウントでログインしてください。</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {userConnectionReady ? <Button type="button" variant="secondary" onClick={() => { void testConnection(); }} disabled={testingConnection}>{testingConnection ? "確認中..." : "接続テスト"}</Button> : null}

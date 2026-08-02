@@ -18,7 +18,7 @@ async function readSetupStatus(request: Request) {
     duplicateProtectionReady = !accountProbe.error;
   }
   return {
-    oauthConfigured: Boolean(process.env.INSTAGRAM_OAUTH_CLIENT_ID && process.env.INSTAGRAM_OAUTH_CLIENT_SECRET && process.env.INSTAGRAM_OAUTH_REDIRECT_URI),
+    oauthConfigured: Boolean(process.env.INSTAGRAM_OAUTH_CLIENT_ID && process.env.INSTAGRAM_OAUTH_CLIENT_SECRET && process.env.INSTAGRAM_OAUTH_REDIRECT_URI && process.env.APP_SESSION_SECRET),
     connectionReady: Boolean(connection || getInstagramUserConfig(ownerId)),
     databaseReady: Boolean(db),
     deletionTableReady,
