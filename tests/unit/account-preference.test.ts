@@ -5,15 +5,24 @@ import type { InstagramPost } from "@/lib/types";
 beforeEach(() => window.localStorage.clear());
 
 describe("account preference", () => {
-  it("同じ表示名のアカウントを選択中の項目を優先して1件にまとめる", () => {
+  it("同じInstagramユーザー名の表示名違いを1件にまとめる", () => {
     const base = { username: "tamaenergycircle", instagramApiUsername: "", profileUrl: "", industry: "", targetAudience: "", goal: "", openaiApiKeyEnvName: "", openaiModel: "", analysisInstructions: "", memo: "", createdAt: "", updatedAt: "" };
     const accounts = [
-      { ...base, id: "first", name: "ペパポン班（多摩大学新西ゼミ）" },
-      { ...base, id: "second", name: " ペパポン班（多摩大学新西ゼミ） " },
-      { ...base, id: "third", name: "tamaenergycircle" },
+      { ...base, id: "username-only", name: "tamaenergycircle" },
+      { ...base, id: "profile", name: "ペパポン班（多摩大学新西ゼミ）", instagramApiUsername: "tamaenergycircle" },
     ];
 
-    expect(uniqueAccountOptions(accounts, "second").map((account) => account.id)).toEqual(["second", "third"]);
+    expect(uniqueAccountOptions(accounts).map((account) => account.id)).toEqual(["profile"]);
+  });
+
+  it("選択中の重複項目は表示を維持する", () => {
+    const base = { username: "tamaenergycircle", instagramApiUsername: "", profileUrl: "", industry: "", targetAudience: "", goal: "", openaiApiKeyEnvName: "", openaiModel: "", analysisInstructions: "", memo: "", createdAt: "", updatedAt: "" };
+    const accounts = [
+      { ...base, id: "selected", name: "tamaenergycircle" },
+      { ...base, id: "profile", name: "ペパポン班（多摩大学新西ゼミ）" },
+    ];
+
+    expect(uniqueAccountOptions(accounts, "selected").map((account) => account.id)).toEqual(["selected"]);
   });
   it("uses all accounts by default", () => {
     expect(getSelectedAccountId()).toBe("all");

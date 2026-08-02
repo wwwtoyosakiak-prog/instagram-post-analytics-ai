@@ -24,11 +24,32 @@ export function withSelectedAccount(url: string) {
 }
 
 export function uniqueAccountOptions(accounts: InstagramAccount[], selectedAccountId = "all") {
-  const byName = new Map<string, InstagramAccount>();
+  const groups: { account: InstagramAccount; aliases: Set<string> }[] = [];
+  const normalize = (value: string | undefined) => String(value ?? "")
+    .replace(/^@/, "")
+    .trim()
+    .toLocaleLowerCase("ja-JP");
+
   for (const account of accounts) {
-    const key = account.name.trim().toLocaleLowerCase("ja-JP");
-    const current = byName.get(key);
-    if (!current || account.id === selectedAccountId) byName.set(key, account);
+    const aliases = new Set(
+      [account.name, account.username, account.instagramApiUsername]
+        .map(normalize)
+        .filter(Boolean),
+    );
+    const group = groups.find((item) => [...aliases].some((alias) => item.aliases.has(alias)));
+
+    if (!group) {
+      groups.push({ account, aliases });
+      continue;
+    }
+
+    for (const alias of aliases) group.aliases.add(alias);
+    const currentLooksLikeUsername = normalize(group.account.name) === normalize(group.account.username);
+    const nextLooksLikeDisplayName = normalize(account.name) !== normalize(account.username);
+    if (account.id === selectedAccountId || (group.account.id !== selectedAccountId && currentLooksLikeUsername && nextLooksLikeDisplayName)) {
+      group.account = account;
+    }
   }
-  return [...byName.values()];
+
+  return groups.map((group) => group.account);
 }
