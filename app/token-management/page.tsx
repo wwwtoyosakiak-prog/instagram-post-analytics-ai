@@ -106,6 +106,7 @@ export default function TokenManagementPage() {
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionTestMessage, setConnectionTestMessage] = useState("");
+  const [connectionTestError, setConnectionTestError] = useState("");
 
   const loadStatus = async (mode: "initial" | "check" = "initial") => {
     if (mode === "check") {
@@ -165,13 +166,13 @@ export default function TokenManagementPage() {
   const testConnection = async () => {
     setTestingConnection(true);
     setConnectionTestMessage("");
-    setError("");
+    setConnectionTestError("");
     try {
       const result = await requestJson<{ ok: boolean; message: string }>("/api/instagram/setup-status", { method: "POST" }, "Instagram接続テストに失敗しました。");
       setConnectionTestMessage(result.message);
       await loadStatus();
     } catch (caught) {
-      setError(toUserFacingError(caught, "token"));
+      setConnectionTestError(caught instanceof Error ? caught.message : "Instagram接続テストに失敗しました。");
     } finally {
       setTestingConnection(false);
     }
@@ -208,6 +209,7 @@ export default function TokenManagementPage() {
         </div>
         {legacyTokenAvailable ? <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">共通トークンは利用できますが、このユーザー専用のInstagram連携はまだ完了していません。上の「Instagramと連携」から接続してください。</p> : null}
         {connectionTestMessage ? <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{connectionTestMessage}</p> : null}
+        {connectionTestError ? <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{connectionTestError}</p> : null}
       </Panel>
 
       <Panel className="mb-6">

@@ -36,6 +36,12 @@ export async function POST(request: Request) {
     const account = await fetchAccountInfo(undefined, ownerId);
     return NextResponse.json({ ok: true, username: account.username ?? null, message: `@${account.username ?? "Instagram"} への接続を確認しました。` });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Instagram接続を確認できませんでした。" }, { status: 502 });
+    const apiError = error && typeof error === "object" ? error as { type?: unknown; message?: unknown } : null;
+    const message = apiError?.type === "token_expired"
+      ? "Instagramの認証期限が切れています。連携を解除して、もう一度接続してください。"
+      : apiError?.type === "permission_denied"
+        ? "Instagramの必要な権限が許可されていません。連携を解除して、権限を許可し直してください。"
+        : "Instagramへ接続できませんでした。連携を解除して、接続したいアカウントでやり直してください。";
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
