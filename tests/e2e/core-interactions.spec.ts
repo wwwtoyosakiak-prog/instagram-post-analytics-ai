@@ -192,6 +192,30 @@ test("共通トークンがあってもユーザー別Instagram連携を開始�
   await expect(page.getByRole("button", { name: "連携を解除" })).toHaveCount(0);
 });
 
+test("Instagram接続テストの失敗理由を接続欄に表示する", async ({ page }) => {
+  await page.unroute("**/api/instagram/setup-status");
+  await page.route("**/api/instagram/setup-status", (route) => {
+    if (route.request().method() === "POST") {
+      return route.fulfill({
+        status: 502,
+        json: { error: "Instagramの認証期限が切れています。連携を解除して、もう一度接続してください。" },
+      });
+    }
+    return route.fulfill({ json: {
+      oauthConfigured: true,
+      connectionReady: true,
+      databaseReady: true,
+      deletionTableReady: true,
+      duplicateProtectionReady: true,
+    } });
+  });
+
+  await page.goto("/token-management");
+  await page.getByRole("button", { name: "接続テスト" }).click();
+
+  await expect(page.getByText("Instagramの認証期限が切れています。連携を解除して、もう一度接続してください。", { exact: true })).toBeVisible();
+});
+
 test("投稿タイプで一覧を絞り込める", async ({ page }) => {
   await page.goto("/posts");
   await expect(page.getByText("画像投稿のテスト")).toBeVisible();
