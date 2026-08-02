@@ -49,7 +49,7 @@ export function useDashboardSync(
       );
       const firstError = result.error ?? result.errors?.[0] ?? "同期に失敗しました。";
 
-      if (result.ok === false) {
+      if (result.ok === false || result.status === "failed") {
         throw new Error(firstError);
       }
 

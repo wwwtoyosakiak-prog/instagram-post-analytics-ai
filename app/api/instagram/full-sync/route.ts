@@ -275,7 +275,7 @@ async function handler(triggerType: SyncTriggerType, ownerId: string) {
         results.media_saved++;
       }
 
-      // インサイト保存（fetchMediaList でフィールド展開済み）
+      // インサイトは投稿一覧とは分けて取得する。権限不足でも投稿本体の同期は継続する。
       try {
         const ins = media.insights ?? null;
         const detailedInsights = await fetchMediaInsights(media.id, media.media_type, media.media_product_type, ownerId);
@@ -399,7 +399,7 @@ async function handler(triggerType: SyncTriggerType, ownerId: string) {
     }
 
     return NextResponse.json(
-      { ok: fullSyncStatus === "success", status: fullSyncStatus, ...results },
+      { ok: fullSyncStatus !== "failed", status: fullSyncStatus, ...results },
       { status: fullSyncStatus === "failed" ? 500 : fullSyncStatus === "partial" ? 207 : 200 }
     );
 
