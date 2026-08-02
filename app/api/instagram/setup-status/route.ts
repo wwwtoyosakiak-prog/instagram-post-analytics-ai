@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchAccountInfo } from "@/lib/instagram-graph-api";
+import { fetchConnectionIdentity } from "@/lib/instagram-graph-api";
 import { getAuthenticatedUser } from "@/lib/authenticated-user";
 import { getStoredInstagramConnection } from "@/lib/instagram-connection-store";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const ownerId = getAuthenticatedUser(request);
   try {
-    const account = await fetchAccountInfo(undefined, ownerId);
+    const account = await fetchConnectionIdentity(ownerId);
     return NextResponse.json({ ok: true, username: account.username ?? null, message: `@${account.username ?? "Instagram"} への接続を確認しました。` });
   } catch (error) {
     const apiError = error && typeof error === "object" ? error as { type?: unknown; message?: unknown } : null;
@@ -41,7 +41,9 @@ export async function POST(request: Request) {
       ? "Instagramの認証期限が切れています。連携を解除して、もう一度接続してください。"
       : apiError?.type === "permission_denied"
         ? "Instagramの必要な権限が許可されていません。連携を解除して、権限を許可し直してください。"
-        : "Instagramへ接続できませんでした。連携を解除して、接続したいアカウントでやり直してください。";
+        : typeof apiError?.message === "string" && apiError.message.trim()
+          ? `Instagram APIからエラーが返されました：${apiError.message}`
+          : "Instagramへ接続できませんでした。連携を解除して、接続したいアカウントでやり直してください。";
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
