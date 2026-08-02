@@ -71,6 +71,15 @@ async function mockCoreData(page: Page) {
   await page.route("**/api/instagram/token/status", (route) =>
     route.fulfill({ json: { status: "active" } }),
   );
+  await page.route("**/api/instagram/setup-status", (route) =>
+    route.fulfill({ json: {
+      oauthConfigured: true,
+      connectionReady: false,
+      databaseReady: true,
+      deletionTableReady: true,
+      duplicateProtectionReady: true,
+    } }),
+  );
 }
 
 test.beforeEach(async ({ page }) => {
@@ -173,6 +182,14 @@ test("プロフィールからデータを書き出し・復元できる", async
   await expect(page.getByRole("heading", { name: "データを保護" })).toBeVisible();
   await expect(page.getByRole("button", { name: "データを書き出す" })).toBeVisible();
   await expect(page.getByText("データを復元", { exact: true })).toBeVisible();
+});
+
+test("共通トークンがあってもユーザー別Instagram連携を開始できる", async ({ page }) => {
+  await page.goto("/token-management");
+
+  await expect(page.getByRole("link", { name: "Instagramと連携", exact: true })).toHaveAttribute("href", "/api/instagram/oauth/start");
+  await expect(page.getByText("共通トークンは利用できますが、このユーザー専用のInstagram連携はまだ完了していません。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "連携を解除" })).toHaveCount(0);
 });
 
 test("投稿タイプで一覧を絞り込める", async ({ page }) => {

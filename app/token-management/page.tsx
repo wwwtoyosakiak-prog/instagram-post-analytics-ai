@@ -159,7 +159,8 @@ export default function TokenManagementPage() {
   };
 
   const warningMessage = useMemo(() => getWarningMessage(token), [token]);
-  const connected = Boolean(token && token.status !== "missing");
+  const userConnectionReady = setupStatus?.connectionReady === true;
+  const legacyTokenAvailable = Boolean(token && token.status !== "missing" && !userConnectionReady);
 
   const testConnection = async () => {
     setTestingConnection(true);
@@ -200,11 +201,12 @@ export default function TokenManagementPage() {
             <p className="mt-1 text-sm text-stone-600">各ユーザーが自分のInstagramで認証します。アクセストークンを手入力する必要はありません。</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {connected ? <Button type="button" variant="secondary" onClick={() => { void testConnection(); }} disabled={testingConnection}>{testingConnection ? "確認中..." : "接続テスト"}</Button> : null}
-            {connected ? <button type="button" className="btn-secondary" onClick={async () => { if (!window.confirm("Instagram連携を解除しますか？")) return; await fetch("/api/instagram/oauth/disconnect", { method: "POST" }); await loadStatus(); }}>連携を解除</button>
-              : <a className="btn-primary" href="/api/instagram/oauth/start">Instagramと連携</a>}
+            {userConnectionReady ? <Button type="button" variant="secondary" onClick={() => { void testConnection(); }} disabled={testingConnection}>{testingConnection ? "確認中..." : "接続テスト"}</Button> : null}
+            {userConnectionReady ? <button type="button" className="btn-secondary" onClick={async () => { if (!window.confirm("Instagram連携を解除しますか？")) return; await fetch("/api/instagram/oauth/disconnect", { method: "POST" }); await loadStatus(); }}>連携を解除</button>
+              : setupStatus?.oauthConfigured ? <a className="btn-primary" href="/api/instagram/oauth/start">Instagramと連携</a> : null}
           </div>
         </div>
+        {legacyTokenAvailable ? <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">共通トークンは利用できますが、このユーザー専用のInstagram連携はまだ完了していません。上の「Instagramと連携」から接続してください。</p> : null}
         {connectionTestMessage ? <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{connectionTestMessage}</p> : null}
       </Panel>
 
