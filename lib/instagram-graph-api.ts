@@ -186,10 +186,9 @@ export function getMetric(
 export async function fetchMediaList(igUserId?: string, limit = 50, ownerId = "owner"): Promise<IgMedia[]> {
   const token = await getToken(ownerId);
   const uid = getUid(igUserId, ownerId);
-  // media_product_type=REELS のみリール指標を取得。フィード動画(FEED)では API がエラーを返すため混在リクエストは避ける。
-  // ただし fields expansion でのインライン取得は API 側で型チェックが緩い場合があるため、全指標をリクエストし null を許容する。
-  const insightMetrics = 'reach,views,saved,total_interactions,likes,comments,shares,follows,profile_visits,ig_reels_avg_watch_time,ig_reels_video_view_total_time';
-  const fields = `id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
+  // 投稿一覧とインサイトを同時に要求すると、インサイト権限がない場合に投稿一覧まで
+  // 取得できなくなる。ここでは基本情報だけを取得し、インサイトは投稿ごとに別取得する。
+  const fields = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children';
   const results: IgMedia[] = [];
   let url: string | null = `${getApiBase(ownerId)}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
 
