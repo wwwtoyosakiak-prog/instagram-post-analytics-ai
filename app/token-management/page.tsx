@@ -14,6 +14,14 @@ type RefreshResponse = {
   token?: InstagramAccessTokenRecord;
 };
 
+type SetupStatus = {
+  oauthConfigured: boolean;
+  connectionReady: boolean;
+  databaseReady: boolean;
+  deletionTableReady: boolean;
+  duplicateProtectionReady: boolean;
+};
+
 const statusLabels: Record<InstagramAccessTokenRecord["status"], string> = {
   missing: "未設定",
   environment_only: "初回更新待ち",
@@ -95,6 +103,9 @@ export default function TokenManagementPage() {
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionTestMessage, setConnectionTestMessage] = useState("");
 
   const loadStatus = async (mode: "initial" | "check" = "initial") => {
     if (mode === "check") {
@@ -104,12 +115,12 @@ export default function TokenManagementPage() {
     }
     setError("");
     try {
-      const data = await requestJson<InstagramAccessTokenRecord>(
-        "/api/instagram/token/status",
-        { cache: "no-store" },
-        "トークン状態の取得に失敗しました。",
-      );
+      const [data, setup] = await Promise.all([
+        requestJson<InstagramAccessTokenRecord>("/api/instagram/token/status", { cache: "no-store" }, "トークン状態の取得に失敗しました。"),
+        requestJson<SetupStatus>("/api/instagram/setup-status", { cache: "no-store" }, "連携準備状況を取得できませんでした。"),
+      ]);
       setToken(data);
+      setSetupStatus(setup);
       if (mode === "check") {
         setMessage("最新のトークン状態を確認しました。");
       }
@@ -148,7 +159,22 @@ export default function TokenManagementPage() {
   };
 
   const warningMessage = useMemo(() => getWarningMessage(token), [token]);
-  const connected = token?.status !== "missing";
+  const connected = Boolean(token && token.status !== "missing");
+
+  const testConnection = async () => {
+    setTestingConnection(true);
+    setConnectionTestMessage("");
+    setError("");
+    try {
+      const result = await requestJson<{ ok: boolean; message: string }>("/api/instagram/setup-status", { method: "POST" }, "Instagram接続テストに失敗しました。");
+      setConnectionTestMessage(result.message);
+      await loadStatus();
+    } catch (caught) {
+      setError(toUserFacingError(caught, "token"));
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   return (
     <div>
@@ -173,8 +199,24 @@ export default function TokenManagementPage() {
             <h2 className="font-semibold">Instagramアカウント接続</h2>
             <p className="mt-1 text-sm text-stone-600">各ユーザーが自分のInstagramで認証します。アクセストークンを手入力する必要はありません。</p>
           </div>
-          {connected ? <button type="button" className="btn-secondary" onClick={async () => { if (!window.confirm("Instagram連携を解除しますか？")) return; await fetch("/api/instagram/oauth/disconnect", { method: "POST" }); await loadStatus(); }}>連携を解除</button>
-            : <a className="btn-primary" href="/api/instagram/oauth/start">Instagramと連携</a>}
+          <div className="flex flex-wrap gap-2">
+            {connected ? <Button type="button" variant="secondary" onClick={() => { void testConnection(); }} disabled={testingConnection}>{testingConnection ? "確認中..." : "接続テスト"}</Button> : null}
+            {connected ? <button type="button" className="btn-secondary" onClick={async () => { if (!window.confirm("Instagram連携を解除しますか？")) return; await fetch("/api/instagram/oauth/disconnect", { method: "POST" }); await loadStatus(); }}>連携を解除</button>
+              : <a className="btn-primary" href="/api/instagram/oauth/start">Instagramと連携</a>}
+          </div>
+        </div>
+        {connectionTestMessage ? <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{connectionTestMessage}</p> : null}
+      </Panel>
+
+      <Panel className="mb-6">
+        <h2 className="font-semibold">運用準備チェック</h2>
+        <p className="mt-1 text-sm text-stone-600">接続からデータ保護まで、必要な準備をまとめて確認します。</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <ReadinessItem ready={setupStatus?.oauthConfigured} label="Meta OAuth設定" pending="VercelのInstagramアプリ設定を確認してください" />
+          <ReadinessItem ready={setupStatus?.connectionReady} label="ユーザー別Instagram連携" pending="「Instagramと連携」から接続してください" />
+          <ReadinessItem ready={setupStatus?.databaseReady} label="Supabase保存先" pending="Supabase環境設定を確認してください" />
+          <ReadinessItem ready={setupStatus?.deletionTableReady} label="Metaデータ削除受付" pending="add-instagram-data-deletion.sql を実行してください" />
+          <ReadinessItem ready={setupStatus?.duplicateProtectionReady} label="プロフィール重複防止" pending="add-account-identity-protection.sql を実行してください" />
         </div>
       </Panel>
 
@@ -273,6 +315,15 @@ export default function TokenManagementPage() {
           </table>
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function ReadinessItem({ ready, label, pending }: { ready?: boolean; label: string; pending: string }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+      <p className={`font-semibold ${ready ? "text-emerald-800" : "text-amber-900"}`}>{ready ? "✓" : "!"} {label}</p>
+      <p className={`mt-1 text-xs ${ready ? "text-emerald-700" : "text-amber-800"}`}>{ready ? "準備完了" : pending}</p>
     </div>
   );
 }
