@@ -18,3 +18,8 @@ export async function saveStoredInstagramConnection(ownerId: string, values: Omi
 export async function deleteStoredInstagramConnection(ownerId: string) {
   await supabaseRestRequest(`instagram_user_connections?owner_id=eq.${encodeURIComponent(ownerId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
 }
+
+export async function getStoredInstagramConnectionByInstagramUserId(instagramUserId: string) {
+  const rows = await supabaseRestRequest<InstagramConnection[]>(`instagram_user_connections?instagram_user_id=eq.${encodeURIComponent(instagramUserId)}&select=*&limit=1`).catch(() => []);
+  return rows[0] ?? null;
+}

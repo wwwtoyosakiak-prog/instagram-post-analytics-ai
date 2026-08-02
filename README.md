@@ -71,6 +71,22 @@ INSTAGRAM_GRAPH_API_VERSION=v23.0
 
 Graph APIページでは、Instagramビジネスアカウントから以下を取得します。
 
+### InstagramログインとMetaコールバック
+
+ユーザーごとのInstagramログインを使う場合は、Supabase SQL Editorで次のSQLも1回実行します。
+
+```text
+supabase/add-instagram-data-deletion.sql
+```
+
+Metaの「ビジネスログイン設定」には以下を登録します。
+
+- OAuthリダイレクトURI: `https://instagram-post-analytics-ai.vercel.app/api/instagram/oauth/callback`
+- コールバックURLの承認取り消し: `https://instagram-post-analytics-ai.vercel.app/api/instagram/deauthorize`
+- データの削除リクエストURL: `https://instagram-post-analytics-ai.vercel.app/api/instagram/data-deletion`
+
+VercelにはInstagramアプリID、Instagram app secret、OAuthリダイレクトURIを設定してください。app secretはGitHubへ保存せず、Vercelのサーバー環境変数だけに設定します。
+
 - `id`
 - `caption`
 - `timestamp`
