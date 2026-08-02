@@ -26,6 +26,7 @@ create table if not exists public.instagram_accounts (
   name text not null,
   username text not null,
   instagram_api_username text,
+  identity_key text,
   profile_url text,
   industry text,
   target_audience text,
@@ -37,6 +38,20 @@ create table if not exists public.instagram_accounts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create unique index if not exists instagram_accounts_owner_identity_unique
+  on public.instagram_accounts (owner_id, identity_key)
+  where identity_key is not null and identity_key <> '';
+create or replace function public.set_instagram_account_identity_key()
+returns trigger as $$
+begin
+  new.identity_key := lower(trim(both '@' from coalesce(nullif(new.instagram_api_username, ''), nullif(new.username, ''), new.id)));
+  return new;
+end;
+$$ language plpgsql;
+drop trigger if exists set_instagram_account_identity_key on public.instagram_accounts;
+create trigger set_instagram_account_identity_key
+before insert or update of instagram_api_username, username on public.instagram_accounts
+for each row execute function public.set_instagram_account_identity_key();
 
 create table if not exists public.instagram_posts (
   id text primary key default gen_random_uuid()::text,

@@ -54,6 +54,8 @@ import {
 import { useDashboardSync } from "@/components/dashboard/use-dashboard-sync";
 import { useDashboardData } from "@/components/dashboard/use-dashboard-data";
 import { requestJson } from "@/lib/client-api";
+import { getDataFreshness } from "@/lib/data-freshness";
+import { getSyncRecovery } from "@/lib/sync-recovery";
 
 // ── メインページ（統合ダッシュボード） ────────────────────
 
@@ -483,6 +485,8 @@ export default function DashboardPage() {
   }, [syncRuns]);
   const showLatestSyncFailurePanel = Boolean(latestSyncRun?.status === "failed" && latestSyncError && !syncMonitor.isDelayed);
   const showLatestSyncPartialPanel = Boolean(latestSyncRun?.status === "partial" && latestSyncError && !syncMonitor.isDelayed);
+  const syncRecovery = getSyncRecovery(latestSyncError?.errorSummary || latestSyncError?.errors[0]?.message);
+  const latestFreshness = getDataFreshness(latestSyncRun?.finishedAt);
   const showTodayMissingAlert = Boolean(
     latestSyncRun?.status === "partial" &&
     latestSyncFinishedAt &&
@@ -648,6 +652,7 @@ export default function DashboardPage() {
                 <Insight label="最終自動同期" value={latestScheduledSyncRun ? formatDateTimeJst(latestScheduledSyncRun.finishedAt) : "未記録"} />
                 <Insight label="次回同期予定" value={formatDateTimeJst(syncMonitor.nextScheduledAt.toISOString())} />
                 <Insight label="同期状態" value={syncStatusValue} />
+                <Insight label="データ鮮度" value={latestFreshness.label} />
               </div>
               {syncMonitor.isDelayed ? (
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-amber-950">
@@ -751,6 +756,9 @@ export default function DashboardPage() {
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
                   <p className="font-semibold">自動同期に失敗しました</p>
                   <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "同期でエラーが発生しました。"}</p>
+                  <p className="mt-2 font-medium">原因: {syncRecovery.cause}</p>
+                  <p>次の操作: {syncRecovery.nextAction}</p>
+                  <a href={syncRecovery.href} className="mt-3 inline-flex rounded-md bg-red-700 px-3 py-2 text-xs font-semibold text-white">{syncRecovery.actionLabel}</a>
                   {latestSyncErrorPlannedLabel ? (
                     <p className="mt-2 text-xs text-red-700">予定時刻: {latestSyncErrorPlannedLabel}</p>
                   ) : null}
@@ -761,6 +769,9 @@ export default function DashboardPage() {
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <p className="font-semibold">自動同期で一部失敗しました</p>
                   <p className="mt-1">{latestSyncError.errorSummary || latestSyncError.errors[0]?.message || "一部のデータ保存に失敗しました。"}</p>
+                  <p className="mt-2 font-medium">原因: {syncRecovery.cause}</p>
+                  <p>次の操作: {syncRecovery.nextAction}</p>
+                  <a href={syncRecovery.href} className="mt-3 inline-flex rounded-md bg-amber-800 px-3 py-2 text-xs font-semibold text-white">{syncRecovery.actionLabel}</a>
                   {latestSyncErrorPlannedLabel ? (
                     <p className="mt-2 text-xs text-amber-700">予定時刻: {latestSyncErrorPlannedLabel}</p>
                   ) : null}

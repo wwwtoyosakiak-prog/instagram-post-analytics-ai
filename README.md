@@ -87,6 +87,14 @@ Metaの「ビジネスログイン設定」には以下を登録します。
 
 VercelにはInstagramアプリID、Instagram app secret、OAuthリダイレクトURIを設定してください。app secretはGitHubへ保存せず、Vercelのサーバー環境変数だけに設定します。
 
+プロフィール重複を統合して再発を防ぐ場合は、次のSQLをSupabase SQL Editorで1回実行します。投稿・同期履歴・レポートなどの参照先を残すプロフィールへ付け替えてから、重複プロフィールを整理します。
+
+```text
+supabase/add-account-identity-protection.sql
+```
+
+実行状況はサイトの「Instagram連携」→「運用準備チェック」で確認できます。同じ画面の「接続テスト」では、現在ログインしているサイトユーザー専用のInstagram接続を確認できます。
+
 - `id`
 - `caption`
 - `timestamp`

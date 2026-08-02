@@ -9,6 +9,7 @@ import { ClientApiError, requestJson, requestJsonOr } from "@/lib/client-api";
 import { InstagramAccount } from "@/lib/types";
 import { getSelectedAccountId, withSelectedAccount } from "@/lib/account-preference";
 import { createBackup, parseBackup } from "@/lib/data-backup";
+import { freshnessClass, getDataFreshness } from "@/lib/data-freshness";
 
 interface GraphApiAccount {
   name: string;
@@ -72,6 +73,7 @@ export default function AccountPage() {
 
   const displayName = graphAccount?.name || account?.name || "アカウント未登録";
   const displayUsername = graphAccount?.username || account?.username;
+  const freshness = getDataFreshness(graphAccount?.last_synced_at);
 
   return (
     <div>
@@ -150,6 +152,7 @@ export default function AccountPage() {
           ) : (
             <p className="text-xs text-stone-400">ダッシュボードのAPI同期でプロフィール情報が更新されます</p>
           )}
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${freshnessClass(freshness.tone)}`} title={freshness.description}>{freshness.label}</span>
         </div>
       </div>
 
