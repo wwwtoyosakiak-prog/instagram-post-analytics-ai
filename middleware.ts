@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authenticateAppUser, readAppUsers, readSession, SESSION_COOKIE } from "@/lib/app-auth";
+import { hasInstagramConnection } from "@/lib/instagram-user-config";
 
-const publicPaths = new Set(["/api/health"]);
+const publicPaths = new Set(["/api/health", "/login", "/api/auth/login"]);
 const cronProtectedPaths = [
   "/api/cron/",
   "/api/instagram/full-sync",
   "/api/instagram/sync",
 ];
 const authenticatedUserHeader = "x-app-authenticated-user";
-
-function constantTimeEqual(actual: string, expected: string) {
-  const length = Math.max(actual.length, expected.length);
-  let difference = actual.length ^ expected.length;
-
-  for (let index = 0; index < length; index += 1) {
-    difference |= (actual.charCodeAt(index) || 0) ^ (expected.charCodeAt(index) || 0);
-  }
-
-  return difference === 0;
-}
 
 function nextWithAuthenticatedUser(request: NextRequest, username?: string) {
   const requestHeaders = new Headers(request.headers);
@@ -52,39 +43,12 @@ function readBasicCredentials(request: NextRequest) {
   }
 }
 
-function readConfiguredUsers() {
-  const configuredUsers = process.env.APP_ACCESS_USERS;
-  if (configuredUsers) {
-    if (
-      process.env.USER_DATA_OWNERSHIP_ENABLED !== "true"
-      || !process.env.SUPABASE_URL
-      || !process.env.SUPABASE_SERVICE_ROLE_KEY
-    ) return null;
-    try {
-      const parsed = JSON.parse(configuredUsers) as unknown;
-      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return null;
-      const users = Object.entries(parsed)
-        .filter((entry): entry is [string, string] => Boolean(entry[0]) && typeof entry[1] === "string" && Boolean(entry[1]))
-        .map(([username, password]) => ({ username, password, ownerId: username }));
-      return users.length > 0 ? users : null;
-    } catch {
-      return null;
-    }
-  }
-
-  const username = process.env.APP_ACCESS_USER;
-  const password = process.env.APP_ACCESS_PASSWORD;
-  if (!username && !password) return [];
-  if (!username || !password) return null;
-  return [{ username, password, ownerId: "owner" }];
-}
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   if (publicPaths.has(request.nextUrl.pathname) || isCronRequest(request)) {
     return nextWithAuthenticatedUser(request);
   }
 
-  const configuredUsers = readConfiguredUsers();
+  const configuredUsers = readAppUsers();
   if (configuredUsers?.length === 0) {
     return nextWithAuthenticatedUser(request);
   }
@@ -94,18 +58,24 @@ export function middleware(request: NextRequest) {
   }
 
   const credentials = readBasicCredentials(request);
-  const matchedUser = credentials
-    ? configuredUsers.find(({ username, password }) =>
-      constantTimeEqual(credentials.username, username) && constantTimeEqual(credentials.password, password))
-    : null;
-  if (matchedUser) {
-    if (matchedUser.ownerId !== "owner" && request.nextUrl.pathname.startsWith("/api/instagram/")) {
-      return NextResponse.json(
-        { error: "このユーザーのInstagram連携はまだ設定されていません。" },
-        { status: 403, headers: { "Cache-Control": "no-store" } },
-      );
+  const basicAuthentication = credentials ? authenticateAppUser(credentials.username, credentials.password) : null;
+  const sessionOwner = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const ownerId = basicAuthentication?.status === "authenticated" ? basicAuthentication.ownerId : sessionOwner;
+  if (ownerId) {
+    if (!hasInstagramConnection(ownerId) && request.nextUrl.pathname.startsWith("/api/instagram/")) {
+      return NextResponse.json({ error: "このユーザーのInstagram連携はまだ設定されていません。" }, { status: 403 });
     }
-    return nextWithAuthenticatedUser(request, matchedUser.ownerId);
+    return nextWithAuthenticatedUser(request, ownerId);
+  }
+
+  if (process.env.APP_SESSION_SECRET) {
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "ログインが必要です。" }, { status: 401 });
+    }
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   return new NextResponse("Authentication required.", {

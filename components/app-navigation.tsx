@@ -10,11 +10,13 @@ import {
   Home,
   KeyRound,
   ListChecks,
+  LogOut,
   User,
 } from "lucide-react";
 import { loadAccountsData } from "@/lib/cloud-storage";
 import type { InstagramAccount } from "@/lib/types";
 import { getSelectedAccountId, setSelectedAccountId } from "@/lib/account-preference";
+import { requestJsonOr } from "@/lib/client-api";
 
 const primaryNav = [
   { href: "/", label: "ホーム", icon: Home },
@@ -42,11 +44,17 @@ export function AppNavigation() {
   const currentName = pathname === "/" ? "ホーム" : pageNames[firstSegment] ?? "便利な機能";
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [selectedAccountId, setSelectedAccount] = useState("all");
+  const [sessionLoginEnabled, setSessionLoginEnabled] = useState(false);
 
   useEffect(() => {
+    if (pathname === "/login") return;
     setSelectedAccount(getSelectedAccountId());
     loadAccountsData().then(setAccounts);
-  }, []);
+    requestJsonOr<{ sessionLoginEnabled: boolean }>("/api/auth/session", { sessionLoginEnabled: false })
+      .then((result) => setSessionLoginEnabled(result.sessionLoginEnabled));
+  }, [pathname]);
+
+  if (pathname === "/login") return null;
 
   return (
     <>
@@ -88,6 +96,21 @@ export function AppNavigation() {
               );
             })}
           </nav>
+
+          {sessionLoginEnabled ? (
+            <button
+              type="button"
+              aria-label="ログアウト"
+              title="ログアウト"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-ink"
+              onClick={async () => {
+                await fetch("/api/auth/logout", { method: "POST" });
+                window.location.href = "/login";
+              }}
+            >
+              <LogOut size={17} aria-hidden />
+            </button>
+          ) : null}
 
         </div>
       </header>

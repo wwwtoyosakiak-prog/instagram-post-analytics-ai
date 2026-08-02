@@ -6,24 +6,27 @@
 import { getInstagramAccessTokenForServer } from "@/lib/instagram-token-manager";
 import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
 import { fetchJsonWithTimeout } from "@/lib/server-api";
+import { getInstagramUserConfig } from "@/lib/instagram-user-config";
 
 const API_VERSION = process.env.INSTAGRAM_GRAPH_API_VERSION ?? 'v23.0';
 
 // INSTAGRAM_GRAPH_API_MODE=facebook_login（旧 facebook_business を含む）の場合のみ
 // graph.facebook.com を使う。それ以外（未設定・instagram_login など）は graph.instagram.com。
 // 関数化することで、モジュール初期化時ではなくリクエストごとに env を読む。
-function isFacebookLoginMode() {
+function isFacebookLoginMode(ownerId = "owner") {
+  const userConfig = getInstagramUserConfig(ownerId);
+  if (userConfig) return userConfig.mode === "facebook_login";
   const mode = process.env.INSTAGRAM_GRAPH_API_MODE;
   return mode === 'facebook_login' || mode === 'facebook_business';
 }
 
-function getApiBase(): string {
-  return isFacebookLoginMode()
+function getApiBase(ownerId = "owner"): string {
+  return isFacebookLoginMode(ownerId)
     ? `https://graph.facebook.com/${API_VERSION}`
     : `https://graph.instagram.com/${API_VERSION}`;
 }
-function getApiMode(): string {
-  return isFacebookLoginMode()
+function getApiMode(ownerId = "owner"): string {
+  return isFacebookLoginMode(ownerId)
     ? 'facebook_login'
     : 'instagram_login';
 }
@@ -104,8 +107,8 @@ export type ApiError =
 
 // ── ヘルパー ─────────────────────────────────────────────
 
-async function getToken(): Promise<string> {
-  return getInstagramAccessTokenForServer();
+async function getToken(ownerId = "owner"): Promise<string> {
+  return getInstagramUserConfig(ownerId)?.accessToken ?? getInstagramAccessTokenForServer();
 }
 
 function getTokyoDateKey(date: Date) {
@@ -120,10 +123,10 @@ function getTokyoDateKey(date: Date) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function getUid(igUserId?: string): string {
+function getUid(igUserId?: string, ownerId = "owner"): string {
   if (igUserId) return igUserId;
-  if (getApiMode() === 'instagram_login') return 'me';
-  return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me';
+  if (getApiMode(ownerId) === 'instagram_login') return 'me';
+  return getInstagramUserConfig(ownerId)?.businessAccountId ?? process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? 'me';
 }
 
 async function igFetch(url: string): Promise<unknown> {
@@ -147,11 +150,11 @@ async function igFetch(url: string): Promise<unknown> {
 
 // ── アカウント情報取得 ────────────────────────────────────
 
-export async function fetchAccountInfo(igUserId?: string): Promise<IgAccountInfo> {
-  const token = await getToken();
-  const uid = getUid(igUserId);
+export async function fetchAccountInfo(igUserId?: string, ownerId = "owner"): Promise<IgAccountInfo> {
+  const token = await getToken(ownerId);
+  const uid = getUid(igUserId, ownerId);
   const fields = 'id,name,biography,profile_picture_url,followers_count,follows_count,media_count,website';
-  const url = `${getApiBase()}/${uid}?fields=${fields}&access_token=${token}`;
+  const url = `${getApiBase(ownerId)}/${uid}?fields=${fields}&access_token=${token}`;
   const data = await igFetch(url) as IgAccountInfo;
   return data;
 }
@@ -167,15 +170,15 @@ export function getMetric(
 
 // ── 投稿一覧取得 ─────────────────────────────────────────
 
-export async function fetchMediaList(igUserId?: string, limit = 50): Promise<IgMedia[]> {
-  const token = await getToken();
-  const uid = getUid(igUserId);
+export async function fetchMediaList(igUserId?: string, limit = 50, ownerId = "owner"): Promise<IgMedia[]> {
+  const token = await getToken(ownerId);
+  const uid = getUid(igUserId, ownerId);
   // media_product_type=REELS のみリール指標を取得。フィード動画(FEED)では API がエラーを返すため混在リクエストは避ける。
   // ただし fields expansion でのインライン取得は API 側で型チェックが緩い場合があるため、全指標をリクエストし null を許容する。
   const insightMetrics = 'reach,views,saved,total_interactions,likes,comments,shares,follows,profile_visits,ig_reels_avg_watch_time,ig_reels_video_view_total_time';
   const fields = `id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children,insights.metric(${insightMetrics}){name,values}`;
   const results: IgMedia[] = [];
-  let url: string | null = `${getApiBase()}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
+  let url: string | null = `${getApiBase(ownerId)}/${uid}/media?fields=${fields}&limit=${limit}&access_token=${token}`;
 
   while (url && results.length < 200) {
     const data = await igFetch(url) as { data: IgMedia[]; paging?: { next?: string } };
@@ -210,10 +213,10 @@ type InsightItem = {
   values?: { value: number }[];
 };
 
-export async function fetchMediaInsights(mediaId: string, mediaType: string, mediaProductType?: string): Promise<IgMediaInsights> {
-  const token = await getToken();
+export async function fetchMediaInsights(mediaId: string, mediaType: string, mediaProductType?: string, ownerId = "owner"): Promise<IgMediaInsights> {
+  const token = await getToken(ownerId);
   const metrics = metricsForType(mediaType, mediaProductType).join(',');
-  const url = `${getApiBase()}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
+  const url = `${getApiBase(ownerId)}/${mediaId}/insights?metric=${metrics}&access_token=${token}`;
   let raw: unknown;
   try {
     raw = await igFetch(url);
@@ -233,11 +236,11 @@ export async function fetchMediaInsights(mediaId: string, mediaType: string, med
 
 // ── アカウント全体インサイト取得 ──────────────────────────
 
-export async function fetchAccountInsights(igUserId?: string): Promise<IgAccountInsights> {
-  const token = await getToken();
-  const uid = getUid(igUserId);
+export async function fetchAccountInsights(igUserId?: string, ownerId = "owner"): Promise<IgAccountInsights> {
+  const token = await getToken(ownerId);
+  const uid = getUid(igUserId, ownerId);
 
-  if (getApiMode() === 'instagram_login') {
+  if (getApiMode(ownerId) === 'instagram_login') {
     throw new Error('現在の連携方式ではアカウント全体インサイトを取得できません。Vercel の INSTAGRAM_GRAPH_API_MODE を facebook_login に変更し、INSTAGRAM_BUSINESS_ACCOUNT_ID を設定してください。');
   }
 
@@ -260,7 +263,7 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
   const dailyMetricErrors: string[] = [];
   for (const metric of metrics) {
     try {
-      const url = `${getApiBase()}/${uid}/insights?metric=${metric}&period=day&since=${since}&until=${until}&access_token=${token}`;
+      const url = `${getApiBase(ownerId)}/${uid}/insights?metric=${metric}&period=day&since=${since}&until=${until}&access_token=${token}`;
       const raw = await igFetch(url) as { data: InsightItem[] };
       const item = raw.data?.[0];
       if (!item) {
@@ -291,7 +294,7 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
   const lifetimeMetrics = ['audience_city', 'audience_country', 'audience_gender_age', 'online_followers'];
   for (const metric of lifetimeMetrics) {
     try {
-      const url = `${getApiBase()}/${uid}/insights?metric=${metric}&period=lifetime&access_token=${token}`;
+      const url = `${getApiBase(ownerId)}/${uid}/insights?metric=${metric}&period=lifetime&access_token=${token}`;
       const raw = await igFetch(url) as { data: InsightItem[] };
       const item = raw.data?.[0];
       if (item) (result as Record<string, unknown>)[item.name] = item.values?.[0]?.value ?? item.value ?? null;
@@ -306,12 +309,12 @@ export async function fetchAccountInsights(igUserId?: string): Promise<IgAccount
 
 // ── フォロワー数スナップショット ─────────────────────────
 
-export async function fetchFollowerSnapshot(igUserId?: string): Promise<{
+export async function fetchFollowerSnapshot(igUserId?: string, ownerId = "owner"): Promise<{
   followers_count: number;
   follows_count: number;
   media_count: number;
 }> {
-  const info = await fetchAccountInfo(igUserId);
+  const info = await fetchAccountInfo(igUserId, ownerId);
   return {
     followers_count: info.followers_count,
     follows_count: info.follows_count,

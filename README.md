@@ -256,7 +256,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 ## データのバックアップ
 
-プロフィール画面の「データを保護」から、表示中のアカウントと投稿データをJSONで書き出し・復元できます。ブラウザ保存で運用する場合も、定期的にバックアップしてください。
+プロフィール画面の「データを保護」から、プロフィール、投稿、AI分析履歴、詳細インサイト、月次レポートを1つのJSONに書き出し・復元できます。Supabase未設定時は、従来どおりブラウザ内のプロフィールと投稿を保存します。定期的にバックアップしてください。
 
 設定ページの「CSVをまとめて書き出す」から、以下のCSVを出力できます。
 
@@ -279,11 +279,24 @@ CSVは社内共有や表計算ソフトでの確認に使えます。AI分析結
 ```env
 USER_DATA_OWNERSHIP_ENABLED=true
 APP_ACCESS_USERS={"owner":"現在のパスワード","teammate":"追加ユーザーのパスワード"}
+APP_SESSION_SECRET=十分に長いランダムな文字列
 ```
 
 `APP_ACCESS_USERS` のキーがログインIDです。パスワードは十分に長い別々の値にし、GitHubへ保存しないでください。設定ミスでデータが共有されないよう、SQL適用前、`USER_DATA_OWNERSHIP_ENABLED=true` がない場合、またはSupabase保存が未設定の場合は複数ユーザー設定を受け付けません。
 
+`APP_SESSION_SECRET` を設定すると、ブラウザ標準の認証画面ではなく専用ログイン画面を利用できます。この値を変更すると、ログイン中の全ユーザーが再ログインになります。
+
 従来の `APP_ACCESS_USER` と `APP_ACCESS_PASSWORD` はそのまま利用でき、その場合は既存の `owner` データを表示します。追加ユーザーには既存のInstagram連携情報を公開せず、個別のInstagram連携を設定するまでは手入力データとAI分析だけを利用できます。
+
+追加ユーザーのInstagram連携情報は、Vercelの環境変数にユーザーごとに設定します。トークンは画面やGitHubへ保存されません。
+
+```env
+INSTAGRAM_USER_CONFIGS={"teammate":{"accessToken":"追加ユーザーのトークン","mode":"instagram_login"}}
+```
+
+Facebookログイン方式では、同じユーザー設定に `"mode":"facebook_login"` と `"businessAccountId":"InstagramビジネスアカウントID"` を追加します。
+
+同期失敗を外部の通知先へ送る場合は、Slack互換のWebhook URLを設定します。全ユーザー共通は `SYNC_FAILURE_WEBHOOK_URL`、ユーザー別は `SYNC_FAILURE_WEBHOOK_URLS={"teammate":"https://..."}` を使用できます。通知にはトークンや投稿内容を含めません。
 
 ## 将来のAPI・データベース連携
 

@@ -15,6 +15,7 @@ import { withSelectedAccount } from "@/lib/account-preference";
 
 type USort = "date" | "views" | "reach" | "likes" | "saves" | "engagementRate";
 type UTypeFilter = "" | "video" | "image" | "carousel";
+const POSTS_PER_PAGE = 24;
 
 interface UnifiedEntry {
   key: string;
@@ -91,6 +92,7 @@ export default function PostsPage() {
   const [latestScoreByPostId, setLatestScoreByPostId] = useState<Record<string, number>>({});
   const [sortKey, setSortKey] = useState<USort>("date");
   const [typeFilter, setTypeFilter] = useState<UTypeFilter>("");
+  const [page, setPage] = useState(1);
   const [videoDurationByUrl, setVideoDurationByUrl] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
@@ -181,8 +183,28 @@ export default function PostsPage() {
     return [...manualEntries, ...apiOnlyEntries];
   }, [posts, apiMedia]);
 
+  // ── フィルタ＋ソート ──────────────────────────────────────
+
+  const filteredList = useMemo(() => {
+    return unifiedList
+      .filter((e) => !typeFilter || e.normalizedType === typeFilter)
+      .sort((a, b) => {
+        if (sortKey === "date") return b.date.localeCompare(a.date);
+        if (sortKey === "views") return b.views - a.views;
+        if (sortKey === "reach") return (b.reach ?? -1) - (a.reach ?? -1);
+        if (sortKey === "likes") return b.likes - a.likes;
+        if (sortKey === "saves") return b.saves - a.saves;
+        if (sortKey === "engagementRate") return b.er - a.er;
+        return 0;
+      });
+  }, [unifiedList, typeFilter, sortKey]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredList.length / POSTS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const visibleList = filteredList.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
+
   useEffect(() => {
-    const pendingUrls = unifiedList
+    const pendingUrls = visibleList
       .filter((entry) => entry.normalizedType === "video" && entry.mediaUrl && !(entry.mediaUrl in videoDurationByUrl))
       .map((entry) => entry.mediaUrl as string);
 
@@ -202,9 +224,7 @@ export default function PostsPage() {
         setVideoDurationByUrl((current) => (url in current ? current : { ...current, [url]: duration }));
       };
 
-      video.onloadedmetadata = () => {
-        finalize(Number.isFinite(video.duration) ? video.duration : null);
-      };
+      video.onloadedmetadata = () => finalize(Number.isFinite(video.duration) ? video.duration : null);
       video.onerror = () => finalize(null);
       videos.push(video);
     });
@@ -218,23 +238,7 @@ export default function PostsPage() {
         video.load();
       });
     };
-  }, [unifiedList, videoDurationByUrl]);
-
-  // ── フィルタ＋ソート ──────────────────────────────────────
-
-  const filteredList = useMemo(() => {
-    return unifiedList
-      .filter((e) => !typeFilter || e.normalizedType === typeFilter)
-      .sort((a, b) => {
-        if (sortKey === "date") return b.date.localeCompare(a.date);
-        if (sortKey === "views") return b.views - a.views;
-        if (sortKey === "reach") return (b.reach ?? -1) - (a.reach ?? -1);
-        if (sortKey === "likes") return b.likes - a.likes;
-        if (sortKey === "saves") return b.saves - a.saves;
-        if (sortKey === "engagementRate") return b.er - a.er;
-        return 0;
-      });
-  }, [unifiedList, typeFilter, sortKey]);
+  }, [visibleList, videoDurationByUrl]);
 
   if (loading) return <PageLoading title="投稿一覧" description="投稿と最新の数値を準備しています。" cards={5} />;
 
@@ -262,7 +266,7 @@ export default function PostsPage() {
           <select
             id="posts-sort"
             value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as USort)}
+            onChange={(e) => { setSortKey(e.target.value as USort); setPage(1); }}
             className="text-sm border border-stone-200 rounded-md px-3 py-1.5 bg-white"
           >
             <option value="date">投稿日順</option>
@@ -278,7 +282,7 @@ export default function PostsPage() {
           <select
             id="posts-type-filter"
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as UTypeFilter)}
+            onChange={(e) => { setTypeFilter(e.target.value as UTypeFilter); setPage(1); }}
             className="text-sm border border-stone-200 rounded-md px-3 py-1.5 bg-white"
           >
             <option value="">すべて</option>
@@ -290,7 +294,7 @@ export default function PostsPage() {
         <span className="text-sm text-stone-500 self-end pb-1.5">{filteredList.length} 件</span>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filteredList.map((e) => (
+        {visibleList.map((e) => (
           <UnifiedCard
             key={e.key}
             entry={e}
@@ -311,6 +315,17 @@ export default function PostsPage() {
           />
         )}
       </div>
+      {pageCount > 1 ? (
+        <nav aria-label="投稿一覧のページ" className="mt-6 flex items-center justify-center gap-3">
+          <button type="button" className="btn-secondary" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+            前のページ
+          </button>
+          <span className="text-sm text-stone-600">{currentPage} / {pageCount} ページ</span>
+          <button type="button" className="btn-secondary" disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
+            次のページ
+          </button>
+        </nav>
+      ) : null}
     </div>
   );
 }
