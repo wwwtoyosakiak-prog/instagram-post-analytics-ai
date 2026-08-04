@@ -3,6 +3,7 @@ import { createInstagramGraphUrl, getInstagramGraphConfig, InstagramGraphConfig 
 import { InstagramSyncRun } from "@/lib/types";
 import { logServerIssue, safeErrorMessage } from "@/lib/safe-logging";
 import { getMissingSupabaseEnvNames, supabaseRestRequest } from "@/lib/supabase-server";
+import { getAuthenticatedUser } from "@/lib/authenticated-user";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -119,10 +120,11 @@ async function graphRequest<T extends { error?: GraphError }>(url: URL): Promise
   return data;
 }
 
-async function saveSyncRun(run: Omit<InstagramSyncRun, "id">) {
+async function saveSyncRun(run: Omit<InstagramSyncRun, "id">, ownerId: string) {
   await supabaseRestRequest<unknown[]>("instagram_sync_runs", {
     method: "POST",
     body: JSON.stringify({
+      owner_id: ownerId,
       trigger_type: run.triggerType,
       status: run.status,
       started_at: run.startedAt,
@@ -141,17 +143,17 @@ async function saveSyncRun(run: Omit<InstagramSyncRun, "id">) {
   });
 }
 
-async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">) {
+async function safeSaveSyncRun(run: Omit<InstagramSyncRun, "id">, ownerId: string) {
   try {
-    await saveSyncRun(run);
+    await saveSyncRun(run, ownerId);
   } catch (error) {
     logServerIssue("instagram-sync-run-save", error);
   }
 }
 
-async function getLatestScheduledSyncRun() {
+async function getLatestScheduledSyncRun(ownerId: string) {
   const rows = await supabaseRestRequest<Array<{ finished_at: string }>>(
-    "instagram_sync_runs?trigger_type=eq.scheduled&api_mode=neq.full-sync&select=finished_at&order=finished_at.desc&limit=1",
+    `instagram_sync_runs?owner_id=eq.${encodeURIComponent(ownerId)}&trigger_type=eq.scheduled&api_mode=neq.full-sync&select=finished_at&order=finished_at.desc&limit=1`,
     { method: "GET" }
   );
   return rows[0]?.finished_at ?? null;
@@ -212,25 +214,48 @@ function hasRunForScheduledSlot(latestScheduledFinishedAt: string | null, slotSt
   return new Date(latestScheduledFinishedAt).getTime() >= slotStart.getTime();
 }
 
-async function findOrCreateAccount(posts: GraphMedia[]): Promise<SyncedAccount | null> {
+async function findOrCreateAccount(posts: GraphMedia[], ownerId: string): Promise<SyncedAccount | null> {
   const username = posts.find((post) => post.username)?.username?.replace(/^@/, "").trim();
   if (!username) return null;
 
   const linkedByApiUsername = await supabaseRestRequest<SyncedAccount[]>(
-    `instagram_accounts?instagram_api_username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
+    `instagram_accounts?owner_id=eq.${encodeURIComponent(ownerId)}&instagram_api_username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
     { method: "GET" }
   );
   if (linkedByApiUsername[0]) return linkedByApiUsername[0];
 
   const existing = await supabaseRestRequest<SyncedAccount[]>(
-    `instagram_accounts?username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
+    `instagram_accounts?owner_id=eq.${encodeURIComponent(ownerId)}&username=eq.${encodeURIComponent(username)}&select=id,name,username&limit=1`,
     { method: "GET" }
   );
   if (existing[0]) return existing[0];
 
+  // Each site user owns one Instagram OAuth connection. Older manually-created
+  // profiles may not have a username yet, so reuse the sole existing profile
+  // instead of creating a second row when the first API sync runs.
+  const ownerAccounts = await supabaseRestRequest<SyncedAccount[]>(
+    `instagram_accounts?owner_id=eq.${encodeURIComponent(ownerId)}&select=id,name,username&order=created_at.asc&limit=2`,
+    { method: "GET" }
+  );
+  if (ownerAccounts.length === 1) {
+    const updated = await supabaseRestRequest<SyncedAccount[]>(
+      `instagram_accounts?id=eq.${encodeURIComponent(ownerAccounts[0].id)}&owner_id=eq.${encodeURIComponent(ownerId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          username,
+          instagram_api_username: username,
+          profile_url: `https://www.instagram.com/${encodeURIComponent(username)}/`
+        })
+      }
+    );
+    return updated[0] ?? { ...ownerAccounts[0], username };
+  }
+
   const created = await supabaseRestRequest<SyncedAccount[]>("instagram_accounts", {
     method: "POST",
     body: JSON.stringify({
+      owner_id: ownerId,
       name: username,
       username,
       instagram_api_username: username,
@@ -312,7 +337,7 @@ function legacyPostType(mediaType: string | undefined, mediaProductType: string 
   return "image";
 }
 
-async function syncPost(post: GraphMedia, config: InstagramGraphConfig, capturedAt: string, accountId: string | null) {
+async function syncPost(post: GraphMedia, config: InstagramGraphConfig, capturedAt: string, accountId: string | null, ownerId: string) {
   const errors: SyncError[] = [];
   const timestamp = post.timestamp || capturedAt;
   const date = timestamp.slice(0, 10);
@@ -322,6 +347,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify({
+        owner_id: ownerId,
         id: post.id,
         account_id: accountId,
         caption: post.caption || "",
@@ -381,7 +407,7 @@ async function syncPost(post: GraphMedia, config: InstagramGraphConfig, captured
   }
 }
 
-async function handler(triggerType: SyncTriggerType) {
+async function handler(triggerType: SyncTriggerType, ownerId: string) {
   const startedAt = new Date().toISOString();
   const missing = getMissingSupabaseEnvNames();
   if (missing.length) {
@@ -410,7 +436,7 @@ async function handler(triggerType: SyncTriggerType) {
       apiMode: "unknown",
       errorSummary: payload.error,
       errors: []
-    });
+    }, ownerId);
     return NextResponse.json(payload, { status: 500 });
   }
 
@@ -418,7 +444,7 @@ async function handler(triggerType: SyncTriggerType) {
     try {
       const now = new Date();
       const slotStart = getCurrentScheduledSlotStart(now);
-      const latestScheduledFinishedAt = await getLatestScheduledSyncRun();
+      const latestScheduledFinishedAt = await getLatestScheduledSyncRun(ownerId);
       if (hasRunForScheduledSlot(latestScheduledFinishedAt, slotStart)) {
         return NextResponse.json({
           success: true,
@@ -440,7 +466,7 @@ async function handler(triggerType: SyncTriggerType) {
 
   let config: InstagramGraphConfig;
   try {
-    config = await getInstagramGraphConfig();
+    config = await getInstagramGraphConfig(ownerId);
   } catch (error) {
     const capturedAt = new Date().toISOString();
     const message = error instanceof Error ? error.message : "Instagram API設定が不正です。";
@@ -468,7 +494,7 @@ async function handler(triggerType: SyncTriggerType) {
       apiMode: "unknown",
       errorSummary: message,
       errors: []
-    });
+    }, ownerId);
     return NextResponse.json(payload, { status: 500 });
   }
 
@@ -503,14 +529,14 @@ async function handler(triggerType: SyncTriggerType) {
       apiMode: config.mode,
       errorSummary: detail.message,
       errors: [detail]
-    });
+    }, ownerId);
     return NextResponse.json(payload, { status: 502 });
   }
 
   const capturedAt = new Date().toISOString();
   let syncedAccount: SyncedAccount | null = null;
   try {
-    syncedAccount = await findOrCreateAccount(posts);
+    syncedAccount = await findOrCreateAccount(posts, ownerId);
   } catch (error) {
     const detail = toSyncError(error, "account_save");
     logSyncError(detail);
@@ -538,7 +564,7 @@ async function handler(triggerType: SyncTriggerType) {
       apiMode: config.mode,
       errorSummary: detail.message,
       errors: [detail]
-    });
+    }, ownerId);
     return NextResponse.json(payload, { status: 500 });
   }
 
@@ -546,7 +572,7 @@ async function handler(triggerType: SyncTriggerType) {
   const concurrency = 5;
   for (let index = 0; index < posts.length; index += concurrency) {
     results.push(...await Promise.all(
-      posts.slice(index, index + concurrency).map((post) => syncPost(post, config, capturedAt, syncedAccount?.id ?? null))
+      posts.slice(index, index + concurrency).map((post) => syncPost(post, config, capturedAt, syncedAccount?.id ?? null, ownerId))
     ));
   }
 
@@ -577,7 +603,7 @@ async function handler(triggerType: SyncTriggerType) {
     accountUsername: syncedAccount?.username,
     errorSummary: errors[0]?.message,
     errors
-  });
+  }, ownerId);
   return NextResponse.json(payload, { status: errors.length ? 207 : 200 });
 }
 
@@ -597,7 +623,7 @@ export async function GET(request: Request) {
       apiMode: "unknown",
       errorSummary: "CRON_SECRETが設定されていません。",
       errors: [{ stage: "auth", message: "CRON_SECRETが設定されていません。" }]
-    });
+    }, "owner");
     return NextResponse.json({ error: "CRON_SECRETが設定されていません。" }, { status: 500 });
   }
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
@@ -614,12 +640,12 @@ export async function GET(request: Request) {
       apiMode: "unknown",
       errorSummary: "CRON_SECRETが一致しません。",
       errors: [{ stage: "auth", message: "CRON_SECRETが一致しません。" }]
-    });
+    }, "owner");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return handler("scheduled");
+  return handler("scheduled", "owner");
 }
 
-export async function POST() {
-  return handler("manual");
+export async function POST(request: Request) {
+  return handler("manual", getAuthenticatedUser(request));
 }
