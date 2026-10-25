@@ -1,0 +1,76 @@
+name: Instagram Daily Autopost
+
+# 毎朝 7:30（日本時間）に「だんボールガチャ ペパポン」のリールを自動で企画・生成・投稿する。
+# 7:05 に起動して動画を作り、7:30 まで待ってから公開する（GitHubの起動遅延を吸収するため）。
+on:
+  schedule:
+    - cron: "5 22 * * *" # 22:05 UTC = 07:05 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "動画を作るだけで投稿しない"
+        type: boolean
+        default: true
+      date:
+        description: "日付を指定（YYYY-MM-DD、空なら今日）"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instagram-daily-autopost
+  cancel-in-progress: false
+
+jobs:
+  autopost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      BASE_URL: https://instagram-post-analytics-ai.vercel.app
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      AUTOPOST_ASSETS_KEY: ${{ secrets.AUTOPOST_ASSETS_KEY }}
+      AUTOPOST_ASSETS: autopost-assets
+      OUT_DIR: autopost-out
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+      AUTOPOST_DATE: ${{ inputs.date }}
+      PUBLISH_AT: ${{ github.event_name == 'schedule' && '07:30' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check secrets
+        run: |
+          [ -n "$CRON_SECRET" ] || { echo "::error::CRON_SECRET is not set."; exit 1; }
+          [ -n "$AUTOPOST_ASSETS_KEY" ] || { echo "::error::AUTOPOST_ASSETS_KEY is not set."; exit 1; }
+
+      - name: Install ffmpeg and Japanese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk fonts-noto-cjk-extra > /dev/null
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python packages
+        run: pip install --quiet pillow numpy
+
+      - name: Decrypt assets
+        run: |
+          mkdir -p "$AUTOPOST_ASSETS"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in autopost/assets.tgz.enc -pass env:AUTOPOST_ASSETS_KEY \
+            | tar xz -C "$AUTOPOST_ASSETS"
+          ls "$AUTOPOST_ASSETS"
+
+      - name: Plan, render and publish
+        run: python3 autopost/run.py
+
+      - name: Keep generated files
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: autopost-${{ github.run_id }}
+          path: autopost-out
+          retention-days: 7
+          if-no-files-found: ignore
