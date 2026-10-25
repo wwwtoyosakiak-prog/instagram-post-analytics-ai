@@ -27,6 +27,7 @@ export type AutopostPlan = {
   quizId: string | null;
   tomorrowTeaser: string;
   caption: string;
+  commentPrompt: string;
   hashtags: string[];
 };
 
@@ -96,7 +97,7 @@ async function createVideoDownloadUrl(path: string) {
 const planSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["style", "theme", "lines", "photos", "quizId", "tomorrowTeaser", "caption", "hashtags"],
+  required: ["style", "theme", "lines", "photos", "quizId", "tomorrowTeaser", "caption", "commentPrompt", "hashtags"],
   properties: {
     style: { type: "string", enum: [...AUTOPOST_STYLES] },
     theme: { type: "string", description: "動画のテーマ。ひらがな多めで12文字以内" },
@@ -104,8 +105,9 @@ const planSchema = {
     photos: { type: "array", items: { type: "string" }, description: "使う写真ID。4〜6枚" },
     quizId: { type: ["string", "null"], description: "style=quizのときだけ、クイズ一覧のIDを1つ。それ以外はnull" },
     tomorrowTeaser: { type: "string", description: "あしたの予告。10文字以内" },
-    caption: { type: "string", description: "Instagramキャプション本文。ハッシュタグは含めない。120文字以内、絵文字1〜3個" },
-    hashtags: { type: "array", items: { type: "string" }, description: "#なしのハッシュタグ。3〜6個" },
+    caption: { type: "string", description: "キャプション本文（ハッシュタグなし）。1行目は目を引く見出し、空行のあと動画の見どころ・つくり方のコツ・学びを2〜4文。全体150〜300文字、絵文字3〜6個、改行で読みやすく" },
+    commentPrompt: { type: "string", description: "コメントしたくなる問いかけ1文。40文字以内（例: どの作品がすき？番号でおしえてね！）" },
+    hashtags: { type: "array", items: { type: "string" }, description: "#なしのハッシュタグ。動画の内容に合うものを8〜12個（例: ダンボール工作、親子工作、自由研究、手作りおもちゃ、知育、リサイクル）" },
   },
 } as const;
 
@@ -132,7 +134,7 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
   const hashtags = [...new Set([
     ...REQUIRED_TAGS,
     ...(Array.isArray(value.hashtags) ? value.hashtags : []).map((tag) => clip(tag, 20).replace(/^#/, "").replace(/\s/g, "")).filter(Boolean),
-  ])].slice(0, 8);
+  ])].slice(0, 14);
   return {
     style,
     theme: clip(value.theme, 12) || "だんボールガチャ",
@@ -140,7 +142,8 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
     photos: uniquePhotos,
     quizId: style === "quiz" ? quizId : null,
     tomorrowTeaser: clip(value.tomorrowTeaser, 10) || "おたのしみに",
-    caption: clip(value.caption, 300),
+    caption: clip(value.caption, 600),
+    commentPrompt: clip(value.commentPrompt, 50),
     hashtags,
   };
 }
@@ -158,6 +161,8 @@ export async function planTodaysPost(input: { date: string; weekday: string; pho
 - 直近の投稿とテーマ・スタイル・写真が重ならないようにする。同じstyleは2日連続にしない。
 - style: pop=元気なカラフル / kraft=段ボールの手づくり感 / dark=黒×クラフトのかっこいい作品紹介 / quiz=クイズ / sdgs=資源・リサイクル / story=絵本風のふりかえり
 - 曜日の雰囲気も少し意識する（例: 月曜は元気に、週末はおでかけ・工作向け）。
+- キャプションは「見出し1行 → 空行 → 見どころ・つくり方のコツ・SDGsなどの学び」を、親が読んで子どもと話したくなるように書く。
+- ハッシュタグは動画の内容に合う日本語タグを具体的に（ペパポン・新西ゼミなどの固定タグは自動で付くので不要）。
 
 テーマのヒント（使っても使わなくてもよい）:
 ${input.ideas.map((idea) => `- ${idea}`).join("\n")}

@@ -71,18 +71,29 @@ def fallback_plan(date, catalog, history):
         "photos": photos,
         "quizId": quiz if style == "quiz" else None,
         "tomorrowTeaser": "おたのしみに",
-        "caption": "だんボールでつくる ガチャガチャ「ペパポン」📦 きょうも みんなの作品を しょうかいします！",
-        "hashtags": ["ペパポン", "新西ゼミ"],
+        "caption": "きょうの ペパポン📦✨\n\nワークショップで子どもたちがつくった、だんボールのガチャガチャを紹介します。\nかお・いろ・かざりつけ、ひとつとして同じものはありません🎨",
+        "commentPrompt": "どの作品がすき？コメントでおしえてね！",
+        "hashtags": ["ダンボール工作", "親子工作", "手作りおもちゃ"],
     }
 
 
-def build_caption(text, hashtags, base):
+ABOUT = ("📦 だんボールガチャ「ペパポン」は、だんボールの板を組み立ててつくる手づくりガチャガチャ。"
+         "株式会社ペパポン × 多摩大学 新西ゼミの産学連携プロジェクトとして、子ども向けワークショップや多摩祭で活動しています。")
+CTA = "🔖 保存して工作の参考にしてね\n🔔 フォローすると毎朝7:30に新しい動画が届きます"
+
+
+def build_caption(plan, catalog):
+    style = plan.get("style", "")
     tags = []
-    for t in list(hashtags) + list(base):
-        t = str(t).lstrip("#").replace(" ", "")
+    for t in list(catalog.get("baseTags", [])) + list(plan.get("hashtags", [])) + list(catalog.get("styleTags", {}).get(style, [])) + list(catalog.get("extraTags", [])):
+        t = str(t).lstrip("#").replace(" ", "").replace("　", "")
         if t and t not in tags:
             tags.append(t)
-    return f"{text.strip()}\n\n" + " ".join("#" + t for t in tags[:10])
+    parts = [plan.get("caption", "").strip()]
+    if plan.get("commentPrompt"):
+        parts.append("💬 " + plan["commentPrompt"].strip())
+    parts += [ABOUT, CTA, " ".join("#" + t for t in tags[:25])]
+    return "\n\n".join(p for p in parts if p)
 
 
 def wait_until_publish_time(date):
@@ -145,7 +156,8 @@ def main():
     if queued:
         source = "queue"
         video = os.path.join(assets, "queue", queued["file"])
-        plan = {"style": queued["style"], "theme": queued["theme"], "photos": [], "caption": queued["caption"], "hashtags": []}
+        plan = {"style": queued["style"], "theme": queued["theme"], "photos": [], "caption": queued["caption"],
+                "commentPrompt": queued.get("commentPrompt", ""), "hashtags": queued.get("hashtags", [])}
         log(f"予約済み動画を使います: {queued['file']}")
     else:
         photos = [{"id": k, "tags": v} for k, v in catalog["photos"].items()]
@@ -168,7 +180,7 @@ def main():
         subprocess.run([sys.executable, os.path.join(HERE, "render.py"), assets, plan_path,
                         os.path.join(out_dir, f"{date}-preview.png"), "--stills", "0.8", "3.0", "5.2", "7.2", "8.8"], check=True)
 
-    caption = build_caption(plan.get("caption", ""), plan.get("hashtags", []), catalog.get("baseTags", []))
+    caption = build_caption(plan, catalog)
     open(os.path.join(out_dir, f"{date}-caption.txt"), "w", encoding="utf-8").write(caption)
     log("caption:\n" + caption)
     if dry:
