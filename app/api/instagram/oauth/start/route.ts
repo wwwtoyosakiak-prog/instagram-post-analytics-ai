@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "instagram_business_basic,instagram_business_manage_insights");
+  url.searchParams.set("scope", "instagram_business_basic,instagram_business_manage_insights,instagram_business_content_publish");
   url.searchParams.set("force_reauth", "true");
   url.searchParams.set("state", state);
   return NextResponse.redirect(url);

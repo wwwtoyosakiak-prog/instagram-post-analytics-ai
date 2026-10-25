@@ -17,3 +17,7 @@ php-backend/data/app-data.json
 playwright-report/
 test-results/
 tsconfig.tsbuildinfo
+
+# autopost
+autopost-assets/
+autopost-out/
