@@ -47,8 +47,8 @@ async function ensureBucket() {
   const storage = requireSupabaseServerClient().storage;
   const { data } = await storage.getBucket(AUTOPOST_BUCKET);
   if (data) return;
-  const { error } = await storage.createBucket(AUTOPOST_BUCKET, { public: false, fileSizeLimit: "100MB" });
-  if (error && !/already exists/i.test(error.message)) throw new Error(`Storageバケットを作成できませんでした: ${error.message}`);
+  const { error } = await storage.createBucket(AUTOPOST_BUCKET, { public: false });
+  if (error && !/already exists|duplicate/i.test(error.message)) throw new ApiRequestError(`Storageバケットを作成できませんでした: ${error.message}`, 502);
 }
 
 export async function readAutopostHistory(): Promise<AutopostHistoryEntry[]> {
@@ -68,7 +68,7 @@ export async function appendAutopostHistory(entry: AutopostHistoryEntry) {
   const next = [...history.filter((item) => !(item.date === entry.date && item.mediaId === entry.mediaId)), entry].slice(-HISTORY_LIMIT);
   const body = new Blob([JSON.stringify(next, null, 2)], { type: "application/json" });
   const { error } = await requireSupabaseServerClient().storage.from(AUTOPOST_BUCKET).upload(HISTORY_PATH, body, { upsert: true, contentType: "application/json" });
-  if (error) throw new Error(`投稿履歴を保存できませんでした: ${error.message}`);
+  if (error) throw new ApiRequestError(`投稿履歴を保存できませんでした: ${error.message}`, 502);
   return next;
 }
 
@@ -80,14 +80,14 @@ export async function createVideoUploadUrl(path: string) {
   assertVideoPath(path);
   await ensureBucket();
   const { data, error } = await requireSupabaseServerClient().storage.from(AUTOPOST_BUCKET).createSignedUploadUrl(path, { upsert: true });
-  if (error || !data) throw new Error(`アップロードURLを作成できませんでした: ${error?.message ?? "unknown"}`);
+  if (error || !data) throw new ApiRequestError(`アップロードURLを作成できませんでした: ${error?.message ?? "unknown"}`, 502);
   return { uploadUrl: data.signedUrl, path: data.path };
 }
 
 async function createVideoDownloadUrl(path: string) {
   assertVideoPath(path);
   const { data, error } = await requireSupabaseServerClient().storage.from(AUTOPOST_BUCKET).createSignedUrl(path, 60 * 60 * 3);
-  if (error || !data) throw new Error(`動画URLを作成できませんでした: ${error?.message ?? "unknown"}`);
+  if (error || !data) throw new ApiRequestError(`動画URLを作成できませんでした: ${error?.message ?? "unknown"}`, 502);
   return data.signedUrl;
 }
 
