@@ -113,8 +113,13 @@ class Assets:
     def photo(self, pid):
         if pid not in self._photos:
             im = ImageOps.exif_transpose(Image.open(os.path.join(self.root, "photos", pid + ".jpg"))).convert("RGB")
+            im._illustration = pid in ("sdgs_work", "sdgs_again", "quiz_paper")
             self._photos[pid] = im
         return self._photos[pid]
+
+    def focus(self, pid):
+        f = self.catalog.get("focus", {}).get(pid)
+        return (f[0], f[1]) if f else (0.5, 0.5)
 
     def capsule(self):
         if self._cap is None:
@@ -139,11 +144,11 @@ def cover(im, w, h, zoom=1.0, fx=0.5, fy=0.5):
     return im.resize((w, h), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + ch))
 
 
-def fit_card(im, w, h, zoom=1.0):
-    """縦長でない写真（ロゴ・イラスト）は切らずにぼかし背景で収める"""
+def fit_card(im, w, h, zoom=1.0, focus=(0.5, 0.5)):
+    """ふつうの写真は被写体（focus）を中心に切り抜き、横に長すぎる写真やイラストは切らずにぼかし背景で収める"""
     ratio = im.width / im.height
-    if 0.6 < ratio < 0.95:
-        return cover(im, w, h, zoom)
+    if 0.5 < ratio <= 1.7 and not getattr(im, "_illustration", False):
+        return cover(im, w, h, zoom, *focus)
     bg = cover(im, w // 8, h // 8).filter(ImageFilter.GaussianBlur(4)).resize((w, h), Image.BILINEAR)
     bg = Image.blend(bg, Image.new("RGB", bg.size, WHITE), 0.35)
     s = min(w / im.width, h / im.height) * 0.94 * zoom
@@ -257,7 +262,7 @@ class Reel:
         calm = per >= 4
         pop = 1 + (0.015 if calm else 0.05) * math.exp(-dt * 10)
         drift = 1.03 + (0.04 * (t - t0) / (per * 0.5) if calm else 0)
-        inner = fit_card(self.a.photo(pid), 820, 1060, drift * pop)
+        inner = fit_card(self.a.photo(pid), 820, 1060, drift * pop, self.a.focus(pid))
         e = eob(prog(t, t0, t0 + 0.2))
         self.card(img, inner, 540 + (1 - e) * (300 if n % 2 else -300), 1000, (-3 if n % 2 else 3), 0.8 + 0.2 * e)
         cap = self.lines[n % len(self.lines)]
@@ -286,7 +291,7 @@ class Reel:
         t_ans = self.bt[ans_i]
         ptext(img, "Q. " + q["q"], 540, 470, 76, WHITE, band=INK, k=eob(prog(t, 0.3, 0.6)))
         if t < t_ans:
-            self.card(img, fit_card(self.a.photo(q["photo"]), 640, 560), 540, 960, -2, eob(prog(t, 0.5, 0.8)))
+            self.card(img, fit_card(self.a.photo(q["photo"]), 640, 560, 1.0, self.a.focus(q["photo"])), 540, 960, -2, eob(prog(t, 0.5, 0.8)))
             for k_, label in enumerate(q["choices"]):
                 cy = 1400 + k_ * 150
                 e = eob(prog(t, 1.2 + k_ * 0.15, 1.5 + k_ * 0.15))
@@ -318,7 +323,8 @@ class Reel:
         pid = self.photos[(n // 2) % min(2, len(self.photos))]
         focus = [(0.5, 0.5), (0.5, 0.32), (0.4, 0.62), (0.62, 0.45)][n % 4]
         z = 1.0 + 0.45 * ((n % 2) + clamp((t - t0) / max(0.1, t1 - t0)) * 0.6)
-        inner = cover(self.a.photo(pid), 860, 1100, z, *focus)
+        base = fit_card(self.a.photo(pid), 860, 1100, 1.0, self.a.focus(pid))
+        inner = cover(base, 860, 1100, z, *focus)
         self.card(img, inner, 540, 1000, -2 if n % 2 else 2, 1.0)
         d = ImageDraw.Draw(img)
         e = eob(prog(t, t0, t0 + 0.25))
@@ -347,7 +353,7 @@ class Reel:
         t0 = start + k * span
         rank = 3 - k
         e = eob(prog(t, t0 + 0.15, t0 + 0.45))
-        inner = cover(self.a.photo(photos[k]), 800, 1000, 1.03 + 0.04 * (t - t0))
+        inner = fit_card(self.a.photo(photos[k]), 800, 1000, 1.03 + 0.04 * (t - t0), self.a.focus(photos[k]))
         self.card(img, inner, 540, 1030, -3 if k % 2 else 3, 0.85 + 0.15 * e)
         d = ImageDraw.Draw(img)
         bk = eob(prog(t, t0, t0 + 0.3))
