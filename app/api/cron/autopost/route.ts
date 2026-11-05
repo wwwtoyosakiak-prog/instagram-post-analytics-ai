@@ -53,6 +53,7 @@ export async function POST(request: Request) {
           photos: readPhotos(body),
           ideas,
           tomorrowTheme: typeof body.tomorrowTheme === "string" ? body.tomorrowTheme.slice(0, 20) : undefined,
+          tagPool: Array.isArray(body.tagPool) ? body.tagPool.map((tag) => String(tag).slice(0, 20)).slice(0, 10) : undefined,
           quizzes: Array.isArray(body.quizzes)
             ? body.quizzes.filter(isRecord).slice(0, 20).map((quiz) => ({ id: String(quiz.id ?? "").slice(0, 40), q: String(quiz.q ?? "").slice(0, 40) })).filter((quiz) => quiz.id)
             : [],
