@@ -16,6 +16,11 @@ PAPER = (247, 240, 224); GRID = (176, 204, 226); INK = (44, 40, 52); RED = (214,
 BLUE = (40, 92, 170); HL = (255, 222, 80)
 ACCENTS = [(255, 160, 60), (255, 120, 160), (110, 120, 230), (90, 190, 120), (240, 110, 80), (70, 170, 140), (170, 120, 230)]
 WD = "月火水木金土日"
+try:
+    import json as _json
+    FOCUS = {k: tuple(v) for k, v in _json.load(open(os.path.join(ROOT, "catalog.json"), encoding="utf-8")).get("focus", {}).items()}
+except Exception:  # noqa: BLE001
+    FOCUS = {}
 
 
 def clamp(v, a=0., b=1.): return max(a, min(b, v))
@@ -105,10 +110,17 @@ def photo_card(pid, rot):
     im = ImageOps.exif_transpose(Image.open(os.path.join(ROOT, 'photos', pid + '.jpg'))).convert('RGB')
     w, h = 760, 900
     ratio = im.width / im.height
-    if not pid.startswith(('sdgs_work', 'sdgs_again', 'quiz_paper')):
+    fx, fy = FOCUS.get(pid, (0.5, 0.5))
+    if not pid.startswith(('sdgs_work', 'sdgs_again', 'quiz_paper')) and ratio <= 1.7:
         s = max(w / im.width, h / im.height); cw, ch = w / s, h / s
-        cw = min(cw, im.width); ch = min(ch, im.height); x0 = max(0, (im.width - cw) / 2); y0 = max(0, (im.height - ch) / 2)
+        cw = min(cw, im.width); ch = min(ch, im.height)
+        x0 = clamp(fx * im.width - cw / 2, 0, im.width - cw); y0 = clamp(fy * im.height - ch / 2, 0, im.height - ch)
         ph = im.resize((w, h), Image.LANCZOS, box=(x0, y0, x0 + cw, y0 + ch))
+    elif ratio > 1.7:
+        bgp = ImageOps.fit(im, (w // 8, h // 8)).filter(ImageFilter.GaussianBlur(3)).resize((w, h))
+        ph = Image.blend(bgp, Image.new('RGB', (w, h), (255, 255, 255)), 0.3)
+        s = min(w / im.width, h / im.height) * 0.97; fg = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
+        ph.paste(fg, ((w - fg.width) // 2, (h - fg.height) // 2))
     else:
         ph = Image.new('RGB', (w, h), (255, 255, 255))
         s = min(w / im.width, h / im.height) * 0.95; fg = im.resize((int(im.width * s), int(im.height * s)), Image.LANCZOS)
