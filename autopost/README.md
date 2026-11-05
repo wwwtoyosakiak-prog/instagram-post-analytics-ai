@@ -16,6 +16,20 @@
 6. 7:30 まで待ってから、Instagram Graph API でリールとして公開します。
 7. 投稿履歴は Storage の `history.json` に残ります。同じ日は二重投稿しません。
 
+## 曜日ごとの連載
+
+| 曜日 | 連載 | スタイル |
+|---|---|---|
+| 月 | つくりかた ミニ講座 | kraft |
+| 火 | きょうの いちだい（1台を虫めがねで深掘り） | spotlight |
+| 水 | ペパポン クイズ | quiz |
+| 木 | 推しガチャ ランキング | ranking |
+| 金 | ペパポン図鑑（観察ノート風） | zukan |
+| 土 | SDGs まめちしき | sdgs |
+| 日 | ワークショップ アルバム | story |
+
+AI（既定 gpt-4.1、`AUTOPOST_OPENAI_MODEL` で変更可）は事実シートの範囲で書き、分析アプリに保存された過去投稿の反応（保存・いいね・再生）を参考にします。
+
 ## 必要な設定
 
 | 場所 | 名前 | 内容 |
@@ -44,6 +58,6 @@ GitHub の Actions →「Instagram Daily Autopost」→ Run workflow から実�
 2. 次のコマンドで暗号化し直します。
 
 ```bash
-tar czf /tmp/assets.tgz catalog.json capsule.png logo.png photos bgm queue
+tar czf /tmp/assets.tgz catalog.json capsule.png logo.png photos bgm queue fonts
 openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/assets.tgz -out autopost/assets.tgz.enc -pass env:AUTOPOST_ASSETS_KEY
 ```

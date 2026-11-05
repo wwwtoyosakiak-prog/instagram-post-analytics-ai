@@ -31,3 +31,20 @@ describe("autopost plan sanitizer", () => {
     expect(plan.quizId).toBe("q1");
   });
 });
+
+describe("autopost weekly series", () => {
+  it("曜日ごとに連載とスタイルが決まる", async () => {
+    const { seriesForDate, nextDate } = await import("@/lib/autopost");
+    expect(seriesForDate("2026-11-16").style).toBe("kraft"); // 月
+    expect(seriesForDate("2026-11-19").style).toBe("ranking"); // 木
+    expect(seriesForDate("2026-11-22").style).toBe("story"); // 日
+    expect(nextDate("2026-11-30")).toBe("2026-12-01");
+  });
+
+  it("連載のスタイルと予告はAIの出力より優先される", () => {
+    const plan = sanitizePlan({ style: "dark", photos: ["a"], lines: ["x"], hashtags: [], tomorrowTeaser: "ちがう予告" }, photos, [], "ranking", "ペパポン図鑑");
+    expect(plan.style).toBe("ranking");
+    expect(plan.tomorrowTeaser).toBe("ペパポン図鑑");
+    expect(plan.photos.length).toBeGreaterThanOrEqual(3);
+  });
+});
