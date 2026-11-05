@@ -106,7 +106,12 @@ def build_caption(plan, catalog):
         t = str(t).lstrip("#").replace(" ", "").replace("　", "")
         if t and t not in tags:
             tags.append(t)
-    parts = [plan.get("caption", "").strip()]
+    text = plan.get("caption", "").strip()
+    if plan.get("commentPrompt"):
+        lines = text.rstrip().split("\n")
+        if len(lines) > 2 and lines[-1].rstrip().endswith(("？", "?")):
+            text = "\n".join(lines[:-1]).rstrip()  # 問いかけは 💬 の行にまとめる
+    parts = [text]
     if plan.get("commentPrompt"):
         parts.append("💬 " + plan["commentPrompt"].strip())
     parts += [ABOUT, CTA, " ".join("#" + t for t in tags[:25])]
