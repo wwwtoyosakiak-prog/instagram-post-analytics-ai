@@ -10,6 +10,7 @@
   PUBLISH_AT        "07:30" のように指定すると、動画を作り終えてからその時刻（日本時間）まで待って投稿
 """
 import json
+import re
 import os
 import subprocess
 import sys
@@ -127,6 +128,12 @@ def build_caption(plan, catalog):
         lines = text.rstrip().split("\n")
         if len(lines) > 2 and lines[-1].rstrip().endswith(("？", "?")):
             text = "\n".join(lines[:-1]).rstrip()  # 問いかけは 💬 の行にまとめる
+    paras = []
+    for para in text.split("\n\n"):
+        if "\n" not in para and len(para) > 90:  # 長い段落は1文ずつ改行して読みやすく
+            para = re.sub(r"([。！？!?])(?=[^」』）)\n])", r"\1\n", para).strip()
+        paras.append(para)
+    text = "\n\n".join(paras)
     parts = [text]
     if plan.get("commentPrompt"):
         parts.append("💬 " + plan["commentPrompt"].strip())
