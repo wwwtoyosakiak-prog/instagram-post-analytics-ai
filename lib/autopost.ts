@@ -99,7 +99,7 @@ export const AUTOPOST_SERIES: { name: string; style: AutopostStyle; guide: strin
   { name: "つくりかた ミニ講座", style: "kraft", guide: "組み立て・かざりつけの流れを順番に紹介。make_* や ws_hands / ws_help などの写真中心。lines は手順（例: いたを はずして / おって たてて / ゴムを かけたら / かんせい！）" },
   { name: "きょうの いちだい", style: "spotlight", guide: "作品を1〜2台だけ選び、虫めがねで細部を見るように紹介。photos は同じ作品を中心に2枚。lines はその作品の細部の見どころ（例: めだまが ぎょろっ / キラキラの テープ）" },
   { name: "ペパポン クイズ", style: "quiz", guide: "クイズ一覧から、直近で使っていないものを1つ選ぶ。キャプションは答えを書かず『こたえは動画で』と誘う" },
-  { name: "推しガチャ ランキング", style: "ranking", guide: "作品写真を3枚。photos は 3位→2位→1位 の順。lines は各作品の推しポイント3つ（優劣ではなく『推し』の理由）。キャプションで3作品それぞれの推しポイントを紹介" },
+  { name: "推しガチャ ランキング", style: "ranking", guide: "作品写真を3枚。photos は 3位→2位→1位 の順。lines は photos と同じ順で各作品の推しポイントを3つ（優劣ではなく『推し』の理由）。キャプションも 🥉3位 → 🥈2位 → 🥇1位 の順で、それぞれの推しポイントを紹介" },
   { name: "ペパポン図鑑", style: "zukan", guide: "観察ノート風。作品3〜4枚の特徴を観察して lines に書く（例: さんかくの はな / ピンクの ほっぺ）。キャプションは『観察してわかったこと』の形で" },
   { name: "SDGs まめちしき", style: "sdgs", guide: "事実シートの範囲で SDGs・資源の豆知識を1つだけ深掘り。sdgs_* と作品写真を組み合わせる" },
   { name: "ワークショップ アルバム", style: "story", guide: "ws_* 写真中心に、ワークショップの1場面を思い出として。子どもたちの工夫や表情（顔は写っていない）を言葉で伝える" },
@@ -118,9 +118,11 @@ export function nextDate(date: string) {
 
 const FACT_SHEET = `- ペパポンは株式会社ペパポンの、だんボールでつくるガチャガチャ。だんボールの板を組み立て、ゴムをかけて完成させる。
 - 多摩大学 新西ゼミとの産学連携。子ども向けワークショップを開き、多摩祭（2026年10月24日）でも展示した。
+- ws_* や IMG_* の写真は子ども向けワークショップのもの（多摩祭の写真ではない）。
 - ワークショップでは子どもたちがシール、ペン、クレヨン、色紙、めだまシール、キラキラテープなどでかざりつけをした。星形の穴とLEDで光る作品もある。
 - カプセルはひとつずつ手づくり。SDGsの8番（働きがいも経済成長も）と12番（つくる責任つかう責任）に関わる。
 - だんボールや新聞紙は分別して出せば資源として回収され、また紙やだんボールに生まれかわる（出し方は地域のルールによる）。
+- 写真タグと事実シートにない材料・場面・使い方（例: 夜に使う、別の道具で代用する）を足さない。
 - 書いてはいけないこと: 価格・販売場所・次回イベント日程・参加人数・満足度などの数字、写真にない作品や出来事、子どもの名前や年齢。`;
 
 const EXAMPLE_CAPTION = `📖 ペパポン図鑑 No.2「かおのある ガチャ」
@@ -151,7 +153,7 @@ const planSchema = {
   properties: {
     style: { type: "string", enum: [...AUTOPOST_STYLES] },
     theme: { type: "string", description: "動画のタイトル。子どもが読めるひらがな多めで、12文字以内" },
-    lines: { type: "array", items: { type: "string" }, description: "写真に重ねる短いテロップ。ひらがな多め、各10文字以内、3〜4個。写真ごとに具体的に（「かわいい」だけ等の抽象語は避ける）" },
+    lines: { type: "array", items: { type: "string" }, description: "写真に重ねる短いテロップ。ひらがな多め、各4〜9文字（10文字を超えない）、3〜4個。写真ごとに具体的に（「かわいい」だけ等の抽象語は避ける）。例: めだまが ぎょろっ / ピンクの しまもよう" },
     photos: { type: "array", items: { type: "string" }, description: "使う写真ID。4〜6枚" },
     quizId: { type: ["string", "null"], description: "style=quizのときだけ、クイズ一覧のIDを1つ。それ以外はnull" },
     tomorrowTeaser: { type: "string", description: "空文字でよい（自動で入る）" },
@@ -181,7 +183,7 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
     if (uniquePhotos.length >= minPhotos) break;
     if (!uniquePhotos.includes(photo.id)) uniquePhotos.push(photo.id);
   }
-  const lines = (Array.isArray(value.lines) ? value.lines : []).map((line) => clip(line, 10)).filter(Boolean).slice(0, 4);
+  const lines = (Array.isArray(value.lines) ? value.lines : []).map((line) => clip(String(line).replace(/[\s　]+/g, " "), 14)).filter(Boolean).slice(0, 4);
   const hashtags = [...new Set([
     ...REQUIRED_TAGS,
     ...(Array.isArray(value.hashtags) ? value.hashtags : []).map((tag) => clip(tag, 20).replace(/^#/, "").replace(/\s/g, "")).filter(Boolean),

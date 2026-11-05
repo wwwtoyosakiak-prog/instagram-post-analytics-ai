@@ -196,14 +196,17 @@ def body(img, day, t, cuts):
     side = idx % 2
     lp = prog(t, t0 + 0.35, t0 + 0.35 + 0.05 * len(label))
     s = typewriter(label, lp)
+    lpx = 76
+    _w = text_img(label, YOMO, 76, INK + (255,)).width
+    if _w > 760: lpx = max(40, int(76 * 760 / _w))
     badge = Image.new('RGBA', (86, 86), (0, 0, 0, 0)); bd = ImageDraw.Draw(badge)
     bd.ellipse([3, 3, 83, 83], fill=day['accent'] + (255,)); bt_ = text_img('①②③④⑤'[idx] if False else str(idx + 1), SANS, 52, (255, 255, 255, 255))
     badge.alpha_composite(bt_, (43 - bt_.width // 2, 41 - bt_.height // 2))
     lab_y = 1640
     paste_c(img, badge, 210, lab_y, eob(prog(t, t0 + 0.25, t0 + 0.45)))
     if s:
-        tim = text_img(s, YOMO, 76, INK + (255,), stroke=2, stroke_fill=INK + (255,)); img.paste(tim.convert('RGB'), (270, int(lab_y - tim.height / 2)), tim.getchannel('A'))
-    full = text_img(label, YOMO, 76, INK + (255,), stroke=2, stroke_fill=INK + (255,))
+        tim = text_img(s, YOMO, lpx, INK + (255,), stroke=2, stroke_fill=INK + (255,)); img.paste(tim.convert('RGB'), (270, int(lab_y - tim.height / 2)), tim.getchannel('A'))
+    full = text_img(label, YOMO, lpx, INK + (255,), stroke=2, stroke_fill=INK + (255,))
     up = prog(t, t0 + 0.35 + 0.05 * len(label), t0 + 0.6 + 0.05 * len(label))
     pts = wobble_pts([(280 + i * (full.width - 20) / 12, lab_y + 52 + 4 * math.sin(i)) for i in range(13)], idx + (day['no'] or 0) * 10, 2)
     draw_partial(d, pts, up, RED, 9)
