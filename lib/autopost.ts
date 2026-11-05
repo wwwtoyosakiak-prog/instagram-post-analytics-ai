@@ -169,6 +169,15 @@ function clip(value: unknown, max: number) {
   return typeof value === "string" ? Array.from(value.trim()).slice(0, max).join("") : "";
 }
 
+/** テロップは語の途中で切らない（長いときは最後の区切りまで。描画側で文字を自動縮小する） */
+export function clipTelop(text: string, max = 16) {
+  const chars = Array.from(text.replace(/[\s　]+/g, " ").trim());
+  if (chars.length <= max) return chars.join("");
+  const head = chars.slice(0, max).join("");
+  const cut = Math.max(head.lastIndexOf(" "), head.lastIndexOf("、"));
+  return (cut >= 4 ? head.slice(0, cut) : head).trim();
+}
+
 export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: string[] = [], forcedStyle?: AutopostStyle, teaser?: string): AutopostPlan {
   if (!raw || typeof raw !== "object") throw new ApiRequestError("企画データが正しくありません。", 502);
   const value = raw as Record<string, unknown>;
@@ -183,7 +192,7 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
     if (uniquePhotos.length >= minPhotos) break;
     if (!uniquePhotos.includes(photo.id)) uniquePhotos.push(photo.id);
   }
-  const lines = (Array.isArray(value.lines) ? value.lines : []).map((line) => clip(String(line).replace(/[\s　]+/g, " "), 14)).filter(Boolean).slice(0, 4);
+  const lines = (Array.isArray(value.lines) ? value.lines : []).map((line) => clipTelop(String(line))).filter(Boolean).slice(0, 4);
   const hashtags = [...new Set([
     ...REQUIRED_TAGS,
     ...(Array.isArray(value.hashtags) ? value.hashtags : []).map((tag) => clip(tag, 20).replace(/^#/, "").replace(/\s/g, "")).filter(Boolean),

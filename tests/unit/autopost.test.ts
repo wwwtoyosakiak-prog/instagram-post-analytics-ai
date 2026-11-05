@@ -48,3 +48,11 @@ describe("autopost weekly series", () => {
     expect(plan.photos.length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("clipTelop", () => {
+  it("長いテロップは区切りで切る", async () => {
+    const { clipTelop } = await import("@/lib/autopost");
+    expect(clipTelop("ぴんくと きらきらが いっぱいの ガチャ")).toBe("ぴんくと きらきらが");
+    expect(clipTelop("めだまが ぎょろっ")).toBe("めだまが ぎょろっ");
+  });
+});
