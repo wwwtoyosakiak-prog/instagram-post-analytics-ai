@@ -13,7 +13,7 @@ export const AUTOPOST_BUCKET = process.env.AUTOPOST_BUCKET || "autopost";
 const HISTORY_PATH = "history.json";
 const HISTORY_LIMIT = 60;
 
-export const AUTOPOST_STYLES = ["pop", "kraft", "dark", "quiz", "sdgs", "story"] as const;
+export const AUTOPOST_STYLES = ["pop", "kraft", "dark", "quiz", "sdgs", "story", "spotlight", "ranking", "zukan"] as const;
 export type AutopostStyle = (typeof AUTOPOST_STYLES)[number];
 
 export type AutopostPhoto = { id: string; tags: string[] };
@@ -94,18 +94,68 @@ async function createVideoDownloadUrl(path: string) {
 
 // ── 企画（OpenAI） ─────────────────────────────────────────
 
+/** 曜日ごとの連載。毎週同じ曜日に同じ企画が来るので、フォロワーが楽しみにしやすい。 */
+export const AUTOPOST_SERIES: { name: string; style: AutopostStyle; guide: string }[] = [
+  { name: "つくりかた ミニ講座", style: "kraft", guide: "組み立て・かざりつけの流れを順番に紹介。make_* や ws_hands / ws_help などの写真中心。lines は手順（例: いたを はずして / おって たてて / ゴムを かけたら / かんせい！）" },
+  { name: "きょうの いちだい", style: "spotlight", guide: "作品を1〜2台だけ選び、虫めがねで細部を見るように紹介。photos は同じ作品を中心に2枚。lines はその作品の細部の見どころ（例: めだまが ぎょろっ / キラキラの テープ）" },
+  { name: "ペパポン クイズ", style: "quiz", guide: "クイズ一覧から、直近で使っていないものを1つ選ぶ。キャプションは答えを書かず『こたえは動画で』と誘う" },
+  { name: "推しガチャ ランキング", style: "ranking", guide: "作品写真を3枚。photos は 3位→2位→1位 の順。lines は各作品の推しポイント3つ（優劣ではなく『推し』の理由）。キャプションで3作品それぞれの推しポイントを紹介" },
+  { name: "ペパポン図鑑", style: "zukan", guide: "観察ノート風。作品3〜4枚の特徴を観察して lines に書く（例: さんかくの はな / ピンクの ほっぺ）。キャプションは『観察してわかったこと』の形で" },
+  { name: "SDGs まめちしき", style: "sdgs", guide: "事実シートの範囲で SDGs・資源の豆知識を1つだけ深掘り。sdgs_* と作品写真を組み合わせる" },
+  { name: "ワークショップ アルバム", style: "story", guide: "ws_* 写真中心に、ワークショップの1場面を思い出として。子どもたちの工夫や表情（顔は写っていない）を言葉で伝える" },
+];
+
+export function seriesForDate(date: string) {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay(); // 0=日
+  return AUTOPOST_SERIES[(day + 6) % 7];
+}
+
+export function nextDate(date: string) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+const FACT_SHEET = `- ペパポンは株式会社ペパポンの、だんボールでつくるガチャガチャ。だんボールの板を組み立て、ゴムをかけて完成させる。
+- 多摩大学 新西ゼミとの産学連携。子ども向けワークショップを開き、多摩祭（2026年10月24日）でも展示した。
+- ワークショップでは子どもたちがシール、ペン、クレヨン、色紙、めだまシール、キラキラテープなどでかざりつけをした。星形の穴とLEDで光る作品もある。
+- カプセルはひとつずつ手づくり。SDGsの8番（働きがいも経済成長も）と12番（つくる責任つかう責任）に関わる。
+- だんボールや新聞紙は分別して出せば資源として回収され、また紙やだんボールに生まれかわる（出し方は地域のルールによる）。
+- 書いてはいけないこと: 価格・販売場所・次回イベント日程・参加人数・満足度などの数字、写真にない作品や出来事、子どもの名前や年齢。`;
+
+const EXAMPLE_CAPTION = `📖 ペパポン図鑑 No.2「かおのある ガチャ」
+
+めだまを つけたり、はなを かいたり…かおが つくと、ガチャが いきものに見えてくる！👀
+さんかくの はな、にっこり がお、ピンクの ほっぺ。
+ワークショップでは、子どもたちが それぞれの キャラクターを うみだしてくれました🎨`;
+
+async function readPerformanceNotes() {
+  try {
+    const { listPostsFromSupabase } = await import("@/lib/supabase-admin");
+    const posts = (await listPostsFromSupabase("owner", { limit: 60, offset: 0 }))
+      .filter((post) => post.caption && (post.views ?? 0) > 0);
+    if (posts.length < 3) return "";
+    const score = (post: (typeof posts)[number]) => (post.saves ?? 0) * 3 + (post.shares ?? 0) * 3 + (post.likes ?? 0) + (post.comments ?? 0) * 2 + (post.views ?? 0) / 100;
+    const sorted = [...posts].sort((a, b) => score(b) - score(a));
+    const line = (post: (typeof posts)[number]) => `- ${post.date} 再生${post.views ?? 0} いいね${post.likes ?? 0} 保存${post.saves ?? 0} 「${String(post.caption).split("\n")[0].slice(0, 40)}」`;
+    return `反応がよかった投稿（この傾向を参考にする）:\n${sorted.slice(0, 4).map(line).join("\n")}\n反応がいまひとつだった投稿（同じ書き方は避ける）:\n${sorted.slice(-3).map(line).join("\n")}`;
+  } catch {
+    return "";
+  }
+}
+
 const planSchema = {
   type: "object",
   additionalProperties: false,
   required: ["style", "theme", "lines", "photos", "quizId", "tomorrowTeaser", "caption", "commentPrompt", "hashtags"],
   properties: {
     style: { type: "string", enum: [...AUTOPOST_STYLES] },
-    theme: { type: "string", description: "動画のテーマ。ひらがな多めで12文字以内" },
-    lines: { type: "array", items: { type: "string" }, description: "写真に重ねる短いテロップ。各10文字以内、3〜4個" },
+    theme: { type: "string", description: "動画のタイトル。子どもが読めるひらがな多めで、12文字以内" },
+    lines: { type: "array", items: { type: "string" }, description: "写真に重ねる短いテロップ。ひらがな多め、各10文字以内、3〜4個。写真ごとに具体的に（「かわいい」だけ等の抽象語は避ける）" },
     photos: { type: "array", items: { type: "string" }, description: "使う写真ID。4〜6枚" },
     quizId: { type: ["string", "null"], description: "style=quizのときだけ、クイズ一覧のIDを1つ。それ以外はnull" },
-    tomorrowTeaser: { type: "string", description: "あしたの予告。10文字以内" },
-    caption: { type: "string", description: "キャプション本文（ハッシュタグなし）。1行目は目を引く見出し、空行のあと動画の見どころ・つくり方のコツ・学びを2〜4文。全体150〜300文字、絵文字3〜6個、改行で読みやすく" },
+    tomorrowTeaser: { type: "string", description: "空文字でよい（自動で入る）" },
+    caption: { type: "string", description: "キャプション本文（ハッシュタグ・固定の紹介文なし）。1行目は連載名入りの見出し、空行のあと写真の中身に具体的にふれる本文3〜4文。漢字かな交じりの自然な日本語、全体180〜320文字、絵文字3〜6個、1文ごとに改行" },
     commentPrompt: { type: "string", description: "コメントしたくなる問いかけ1文。40文字以内（例: どの作品がすき？番号でおしえてね！）" },
     hashtags: { type: "array", items: { type: "string" }, description: "#なしのハッシュタグ。動画の内容に合うものを8〜12個（例: ダンボール工作、親子工作、自由研究、手作りおもちゃ、知育、リサイクル）" },
   },
@@ -117,17 +167,18 @@ function clip(value: unknown, max: number) {
   return typeof value === "string" ? Array.from(value.trim()).slice(0, max).join("") : "";
 }
 
-export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: string[] = []): AutopostPlan {
+export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: string[] = [], forcedStyle?: AutopostStyle, teaser?: string): AutopostPlan {
   if (!raw || typeof raw !== "object") throw new ApiRequestError("企画データが正しくありません。", 502);
   const value = raw as Record<string, unknown>;
   const ids = new Set(photos.map((photo) => photo.id));
-  let style = AUTOPOST_STYLES.includes(value.style as AutopostStyle) ? value.style as AutopostStyle : "pop";
+  let style = forcedStyle ?? (AUTOPOST_STYLES.includes(value.style as AutopostStyle) ? value.style as AutopostStyle : "pop");
   const quizId = typeof value.quizId === "string" && quizIds.includes(value.quizId) ? value.quizId : null;
   if (style === "quiz" && !quizId) style = "pop";
   const chosen = (Array.isArray(value.photos) ? value.photos : []).filter((id): id is string => typeof id === "string" && ids.has(id));
   const uniquePhotos = [...new Set(chosen)].slice(0, 6);
+  const minPhotos = style === "spotlight" ? 2 : style === "ranking" ? 3 : 4;
   for (const photo of photos) {
-    if (uniquePhotos.length >= 4) break;
+    if (uniquePhotos.length >= minPhotos) break;
     if (!uniquePhotos.includes(photo.id)) uniquePhotos.push(photo.id);
   }
   const lines = (Array.isArray(value.lines) ? value.lines : []).map((line) => clip(line, 10)).filter(Boolean).slice(0, 4);
@@ -141,46 +192,58 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
     lines: lines.length ? lines : ["つくって", "かざって", "まわそう！"],
     photos: uniquePhotos,
     quizId: style === "quiz" ? quizId : null,
-    tomorrowTeaser: clip(value.tomorrowTeaser, 10) || "おたのしみに",
+    tomorrowTeaser: clip(teaser ?? value.tomorrowTeaser, 14) || "おたのしみに",
     caption: clip(value.caption, 600),
     commentPrompt: clip(value.commentPrompt, 50),
     hashtags,
   };
 }
 
-export async function planTodaysPost(input: { date: string; weekday: string; photos: AutopostPhoto[]; ideas: string[]; quizzes: AutopostQuiz[] }) {
+export async function planTodaysPost(input: { date: string; weekday: string; photos: AutopostPhoto[]; ideas: string[]; quizzes: AutopostQuiz[]; tomorrowTheme?: string }) {
   if (!process.env.OPENAI_API_KEY) throw new ApiRequestError("OPENAI_API_KEY が設定されていません。", 503);
   const history = await readAutopostHistory();
   const recent = history.slice(-14);
-  const prompt = `あなたは「だんボールガチャ ペパポン」（段ボールでつくるガチャガチャ。株式会社ペパポン×多摩大学 新西ゼミの産学連携）のInstagram運用担当です。
-今日 ${input.date}（${input.weekday}）の朝7:30に投稿する10秒の縦型リールの内容を企画してください。
+  const series = seriesForDate(input.date);
+  const teaser = input.tomorrowTheme || seriesForDate(nextDate(input.date)).name;
+  const performance = await readPerformanceNotes();
+  const prompt = `あなたは「だんボールガチャ ペパポン」のInstagram（@tamaenergycircle）を運用する、子ども向け工作が得意な編集者です。
+今日 ${input.date}（${input.weekday}）に投稿する10秒の縦型リールを企画してください。
 
-ルール:
-- 対象は子ども連れの家族・先生。やさしい日本語、ひらがな多め。
-- 実際の素材（写真）にあるものだけを話題にする。架空のイベント日程・価格・販売情報は書かない。
-- 直近の投稿とテーマ・スタイル・写真が重ならないようにする。同じstyleは2日連続にしない。
-- style: pop=元気なカラフル / kraft=段ボールの手づくり感 / dark=黒×クラフトのかっこいい作品紹介 / quiz=クイズ / sdgs=資源・リサイクル / story=絵本風のふりかえり
-- 曜日の雰囲気も少し意識する（例: 月曜は元気に、週末はおでかけ・工作向け）。
-- キャプションは「見出し1行 → 空行 → 見どころ・つくり方のコツ・SDGsなどの学び」を、親が読んで子どもと話したくなるように書く。
-- ハッシュタグは動画の内容に合う日本語タグを具体的に（ペパポン・新西ゼミなどの固定タグは自動で付くので不要）。
+## 今日の連載「${series.name}」（style=${series.style} 固定）
+${series.guide}
 
-テーマのヒント（使っても使わなくてもよい）:
-${input.ideas.map((idea) => `- ${idea}`).join("\n")}
+## 事実シート（これ以外の事実は書かない）
+${FACT_SHEET}
 
-クイズ一覧（style=quizのときはここから1つ選ぶ。内容は変えない）:
-${input.quizzes.length ? input.quizzes.map((quiz) => `- ${quiz.id}: ${quiz.q}`).join("\n") : "- なし（quizは使わない）"}
+## 書き方
+- 動画のテロップ（theme / lines）は子どもが読める、ひらがな多めの短い言葉。
+- キャプションは親や先生が読む前提で、漢字かな交じりの自然な日本語にする（ひらがなだらけにしない）。
+- 1行目は「連載名 + 今日の中身」がひと目でわかる見出し（例: 🔍 きょうの いちだい「あおい かいじゅう」）。
+- 本文は選んだ写真に写っている具体的なもの（色・かざり・形・道具）にふれる。「かわいい」「たのしい」だけで終わらせない。
+- 子どもと一緒に話したくなる視点（観察・比べる・まねしてみる）を1つ入れる。
+- 直近の投稿と同じ書き出し・同じ話題・同じ写真の組み合わせは避ける。
+- commentPrompt は答えやすい問いかけ（番号・色・一言で答えられる）。
 
-使える写真（ID: 内容タグ）:
+## キャプションの手本（雰囲気の参考。そのまま真似しない）
+${EXAMPLE_CAPTION}
+${performance ? `\n## これまでの反応\n${performance}\n` : ""}
+## クイズ一覧（style=quiz のときだけ。内容は変えない）
+${input.quizzes.length ? input.quizzes.map((quiz) => `- ${quiz.id}: ${quiz.q}`).join("\n") : "- なし"}
+
+## 使える写真（ID: 内容タグ。顔は写っていない）
 ${input.photos.map((photo) => `- ${photo.id}: ${photo.tags.join("、")}`).join("\n")}
 
-直近の投稿:
-${recent.length ? recent.map((item) => `- ${item.date} style=${item.style} theme=${item.theme} photos=${item.photos.join(",")}`).join("\n") : "- まだありません"}`;
+## 直近の投稿
+${recent.length ? recent.map((item) => `- ${item.date} style=${item.style} theme=${item.theme} photos=${item.photos.join(",")} 書き出し「${String(item.caption ?? "").split("\n")[0].slice(0, 30)}」`).join("\n") : "- まだありません"}
+
+## 補足
+- ideas（ヒント）: ${input.ideas.join(" / ")}`;
 
   const { response, data } = await fetchJsonWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+      model: process.env.AUTOPOST_OPENAI_MODEL ?? "gpt-4.1",
       input: prompt,
       text: { format: { type: "json_schema", name: "autopost_plan", strict: true, schema: planSchema } },
     }),
@@ -192,7 +255,7 @@ ${recent.length ? recent.map((item) => `- ${item.date} style=${item.style} theme
   } catch {
     throw new ApiRequestError("企画データを読み取れませんでした。", 502);
   }
-  return { plan: sanitizePlan(parsed, input.photos, input.quizzes.map((quiz) => quiz.id)), recent };
+  return { plan: sanitizePlan(parsed, input.photos, input.quizzes.map((quiz) => quiz.id), series.style, teaser), recent, series: series.name };
 }
 
 // ── 公開（Instagram Graph API） ─────────────────────────────

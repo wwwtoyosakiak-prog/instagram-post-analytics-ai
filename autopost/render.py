@@ -19,6 +19,8 @@ from functools import lru_cache
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 W, H, FPS = 1080, 1920, 30
 DUR = 9.5
 END_T = 7.9
@@ -43,6 +45,9 @@ STYLES = {
     "sdgs":  dict(bg=(110, 190, 150), per=4, spin=6, bgms=["bgm3.mp3", "bgm_glass.mp3"]),
     "story": dict(bg=(170, 140, 230), per=4, spin=5, bgms=["bgm_paper.mp3", "bgm_glass.mp3"]),
     "quiz":  dict(bg=(80, 160, 240), per=4, spin=10, bgms=["bgm5.mp3", "bgm6.mp3"]),
+    "spotlight": dict(bg=None, per=4, spin=8, bgms=["bgm.mp3", "bgm2.mp3", "bgm6.mp3"]),
+    "ranking": dict(bg=(30, 34, 78), per=4, spin=12, bgms=["bgm2.mp3", "bgm6.mp3", "bgm.mp3"]),
+    "zukan": dict(bg=(247, 240, 224), per=4, spin=0, bgms=["bgm_paper.mp3", "bgm_glass.mp3", "bgm3.mp3"]),
 }
 POP_COLORS = [(255, 170, 60), (255, 120, 160), (90, 190, 120), (80, 160, 240), (170, 120, 240), (255, 200, 60)]
 
@@ -126,11 +131,11 @@ class Assets:
         return im
 
 
-def cover(im, w, h, zoom=1.0):
+def cover(im, w, h, zoom=1.0, fx=0.5, fy=0.5):
     s = max(w / im.width, h / im.height) * zoom
-    cw, ch = w / s, h / s
-    x0 = (im.width - cw) / 2
-    y0 = (im.height - ch) / 2
+    cw, ch = min(w / s, im.width), min(h / s, im.height)
+    x0 = clamp(fx * im.width - cw / 2, 0, im.width - cw)
+    y0 = clamp(fy * im.height - ch / 2, 0, im.height - ch)
     return im.resize((w, h), Image.BILINEAR, box=(x0, y0, x0 + cw, y0 + ch))
 
 
@@ -176,6 +181,11 @@ class Reel:
                 self.style, self.cfg = "pop", STYLES["pop"]
         self.rays = self._rays()
         self.paper = self._paper() if self.cfg.get("paper") else None
+        self.zk = None
+        if self.style == "zukan":
+            os.environ["AUTOPOST_ASSETS"] = assets.root
+            import zukan
+            self.zk = (zukan, *zukan.make_day(plan, self.bt))
 
     # ---- 背景 ----
     def _rays(self):
@@ -296,6 +306,76 @@ class Reel:
         self.footer(img, t)
         return img
 
+    def spotlight(self, t):
+        """1〜2台の作品を、ズームで細部まで見せる"""
+        per = self.cfg["per"]
+        i, dt = self.beat(t)
+        n = max(0, i) // per
+        t0 = self.bt[min(n * per, len(self.bt) - 1)]
+        t1 = self.bt[min((n + 1) * per, len(self.bt) - 1)]
+        img = self.bg(t)
+        self.header(img, t)
+        pid = self.photos[(n // 2) % min(2, len(self.photos))]
+        focus = [(0.5, 0.5), (0.5, 0.32), (0.4, 0.62), (0.62, 0.45)][n % 4]
+        z = 1.0 + 0.45 * ((n % 2) + clamp((t - t0) / max(0.1, t1 - t0)) * 0.6)
+        inner = cover(self.a.photo(pid), 860, 1100, z, *focus)
+        self.card(img, inner, 540, 1000, -2 if n % 2 else 2, 1.0)
+        d = ImageDraw.Draw(img)
+        e = eob(prog(t, t0, t0 + 0.25))
+        if e > 0.02:  # 虫めがね風の丸
+            r = 90 * e
+            cx, cy = 540 + (focus[0] - 0.5) * 500, 1000 + (focus[1] - 0.5) * 700
+            d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=WHITE, width=10)
+            d.line([(cx + r * 0.7, cy + r * 0.7), (cx + r * 1.4, cy + r * 1.4)], fill=WHITE, width=16)
+        ptext(img, self.lines[n % len(self.lines)], 540, 1680, 92, WHITE, band=INK, k=eob(prog(t, t0 + 0.05, t0 + 0.25)))
+        self.footer(img, t)
+        return img
+
+    def ranking(self, t):
+        """推しガチャ ランキング：第3位→第2位→第1位"""
+        img = self.bg(t)
+        self.header(img, t)
+        photos = (self.photos + self.photos)[:3]
+        start = 0.6
+        span = (END_T - start) / 3
+        k = int(clamp((t - start) / span, 0, 2.999)) if t >= start else -1
+        if k < 0:
+            ptext(img, "推しガチャ", 540, 900, 150, GOLD, k=eob(prog(t, 0.05, 0.35)), angle=-4)
+            ptext(img, "ランキング！", 540, 1080, 130, WHITE, band=(200, 40, 60), k=eob(prog(t, 0.2, 0.5)), angle=-4)
+            self.footer(img, t)
+            return img
+        t0 = start + k * span
+        rank = 3 - k
+        e = eob(prog(t, t0 + 0.15, t0 + 0.45))
+        inner = cover(self.a.photo(photos[k]), 800, 1000, 1.03 + 0.04 * (t - t0))
+        self.card(img, inner, 540, 1030, -3 if k % 2 else 3, 0.85 + 0.15 * e)
+        d = ImageDraw.Draw(img)
+        bk = eob(prog(t, t0, t0 + 0.3))
+        if bk > 0.02:
+            col = [(205, 127, 50), (192, 192, 200), (240, 196, 60)][k]
+            r = 120 * bk
+            d.ellipse([200 - r, 560 - r, 200 + r, 560 + r], fill=col, outline=WHITE, width=8)
+            ptext(img, f"{rank}位", 200, 555, int(96 * bk) + 4, WHITE, stroke=INK)
+        if rank == 1 and t > t0 + 0.3:
+            ck = eob(prog(t, t0 + 0.3, t0 + 0.6))
+            if ck > 0.02:
+                cx, cy, s_ = 860, 540, 110 * ck
+                pts = [(cx - s_, cy + s_ * 0.6), (cx - s_, cy - s_ * 0.5), (cx - s_ * 0.5, cy), (cx, cy - s_ * 0.8),
+                       (cx + s_ * 0.5, cy), (cx + s_, cy - s_ * 0.5), (cx + s_, cy + s_ * 0.6)]
+                d.polygon(pts, fill=GOLD, outline=INK, width=6)
+                for px_ in (-0.5, 0, 0.5):
+                    d.ellipse([cx + px_ * s_ - 12, cy + s_ * 0.2 - 12, cx + px_ * s_ + 12, cy + s_ * 0.2 + 12], fill=(220, 50, 60))
+            rng = np.random.default_rng(int(t * 30))
+            for _ in range(40):
+                x, y = rng.integers(0, W), rng.integers(450, 1700)
+                c = POP_COLORS[rng.integers(0, len(POP_COLORS))]
+                d.rectangle([x, y, x + 16, y + 26], fill=c)
+            if t - (t0 + 0.3) < 0.1:
+                img = self.flash(img, 0.5)
+        ptext(img, self.lines[k % len(self.lines)], 540, 1720, 92, INK, band=GOLD, stroke=GOLD, k=eob(prog(t, t0 + 0.3, t0 + 0.55)))
+        self.footer(img, t)
+        return img
+
     def end_card(self, t):
         te = t - END_T
         img = Image.new("RGB", (W, H), (16, 14, 20) if self.dark else CREAM)
@@ -316,9 +396,19 @@ class Reel:
         return img
 
     def frame(self, t):
-        if t >= END_T:
+        if t >= END_T and not self.zk:
             return self.end_card(t)
-        img = self.quiz_scene(t) if self.quiz else self.cuts(t)
+        if self.zk:
+            zk, day, bt, cuts = self.zk
+            return zk.frame(day, t, bt, cuts)
+        if self.quiz:
+            img = self.quiz_scene(t)
+        elif self.style == "ranking":
+            img = self.ranking(t)
+        elif self.style == "spotlight":
+            img = self.spotlight(t)
+        else:
+            img = self.cuts(t)
         if t < 0.12:
             img = self.flash(img, 0.6 * (1 - t / 0.12))
         return img

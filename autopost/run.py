@@ -21,7 +21,15 @@ from datetime import datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 JST = timezone(timedelta(hours=9))
 WEEKDAY_JA = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
-STYLE_ROTATION = ["pop", "kraft", "quiz", "pop", "dark", "sdgs", "story"]
+# 曜日ごとの連載（lib/autopost.ts の AUTOPOST_SERIES と同じ並び。月曜はじまり）
+STYLE_ROTATION = ["kraft", "spotlight", "quiz", "ranking", "zukan", "sdgs", "story"]
+SERIES_NAMES = ["つくりかた ミニ講座", "きょうの いちだい", "ペパポン クイズ", "推しガチャ ランキング", "ペパポン図鑑", "SDGs まめちしき", "ワークショップ アルバム"]
+
+
+def tomorrow_theme(date, catalog):
+    nxt = (datetime.fromisoformat(date) + timedelta(days=1)).date()
+    queued = catalog.get("queue", {}).get(nxt.isoformat())
+    return queued["theme"] if queued else SERIES_NAMES[nxt.weekday()]
 
 
 def log(msg):
@@ -62,15 +70,24 @@ def fallback_plan(date, catalog, history):
     quiz = quizzes[d.toordinal() % len(quizzes)]["id"] if quizzes else None
     if style == "sdgs":
         photos = ["sdgs_capsule", "sdgs_work", "sdgs_recycle", "sdgs_again"]
+    elif style == "kraft":
+        photos = ["make_boards", "make_rubber", "make_done", "ws_hands"]
+    elif style == "story":
+        photos = [p for p in catalog["photos"] if p.startswith("ws_") and p not in used][:4] or photos
+    elif style in ("spotlight", "ranking", "zukan"):
+        works = [p for p in catalog["photos"] if p.startswith("IMG_") and p not in used]
+        off = d.toordinal() % max(1, len(works))
+        photos = (works[off:] + works[:off])[:{"spotlight": 2, "ranking": 3, "zukan": 4}[style]]
     return {
         "style": style if (style != "quiz" or quiz) else "pop",
-        "theme": {"pop": "みんなの ガチャ", "kraft": "てづくり ガチャ", "quiz": "だんボールクイズ", "dark": "作品コレクション",
-                  "sdgs": "ガチャと SDGs", "story": "きょうの いちまい"}[style],
-        "lines": {"sdgs": ["カプセルも てづくり", "はたらく ひとを ささえる", "つかったら しげんごみへ", "また だんボールに！"]}.get(
+        "theme": "みんなの 作品" if style == "zukan" else SERIES_NAMES[d.weekday()],
+        "lines": {"sdgs": ["カプセルも てづくり", "はたらく ひとを ささえる", "つかったら しげんごみへ", "また だんボールに！"],
+                  "kraft": ["3まいの いたから", "ゴムを かけて", "かんせい！", "かざりつけへ"],
+                  "ranking": ["いろが すてき", "かざりが ていねい", "かおが ユニーク"]}.get(
             style, ["ぼくの ガチャ", "わたしの ガチャ", "どれが すき？", "つくってみよう！"]),
         "photos": photos,
         "quizId": quiz if style == "quiz" else None,
-        "tomorrowTeaser": "おたのしみに",
+        "tomorrowTeaser": tomorrow_theme(date, catalog),
         "caption": "きょうの ペパポン📦✨\n\nワークショップで子どもたちがつくった、だんボールのガチャガチャを紹介します。\nかお・いろ・かざりつけ、ひとつとして同じものはありません🎨",
         "commentPrompt": "どの作品がすき？コメントでおしえてね！",
         "hashtags": ["ダンボール工作", "親子工作", "手作りおもちゃ"],
@@ -165,7 +182,8 @@ def main():
         try:
             if dry and not os.environ.get("CRON_SECRET"):
                 raise RuntimeError("dry run without API")
-            res = api("plan", {"date": date, "weekday": weekday, "photos": photos, "ideas": catalog.get("ideas", []), "quizzes": quizzes}, timeout=120)
+            res = api("plan", {"date": date, "weekday": weekday, "photos": photos, "ideas": catalog.get("ideas", []), "quizzes": quizzes,
+                              "tomorrowTheme": tomorrow_theme(date, catalog)}, timeout=120)
             plan, source = res["plan"], "ai"
             history = history or res.get("recent", [])
         except Exception as e:  # noqa: BLE001 - 企画に失敗しても投稿は止めない
