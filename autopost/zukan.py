@@ -145,9 +145,12 @@ def stamp(img, day, t, t0):
     if p <= 0: return
     im = Image.new('RGBA', (250, 250), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     d.ellipse([10, 10, 240, 240], outline=RED + (255,), width=10); d.ellipse([30, 30, 220, 220], outline=RED + (255,), width=4)
-    tt = text_img('No.', KLEE, 44, RED + (255,)); im.alpha_composite(tt, (125 - tt.width // 2, 50))
-    tn = text_img(str(day['no']), SANS, 110, RED + (255,)); im.alpha_composite(tn, (125 - tn.width // 2, 92))
-    rng = np.random.default_rng(day['no'])
+    if day['no'] is None:
+        tn = text_img('観察', KLEE, 84, RED + (255,), stroke=2, stroke_fill=RED + (255,)); im.alpha_composite(tn, (125 - tn.width // 2, 125 - tn.height // 2))
+    else:
+        tt = text_img('No.', KLEE, 44, RED + (255,)); im.alpha_composite(tt, (125 - tt.width // 2, 50))
+        tn = text_img(str(day['no']), SANS, 110, RED + (255,)); im.alpha_composite(tn, (125 - tn.width // 2, 92))
+    rng = np.random.default_rng(day['no'] or 0)
     mask = Image.fromarray((rng.random((250, 250)) > 0.12).astype(np.uint8) * 255).filter(ImageFilter.GaussianBlur(1))
     im.putalpha(Image.fromarray(np.minimum(np.asarray(im.getchannel('A')), np.asarray(mask))))
     paste_c(img, im, 945, 175, k * 0.78, -12, alpha=0.92 * p ** 0.5)
@@ -202,7 +205,7 @@ def body(img, day, t, cuts):
         tim = text_img(s, YOMO, 76, INK + (255,), stroke=2, stroke_fill=INK + (255,)); img.paste(tim.convert('RGB'), (270, int(lab_y - tim.height / 2)), tim.getchannel('A'))
     full = text_img(label, YOMO, 76, INK + (255,), stroke=2, stroke_fill=INK + (255,))
     up = prog(t, t0 + 0.35 + 0.05 * len(label), t0 + 0.6 + 0.05 * len(label))
-    pts = wobble_pts([(280 + i * (full.width - 20) / 12, lab_y + 52 + 4 * math.sin(i)) for i in range(13)], idx + day['no'] * 10, 2)
+    pts = wobble_pts([(280 + i * (full.width - 20) / 12, lab_y + 52 + 4 * math.sin(i)) for i in range(13)], idx + (day['no'] or 0) * 10, 2)
     draw_partial(d, pts, up, RED, 9)
     # arrow from label to photo
     ap = prog(t, t0 + 0.45, t0 + 0.8)
@@ -264,7 +267,7 @@ def frame(day, t, bt, cuts):
 
 def make_day(plan, beats):
     d = Date.fromisoformat(plan["date"])
-    no = max(8, 8 + (d - Date(2026, 11, 20)).days // 7)
+    no = None  # 自動投稿の図鑑ページは通し番号なし（スタンプは「観察」）
     photos = plan.get("photos") or []
     lines = plan.get("lines") or []
     items = [(p, lines[i % len(lines)] if lines else "") for i, p in enumerate(photos[:4])] or [("make_done", "かんせい！")]
