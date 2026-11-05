@@ -99,13 +99,29 @@ ABOUT = ("📦 だんボールガチャ「ペパポン」は、だんボール�
 CTA = "🔖 保存して工作の参考にしてね\n🔔 フォローすると毎日新しい動画が届きます"
 
 
-def build_caption(plan, catalog):
-    style = plan.get("style", "")
-    tags = []
-    for t in list(catalog.get("baseTags", [])) + list(plan.get("hashtags", [])) + list(catalog.get("styleTags", {}).get(style, [])) + list(catalog.get("extraTags", [])):
-        t = str(t).lstrip("#").replace(" ", "").replace("　", "")
-        if t and t not in tags:
+MAX_TAGS = 5  # Instagram はリール1本あたりハッシュタグ5個まで（2025年12月〜）
+
+
+def pick_hashtags(plan, catalog):
+    """固定タグ2つ（#ペパポン #新西ゼミ）＋ その日の内容に合う発見用タグ3つ = 5個"""
+    norm = lambda t: str(t).lstrip("#").replace(" ", "").replace("　", "")
+    fixed = [norm(t) for t in catalog.get("fixedTags", ["ペパポン", "新西ゼミ"])]
+    pools = catalog.get("tagPools", {})
+    pool = [norm(t) for t in pools.get(plan.get("style", ""), [])]
+    allowed = set(pool) | {norm(t) for p in pools.values() for t in p}
+    tags = list(fixed)
+    for t in [norm(t) for t in plan.get("hashtags", [])]:
+        # AIの提案はタグ候補（実在・関連性を確認済み）に入っているものだけ使う。予約投稿は指定どおり。
+        if t and t not in tags and (plan.get("source") == "queue" or t in allowed):
             tags.append(t)
+    for t in pool:
+        if t not in tags:
+            tags.append(t)
+    return tags[:MAX_TAGS]
+
+
+def build_caption(plan, catalog):
+    tags = pick_hashtags(plan, catalog)
     text = plan.get("caption", "").strip()
     if plan.get("commentPrompt"):
         lines = text.rstrip().split("\n")
@@ -114,7 +130,7 @@ def build_caption(plan, catalog):
     parts = [text]
     if plan.get("commentPrompt"):
         parts.append("💬 " + plan["commentPrompt"].strip())
-    parts += [ABOUT, CTA, " ".join("#" + t for t in tags[:25])]
+    parts += [ABOUT, CTA, " ".join("#" + t for t in tags)]
     return "\n\n".join(p for p in parts if p)
 
 
@@ -179,7 +195,7 @@ def main():
         source = "queue"
         video = os.path.join(assets, "queue", queued["file"])
         plan = {"style": queued["style"], "theme": queued["theme"], "photos": [], "caption": queued["caption"],
-                "commentPrompt": queued.get("commentPrompt", ""), "hashtags": queued.get("hashtags", [])}
+                "commentPrompt": queued.get("commentPrompt", ""), "hashtags": queued.get("hashtags", []), "source": "queue"}
         log(f"予約済み動画を使います: {queued['file']}")
     else:
         photos = [{"id": k, "tags": v} for k, v in catalog["photos"].items()]
@@ -188,7 +204,8 @@ def main():
             if dry and not os.environ.get("CRON_SECRET"):
                 raise RuntimeError("dry run without API")
             res = api("plan", {"date": date, "weekday": weekday, "photos": photos, "ideas": catalog.get("ideas", []), "quizzes": quizzes,
-                              "tomorrowTheme": tomorrow_theme(date, catalog)}, timeout=120)
+                              "tomorrowTheme": tomorrow_theme(date, catalog),
+                              "tagPool": catalog.get("tagPools", {}).get(STYLE_ROTATION[datetime.fromisoformat(date).weekday()], [])}, timeout=120)
             plan, source = res["plan"], "ai"
             history = history or res.get("recent", [])
         except Exception as e:  # noqa: BLE001 - 企画に失敗しても投稿は止めない

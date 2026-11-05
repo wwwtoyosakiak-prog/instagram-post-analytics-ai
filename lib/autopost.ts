@@ -159,7 +159,7 @@ const planSchema = {
     tomorrowTeaser: { type: "string", description: "空文字でよい（自動で入る）" },
     caption: { type: "string", description: "キャプション本文（ハッシュタグ・固定の紹介文なし）。1行目は連載名入りの見出し、空行のあと写真の中身に具体的にふれる本文3〜4文。漢字かな交じりの自然な日本語、全体180〜320文字、絵文字3〜6個、1文ごとに改行" },
     commentPrompt: { type: "string", description: "コメントしたくなる問いかけ1文。40文字以内（例: どの作品がすき？番号でおしえてね！）" },
-    hashtags: { type: "array", items: { type: "string" }, description: "#なしのハッシュタグ。動画の内容に合うものを8〜12個（例: ダンボール工作、親子工作、自由研究、手作りおもちゃ、知育、リサイクル）" },
+    hashtags: { type: "array", items: { type: "string" }, description: "#なしのハッシュタグを3つ。「タグ候補」の中から、今日の動画の中身に最も合う順に" },
   },
 } as const;
 
@@ -196,7 +196,7 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
   const hashtags = [...new Set([
     ...REQUIRED_TAGS,
     ...(Array.isArray(value.hashtags) ? value.hashtags : []).map((tag) => clip(tag, 20).replace(/^#/, "").replace(/\s/g, "")).filter(Boolean),
-  ])].slice(0, 14);
+  ])].slice(0, 5);
   return {
     style,
     theme: clip(value.theme, 12) || "だんボールガチャ",
@@ -210,7 +210,7 @@ export function sanitizePlan(raw: unknown, photos: AutopostPhoto[], quizIds: str
   };
 }
 
-export async function planTodaysPost(input: { date: string; weekday: string; photos: AutopostPhoto[]; ideas: string[]; quizzes: AutopostQuiz[]; tomorrowTheme?: string }) {
+export async function planTodaysPost(input: { date: string; weekday: string; photos: AutopostPhoto[]; ideas: string[]; quizzes: AutopostQuiz[]; tomorrowTheme?: string; tagPool?: string[] }) {
   if (!process.env.OPENAI_API_KEY) throw new ApiRequestError("OPENAI_API_KEY が設定されていません。", 503);
   const history = await readAutopostHistory();
   const recent = history.slice(-14);
@@ -235,11 +235,15 @@ ${FACT_SHEET}
 - 直近の投稿と同じ書き出し・同じ話題・同じ写真の組み合わせは避ける。
 - commentPrompt は答えやすい問いかけ（番号・色・一言で答えられる）。本文の最後には問いかけを書かない（commentPrompt と重複するため）。
 - 図鑑やランキングの通し番号（No.○）は書かない。
-- hashtags はその日の動画の中身に直接関係するものだけ（関係ないSDGs・リサイクル系のタグを毎回入れない）。
+- hashtags は「タグ候補」から今日の中身に最も合う3つを選ぶ（Instagramは1投稿5個まで。#ペパポン #新西ゼミ は自動で付く）。
+- Instagramの検索はキャプション本文の言葉も拾うので、本文に「ダンボール工作」「ガチャガチャ」「親子」などの検索されやすい言葉を自然に1〜2個入れる。
 
 ## キャプションの手本（雰囲気の参考。そのまま真似しない）
 ${EXAMPLE_CAPTION}
 ${performance ? `\n## これまでの反応\n${performance}\n` : ""}
+## タグ候補
+${(input.tagPool ?? []).join(" / ") || "ダンボール工作 / 親子工作 / 手作りおもちゃ"}
+
 ## クイズ一覧（style=quiz のときだけ。内容は変えない）
 ${input.quizzes.length ? input.quizzes.map((quiz) => `- ${quiz.id}: ${quiz.q}`).join("\n") : "- なし"}
 
